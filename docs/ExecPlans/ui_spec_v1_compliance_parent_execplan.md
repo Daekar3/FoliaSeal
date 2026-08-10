@@ -62,7 +62,7 @@ Foundation tranche:
   signing-rail divider and independent scroll-region evidence are implemented and validated in the
   offscreen integration node; final parent acceptance remains with the display-backed/release
   gates.
-- [ ] docs/ExecPlans/ui_library_geometry_persistence_execplan.md — remembered Signature Library
+- [x] docs/ExecPlans/ui_library_geometry_persistence_execplan.md — remembered Signature Library
   dialog geometry and three-column splitter widths; this is the active follow-up to the completed
   Library topology and typed UI-settings children.
 - [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
@@ -248,8 +248,9 @@ Release tranche:
   scrollable regions, and remembered divider remain open in this child and their owning children.
 - [x] (2026-08-09) Loop 7 completed the bounded main-window geometry/restart slice: validated
   `MainWindowGeometry` survives settings round-trip, restores before display, captures after the
-  event loop (including controlled cleanup), and preserves unknown UI keys. Rail-divider, Library,
-  full monitor/DPI, and toolbar persistence remain open in the window child.
+  event loop (including controlled cleanup), and preserves unknown UI keys. Rail-divider and
+  Signature Library layout now have dedicated completed children; full monitor/DPI and toolbar
+  persistence remain open in the responsive/release gates.
 - [x] (2026-08-09) Loop 8 completed the bounded Settings command-model increment: the five existing
   Settings callbacks now use the shared typed registry with unique mnemonics, stable IDs/object
   names, Qt descriptions, and callback-routing tests. Edit, Signing, Help, and remaining View
@@ -269,7 +270,11 @@ Release tranche:
   `QSplitter`, the public workspace-view lifecycle captures the live width, and the real offscreen
   integration test proves movement, `AppSettingsStore` save/reload, unknown-key preservation,
   rebuild restoration, and independent viewer/properties scroll areas. Display-backed and remaining
-  Library/monitor/DPI/toolbar release gates remain open.
+  monitor/DPI/toolbar release gates remain open.
+- [x] (2026-08-10) Completed the remembered Signature Library layout child: typed 1000x650-safe
+  geometry and three-column splitter settings preserve unknown UI keys; the modeless dialog restores
+  its rectangle and columns before/after show, exposes a vertical detail scroll area, and the real
+  offscreen frame test proves atomic store save/reload without automatic Library startup.
 - [x] (2026-08-10) Completed the supported Signing command increment: Signature Library is available
   from a no-document frame, while Sign and save is routed through public session readiness and
   transaction state; readiness/status changes keep the action truthful. Placement commands were
@@ -287,7 +292,8 @@ Release tranche:
 - [x] (2026-08-10) Completed the bounded Signature Library topology slice: the AppFrame now owns one
   modeless Presets-first three-column surface with searchable typed rows, injected certificate
   projections, and an isolated Save/Cancel name draft. Nested editors, certificate mutations,
-  Duplicate/Pin, dirty prompts, and Library-specific preferences remain open in their owning plans.
+  Duplicate/Pin, dirty prompts, and remaining Library mutation/detail flows remain open in their
+  owning plans; geometry, columns, and catalog/sort persistence are now complete.
 - [x] (2026-08-10) Implemented the catalog search/sort/pinning foundation: persistent pins now cover
   reusable and certificate records, duplicate objects reset pin state, names are case-insensitively
   unique, pinned rows sort first, and Library catalog/sort preferences persist. Certificate validity
@@ -582,7 +588,7 @@ Release tranche:
   atomic store without a schema-version bump, but the full UI_SPEC responsive contract is broader
   than one rectangle and maximized flag.
   Evidence: Loop 7 explorer review, `MainWindowGeometry`, and the window child ExecPlan's explicit
-  rail/Library/monitor/DPI/toolbar deferrals.
+  rail/Library-layout/monitor/DPI/toolbar ownership split.
 - Observation: safe document replacement requires composing and validating the candidate before
   discarding the active dirty draft.
   Evidence: `SigningWorkspaceLifecycle.prepare()` / `replace_prepared()` and the lifecycle-focused
@@ -648,17 +654,18 @@ than full SPEC/UI_SPEC compliance. Proven slices include no-document launch, typ
 commands, single-instance open routing, app-frame appearance/minimum sizing, View Previous/Next
 Page navigation, a fixed signing rail with a read-only status region and typed recommended action,
 main-window geometry/maximized persistence, and typed Settings command metadata/callback routing.
-Focused and full validation remained green through the final loop (`1185 passed, 20 skipped,
-1 warning`), with bounded CLI audits cleaning up their isolated roots and recording the environment's
-`SingleInstanceUnavailable` local-endpoint limitation.
+Focused and full validation remained green through the final loop (`1492 passed, 20 skipped,
+1 warning`); Ruff and `pip check` were clean, and bounded Qt/CLI audits cleaned up their isolated
+roots and processes while recording the environment's `SingleInstanceUnavailable` local-endpoint
+limitation.
 
 The parent is not complete. Several child checkboxes remain open because the remaining requirements
-include full document lifecycle/recovery, nested Library transactions and editors, certificate flows,
-pointer/keyboard placement, preview fidelity, atomic sign/write/verification/recovery, complete
-Edit/View/Signing/Help command surfaces, Library/monitor/DPI/toolbar persistence, accessibility
-and packaged-release acceptance. The remembered rail divider is now complete; the bounded slices
-deliberately recorded the remaining gaps instead of
-claiming compliance from narrow tests.
+include full document lifecycle/recovery, remaining nested Library transactions and editors,
+certificate flows, pointer/keyboard placement, preview fidelity, atomic sign/write/verification/
+recovery, complete Edit/View/Signing/Help command surfaces, remaining Library editor/mutation flows,
+monitor/DPI/toolbar persistence, accessibility and packaged-release acceptance. The remembered rail
+divider and Library layout are now complete; the bounded slices deliberately recorded the remaining
+gaps instead of claiming compliance from narrow tests.
 
 ## Context and Orientation
 

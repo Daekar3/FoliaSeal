@@ -9,6 +9,7 @@ from foliaseal.infra.config.app_settings_storage import (
 )
 from foliaseal.infra.config.app_settings_ui import (
     AppUiSettings,
+    LibraryGeometry,
     LibrarySortOrder,
     MainWindowGeometry,
 )
@@ -125,6 +126,30 @@ def test_app_settings_store_round_trips_library_catalog_and_sort(tmp_path: Path)
     loaded = store.load_settings()
     assert loaded.ui_settings.library_last_catalog == "placements"
     assert loaded.ui_settings.library_sort is LibrarySortOrder.NAME_DESCENDING
+
+
+def test_app_settings_store_round_trips_library_layout_and_unknown_ui_key(
+    tmp_path: Path,
+) -> None:
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    geometry = LibraryGeometry(x=40, y=50, width=1100, height=700, maximized=False)
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "out"),
+        default_open_directory=str(tmp_path / "in"),
+        linux_packaging_channel="primary",
+        ui=AppUiSettings(
+            library_geometry=geometry,
+            library_splitter_sizes=(180, 300, 560),
+        ).to_mapping({"future_preference": "keep"}),
+    )
+
+    store.save_settings(settings)
+
+    loaded = store.load_settings()
+    assert loaded.ui_settings.library_geometry == geometry
+    assert loaded.ui_settings.library_splitter_sizes == (180, 300, 560)
+    assert loaded.ui["future_preference"] == "keep"
 
 
 def test_app_settings_store_removes_temp_file_when_replace_fails(

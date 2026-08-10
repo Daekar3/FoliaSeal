@@ -13,11 +13,17 @@ from foliaseal.application.reusable_signing_models import (
 from foliaseal.domain.errors import ConfigValidationError
 from foliaseal.domain.models import SignatureStampPosition, TimestampTrustPolicy
 from foliaseal.infra.config.app_settings_ui import (
+    DEFAULT_LIBRARY_SPLITTER_SIZES,
     DEFAULT_RAIL_WIDTH,
+    MAX_LIBRARY_COLUMN_WIDTH,
     MAX_RAIL_WIDTH,
+    MIN_LIBRARY_COLUMN_WIDTH,
+    MIN_LIBRARY_HEIGHT,
+    MIN_LIBRARY_WIDTH,
     MIN_RAIL_WIDTH,
     AppearanceMode,
     AppUiSettings,
+    LibraryGeometry,
     MainWindowGeometry,
 )
 from foliaseal.infra.config.certificate_codecs import (
@@ -212,6 +218,80 @@ def test_main_window_geometry_rejects_malformed_or_undersized_payloads() -> None
     assert MainWindowGeometry.from_mapping(
         {"x": 0, "y": 0, "width": 1100, "height": 700, "maximized": "yes"}
     ) is None
+
+
+def test_library_geometry_rejects_malformed_or_undersized_payloads() -> None:
+    assert LibraryGeometry.from_mapping({"x": 1}) is None
+    assert LibraryGeometry.from_mapping(
+        {"x": 0, "y": 0, "width": MIN_LIBRARY_WIDTH - 1, "height": MIN_LIBRARY_HEIGHT}
+    ) is None
+    assert LibraryGeometry.from_mapping(
+        {"x": 0, "y": 0, "width": MIN_LIBRARY_WIDTH, "height": MIN_LIBRARY_HEIGHT, "maximized": 1}
+    ) is None
+
+
+def test_app_ui_settings_normalizes_library_splitter_sizes() -> None:
+    assert (
+        AppSettings.default().ui_settings.library_splitter_sizes
+        == DEFAULT_LIBRARY_SPLITTER_SIZES
+    )
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={
+            "library_splitter_sizes": [
+                MIN_LIBRARY_COLUMN_WIDTH - 1,
+                MAX_LIBRARY_COLUMN_WIDTH + 1,
+                True,
+            ]
+        },
+    )
+    assert settings.ui_settings.library_splitter_sizes == DEFAULT_LIBRARY_SPLITTER_SIZES
+
+    clamped = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={
+            "library_splitter_sizes": [
+                MIN_LIBRARY_COLUMN_WIDTH - 1,
+                400,
+                MAX_LIBRARY_COLUMN_WIDTH + 1,
+            ]
+        },
+    )
+    assert clamped.ui_settings.library_splitter_sizes == (
+        MIN_LIBRARY_COLUMN_WIDTH,
+        400,
+        MAX_LIBRARY_COLUMN_WIDTH,
+    )
+
+
+def test_app_ui_settings_round_trips_library_layout_and_unknown_keys() -> None:
+    geometry = LibraryGeometry(x=12, y=34, width=1040, height=680, maximized=True)
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/home/user/out",
+        default_open_directory="/home/user/in",
+        linux_packaging_channel="primary",
+        ui={"appearance_mode": "dark", "future_preference": 7},
+    )
+
+    merged = AppUiSettings(
+        appearance_mode=settings.ui_settings.appearance_mode,
+        library_geometry=geometry,
+        library_splitter_sizes=(180, 260, 520),
+    ).to_mapping(settings.ui)
+
+    assert merged == {
+        "appearance_mode": "dark",
+        "future_preference": 7,
+        "library_geometry": geometry.to_mapping(),
+        "library_splitter_sizes": [180, 260, 520],
+    }
 
 
 def test_app_settings_round_trip_preserves_ui_mapping() -> None:

@@ -137,6 +137,8 @@ class SigningWorkspaceComposition:
         ui_settings = AppUiSettings(
             appearance_mode=current.appearance_mode,
             main_window_geometry=current.main_window_geometry,
+            library_geometry=current.library_geometry,
+            library_splitter_sizes=current.library_splitter_sizes,
             library_last_catalog=current.library_last_catalog,
             library_sort=current.library_sort,
             rail_width=normalize_rail_width(values[1]),

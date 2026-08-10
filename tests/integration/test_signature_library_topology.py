@@ -10,7 +10,7 @@ def test_library_is_modeless_three_column_and_document_independent(tmp_path: Pat
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
-    from PySide6.QtWidgets import QApplication, QLineEdit, QListWidget, QSplitter
+    from PySide6.QtWidgets import QApplication, QLineEdit, QListWidget, QScrollArea, QSplitter
 
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
     from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -43,11 +43,88 @@ def test_library_is_modeless_three_column_and_document_independent(tmp_path: Pat
     assert isinstance(library.controls.object_selector, QListWidget)
     assert isinstance(library.controls.search_input, QLineEdit)
     assert len(library.controls.dialog.findChildren(QSplitter)) == 1
+    assert isinstance(library.controls.detail_scroll_area, QScrollArea)
+    assert library.controls.detail_scroll_area.widget() is library.controls.detail_view
 
     library.controls.dialog.close()
     frame.window.close()
     app.processEvents()
 
+
+def test_library_geometry_and_columns_persist_through_frame_store_reload(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication, QSplitter
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-persistence"])
+    store = AppSettingsStore(storage_dir=tmp_path / "config")
+    common = {
+        "app_settings_store": store,
+        "certificate_catalog_store": CertificateCatalogStore(
+            storage_dir=tmp_path / "certificates"
+        ),
+        "preset_catalog_store": SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    }
+    initial = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "home"),
+        default_open_directory=str(tmp_path / "home"),
+        linux_packaging_channel="primary",
+        ui={"future_preference": "keep"},
+    )
+    first_frame = QtAppFrameAdapter().create_frame(app_settings=initial, **common)
+    first_library = first_frame.show_reusable_object_library()
+    app.processEvents()
+    try:
+        first_library.controls.dialog.setGeometry(48, 64, 1120, 700)
+        splitter = first_library.controls.splitter
+        assert isinstance(splitter, QSplitter)
+        splitter.setSizes([180, 300, 560])
+        show_maximized = getattr(first_library.controls.dialog, "showMaximized", None)
+        assert callable(show_maximized)
+        show_maximized()
+        app.processEvents()
+
+        captured = first_frame.capture_window_geometry()
+        first_frame.persist_captured_window_geometry()
+        expected_geometry = captured.ui_settings.library_geometry
+        expected_sizes = captured.ui_settings.library_splitter_sizes
+        assert expected_geometry is not None
+        assert expected_geometry.maximized is True
+        assert expected_sizes == tuple(splitter.sizes())
+    finally:
+        first_library.controls.dialog.close()
+        first_frame.window.close()
+        app.processEvents()
+
+    loaded = store.load_settings()
+    assert loaded.ui["future_preference"] == "keep"
+    assert loaded.ui_settings.library_geometry == expected_geometry
+    assert loaded.ui_settings.library_splitter_sizes == expected_sizes
+
+    second_frame = QtAppFrameAdapter().create_frame(app_settings=loaded, **common)
+    assert second_frame._reusable_object_library is None  # noqa: SLF001
+    second_library = second_frame.show_reusable_object_library()
+    app.processEvents()
+    try:
+        assert second_library.controls.dialog.isVisible() is True
+        assert second_library.controls.dialog.isMaximized() is True
+        restored = second_library.capture_ui_settings(loaded)
+        assert restored.ui_settings.library_geometry == expected_geometry
+        restored_splitter = second_library.controls.splitter
+        assert isinstance(restored_splitter, QSplitter)
+        assert tuple(restored_splitter.sizes()) == expected_sizes
+    finally:
+        second_library.controls.dialog.close()
+        second_frame.window.close()
+        app.processEvents()
 
 def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")

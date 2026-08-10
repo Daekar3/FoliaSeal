@@ -25,7 +25,15 @@ from foliaseal.application.signature_library_session import (
     SignatureLibraryRow,
     SignatureLibrarySession,
 )
-from foliaseal.infra.config.schemas import ConfigValidationError
+from foliaseal.infra.config.app_settings_ui import (
+    DEFAULT_LIBRARY_SPLITTER_SIZES,
+    MIN_LIBRARY_HEIGHT,
+    MIN_LIBRARY_WIDTH,
+    AppUiSettings,
+    LibraryGeometry,
+    normalize_library_splitter_sizes,
+)
+from foliaseal.infra.config.schemas import AppSettings, ConfigValidationError
 from foliaseal.presentation.qt.appearance_profile_editor_widget import (
     AppearanceProfileEditorWidget,
 )
@@ -62,6 +70,16 @@ def _set_text(widget: Any, value: str) -> None:
         widget.text = value
 
 
+def _qt_rect_value(rectangle: Any, name: str) -> int | None:
+    """Read a QRect-like integer property from real or fake Qt objects."""
+
+    value = getattr(rectangle, name, None)
+    if not callable(value):
+        return None
+    result = value()
+    return result if type(result) is int else None
+
+
 @dataclass(frozen=True)
 class ReusableObjectLibraryControls:
     """Widgets exposed by the reusable-signing-object library dialog."""
@@ -87,6 +105,8 @@ class ReusableObjectLibraryControls:
     save_button: Any
     cancel_button: Any
     close_button: Any
+    splitter: Any | None = None
+    detail_scroll_area: Any | None = None
     appearance_editor: AppearanceProfileEditorWidget | None = None
     preset_editor: SignaturePresetEditorWidget | None = None
 
@@ -110,6 +130,8 @@ class ReusableObjectLibraryDialog:
         certificate_catalog_provider: Callable[[], Any] | None = None,
         initial_catalog: str = "presets",
         library_sort: str = LibrarySort.NAME_ASCENDING.value,
+        library_geometry: LibraryGeometry | None = None,
+        library_splitter_sizes: tuple[int, int, int] = DEFAULT_LIBRARY_SPLITTER_SIZES,
         on_preferences_changed: Callable[[str, str], None] | None = None,
         on_reusable_objects_changed: Callable[[], None] | None = None,
         on_toggle_certificate_pin: Callable[[CertificateLibraryRef, bool], bool] | None = None,
@@ -156,14 +178,25 @@ class ReusableObjectLibraryDialog:
         self._resolving_appearance_editor = False
         self._rendering_master_list = False
         self._rendering_catalog_navigation = False
+        self._library_geometry = library_geometry
+        self._library_splitter_sizes = normalize_library_splitter_sizes(library_splitter_sizes)
+        self._restore_maximized = bool(library_geometry.maximized) if library_geometry else False
         self.controls = self._build_controls(parent)
+        self._restore_layout()
         self.refresh()
 
     def show(self) -> Any:
         """Show the modeless Library window without blocking the main frame."""
+        self._apply_splitter_sizes()
         show = getattr(self.controls.dialog, "show", None)
         if callable(show):
             show()
+        self._apply_splitter_sizes()
+        if self._restore_maximized:
+            show_maximized = getattr(self.controls.dialog, "showMaximized", None)
+            if callable(show_maximized):
+                show_maximized()
+            self._apply_splitter_sizes()
         raise_window = getattr(self.controls.dialog, "raise_", None)
         if callable(raise_window):
             raise_window()
@@ -171,6 +204,69 @@ class ReusableObjectLibraryDialog:
         if callable(activate):
             activate()
         return self
+
+    def capture_ui_settings(self, settings: AppSettings) -> AppSettings:
+        """Project this dialog's public layout state into application settings."""
+
+        geometry = self._capture_geometry()
+        splitter = self._capture_splitter_sizes()
+        current = settings.ui_settings
+        ui_settings = AppUiSettings(
+            appearance_mode=current.appearance_mode,
+            main_window_geometry=current.main_window_geometry,
+            library_geometry=geometry or current.library_geometry,
+            library_splitter_sizes=splitter,
+            library_last_catalog=current.library_last_catalog,
+            library_sort=current.library_sort,
+            rail_width=current.rail_width,
+        )
+        return AppSettings(
+            schema_version=settings.schema_version,
+            default_output_directory=settings.default_output_directory,
+            default_open_directory=settings.default_open_directory,
+            linux_packaging_channel=settings.linux_packaging_channel,
+            ui=ui_settings.to_mapping(settings.ui),
+        )
+
+    def _capture_geometry(self) -> LibraryGeometry | None:
+        geometry_getter = getattr(self.controls.dialog, "geometry", None)
+        if not callable(geometry_getter):
+            return None
+        rectangle = geometry_getter()
+        values = {name: _qt_rect_value(rectangle, name) for name in ("x", "y", "width", "height")}
+        if any(value is None for value in values.values()):
+            return None
+        try:
+            return LibraryGeometry(
+                x=values["x"],
+                y=values["y"],
+                width=max(values["width"], LibraryGeometry.MIN_WIDTH),
+                height=max(values["height"], LibraryGeometry.MIN_HEIGHT),
+                maximized=bool(getattr(self.controls.dialog, "isMaximized", lambda: False)()),
+            )
+        except (TypeError, ValueError):
+            return None
+
+    def _capture_splitter_sizes(self) -> tuple[int, int, int]:
+        splitter = self.controls.splitter
+        sizes = getattr(splitter, "sizes", None)
+        if not callable(sizes):
+            return self._library_splitter_sizes
+        return normalize_library_splitter_sizes(sizes())
+
+    def _restore_layout(self) -> None:
+        geometry = self._library_geometry
+        if geometry is not None:
+            set_geometry = getattr(self.controls.dialog, "setGeometry", None)
+            if callable(set_geometry):
+                set_geometry(geometry.x, geometry.y, geometry.width, geometry.height)
+        self._apply_splitter_sizes()
+
+    def _apply_splitter_sizes(self) -> None:
+        splitter = self.controls.splitter
+        set_sizes = getattr(splitter, "setSizes", None)
+        if callable(set_sizes):
+            set_sizes(list(self._library_splitter_sizes))
 
     def refresh(self) -> None:
         if self._certificate_catalog_provider is not None:
@@ -333,6 +429,9 @@ class ReusableObjectLibraryDialog:
         set_title = getattr(dialog, "setWindowTitle", None)
         if callable(set_title):
             set_title("Manage reusable signing objects")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(MIN_LIBRARY_WIDTH, MIN_LIBRARY_HEIGHT)
         layout = self._bindings.q_hbox_layout(dialog)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
@@ -419,7 +518,19 @@ class ReusableObjectLibraryDialog:
             add_stretch()
         detail_view_layout.addWidget(_compose_row(self._bindings, save, cancel))
         detail_view_layout.addWidget(close)
-        detail_layout.addWidget(detail_view)
+        detail_scroll_area = None
+        scroll_factory = getattr(self._bindings, "q_scroll_area", None)
+        if scroll_factory is not None:
+            detail_scroll_area = scroll_factory()
+            set_widget_resizable = getattr(detail_scroll_area, "setWidgetResizable", None)
+            if callable(set_widget_resizable):
+                set_widget_resizable(True)
+            set_widget = getattr(detail_scroll_area, "setWidget", None)
+            if callable(set_widget):
+                set_widget(detail_view)
+            detail_layout.addWidget(detail_scroll_area)
+        else:
+            detail_layout.addWidget(detail_view)
 
         appearance_editor_host = self._bindings.q_widget()
         appearance_editor_host_layout = self._bindings.q_vbox_layout(appearance_editor_host)
@@ -430,6 +541,7 @@ class ReusableObjectLibraryDialog:
             set_visible(False)
         self._appearance_editor_host_layout = appearance_editor_host_layout
 
+        splitter = None
         splitter_cls = getattr(self._bindings, "q_splitter", None)
         if splitter_cls is not None:
             splitter = splitter_cls()
@@ -499,6 +611,8 @@ class ReusableObjectLibraryDialog:
             save_button=save,
             cancel_button=cancel,
             close_button=close,
+            splitter=splitter,
+            detail_scroll_area=detail_scroll_area,
         )
 
     def _edit_selected_placement(self) -> bool:

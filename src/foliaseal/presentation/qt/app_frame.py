@@ -1379,6 +1379,8 @@ class FoliaSealAppFrame:
                 initial_catalog or self._app_settings.ui_settings.library_last_catalog
             ),
             library_sort=self._app_settings.ui_settings.library_sort.value,
+            library_geometry=self._app_settings.ui_settings.library_geometry,
+            library_splitter_sizes=self._app_settings.ui_settings.library_splitter_sizes,
             on_preferences_changed=self._persist_library_preferences,
             on_reusable_objects_changed=self._refresh_shell_signature_profiles,
             on_toggle_certificate_pin=self._toggle_certificate_pin,
@@ -1412,6 +1414,8 @@ class FoliaSealAppFrame:
         updated_ui = AppUiSettings(
             appearance_mode=ui.appearance_mode,
             main_window_geometry=ui.main_window_geometry,
+            library_geometry=ui.library_geometry,
+            library_splitter_sizes=ui.library_splitter_sizes,
             library_last_catalog=catalog.strip().lower() or "presets",
             library_sort=ui.library_sort.__class__.from_value(sort),
             rail_width=ui.rail_width,
@@ -2472,12 +2476,24 @@ class FoliaSealAppFrame:
     def capture_window_geometry(self) -> AppSettings:
         """Capture the current main-window rectangle into the in-memory settings."""
 
+        def capture_library_ui(settings: AppSettings) -> AppSettings:
+            library = self._reusable_object_library
+            capture = getattr(library, "capture_ui_settings", None)
+            if not callable(capture):
+                return settings
+            captured = capture(settings)
+            return captured if isinstance(captured, AppSettings) else settings
+
         def capture_workspace_ui(view: Any) -> AppSettings:
             capture = getattr(view, "capture_ui_settings", None)
             if not callable(capture):
                 return self._app_settings
             captured = capture(self._app_settings)
             return captured if isinstance(captured, AppSettings) else self._app_settings
+
+        captured_library = capture_library_ui(self._app_settings)
+        if isinstance(captured_library, AppSettings):
+            self._app_settings = captured_library
 
         captured_workspace = self._with_current_workspace_view(capture_workspace_ui)
         if isinstance(captured_workspace, AppSettings):
@@ -2503,6 +2519,8 @@ class FoliaSealAppFrame:
         ui_settings = AppUiSettings(
             appearance_mode=self._app_settings.ui_settings.appearance_mode,
             main_window_geometry=geometry,
+            library_geometry=self._app_settings.ui_settings.library_geometry,
+            library_splitter_sizes=self._app_settings.ui_settings.library_splitter_sizes,
             library_last_catalog=self._app_settings.ui_settings.library_last_catalog,
             library_sort=self._app_settings.ui_settings.library_sort,
             rail_width=self._app_settings.ui_settings.rail_width,

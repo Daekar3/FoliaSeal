@@ -24,14 +24,14 @@ the visible geometry and column widths.
 
 ## Progress
 
-- [ ] (2026-08-10) Add typed, malformed-safe Library geometry and three-column splitter settings
+- [x] (2026-08-10) Add typed, malformed-safe Library geometry and three-column splitter settings
   that preserve unknown UI keys.
-- [ ] (2026-08-10) Expose a narrow dialog layout capture/restore seam and apply saved layout before
+- [x] (2026-08-10) Expose a narrow dialog layout capture/restore seam and apply saved layout before
   the modeless Library is shown.
-- [ ] (2026-08-10) Capture Library layout through `FoliaSealAppFrame` settings persistence without
+- [x] (2026-08-10) Capture Library layout through `FoliaSealAppFrame` settings persistence without
   reopening the Library automatically.
-- [ ] (2026-08-10) Add unit, offscreen topology, and frame persistence evidence; reconcile docs,
-  run full validation, clean temporary roots/processes, and commit.
+- [x] (2026-08-10) Add unit, offscreen topology, and frame persistence evidence; reconcile docs,
+  run full validation, and clean temporary roots/processes.
 
 ## Surprises & Discoveries
 
@@ -44,10 +44,17 @@ the visible geometry and column widths.
   store or reopening the Library at startup.
   Evidence: `FoliaSealAppFrame.show_reusable_object_library()` and
   `self._reusable_object_library` lifecycle in `app_frame.py`.
+- Observation: three current `AppUiSettings(...)` reconstruction sites can drop newly added fields:
+  `signing_workspace_composition.py`, `_persist_library_preferences()` in `app_frame.py`, and
+  `capture_window_geometry()` in `app_frame.py`.
+  Evidence: fresh source audit on 2026-08-10.
+- Observation: the offscreen no-auto-open assertion inspects the AppFrame's retained dialog handle
+  as a test-only lifecycle seam; production layout capture remains on the dialog's public method.
+  Evidence: `tests/integration/test_signature_library_topology.py` and the AppFrame ownership model.
 
 ## Decision Log
 
-- Decision: persist `LibraryGeometry` separately from `MainWindowGeometry`, with a 900x600 minimum
+- Decision: persist `LibraryGeometry` separately from `MainWindowGeometry`, with a 1000x650 minimum
   and a nullable value so a fresh installation does not open the Library automatically.
   Rationale: UI_SPEC requires remembered Library geometry but explicitly forbids reopening dialogs
   automatically; the Library has a smaller independent window contract.
@@ -63,12 +70,19 @@ the visible geometry and column widths.
   widgets, and settings capture must never cause a hidden dialog to be shown.
   Rationale: the dialog owns Qt layout state while the frame owns atomic persistence.
   Date/Author: 2026-08-10 / Codex
+- Decision: resize the dialog from the saved rectangle before applying splitter sizes, then apply
+  sizes immediately before `show()` and assert post-show values in the real offscreen test.
+  Rationale: Qt layout negotiation can overwrite splitter sizes when a dialog has not yet received
+  its meaningful size; the visible result is the governing behavior.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-This section will be completed after implementation and validation. The intended outcome is
-remembered Library geometry and column widths with no change to catalog/sort semantics, nested
-editor behavior, or automatic startup behavior.
+The typed settings projection now validates a 1000x650 minimum Library rectangle, normalizes three
+JSON-safe splitter widths, and preserves unknown UI keys. The modeless dialog owns a public
+capture/restore seam, including a vertical detail scroll area; the AppFrame captures the retained
+instance without showing it during shutdown, and `AppSettingsStore` save/reload evidence proves a
+new frame restores the visible geometry and all three columns without automatic startup.
 
 ## Context and Orientation
 
@@ -95,26 +109,32 @@ forbidden in the commit.
 
 ## Plan of Work
 
-Add `LibraryGeometry` with JSON-safe x/y/width/height/maximized fields and a 900x600 minimum. Add
+Add `LibraryGeometry` with JSON-safe x/y/width/height/maximized fields and a 1000x650 minimum. Add
 `library_geometry: LibraryGeometry | None` and `library_splitter_sizes: tuple[int, int, int]` to
 `AppUiSettings`; malformed values fall back to no geometry and default positive column sizes, while
-valid values clamp safely and serialize only when non-default or already present. Update every
-existing `AppUiSettings(...)` reconstruction in `app_frame.py` so these fields cannot be lost when
-appearance, Library preferences, rail width, or main-window geometry changes.
+valid values clamp safely and serialize only when non-default or already present. Require exactly
+three integer splitter values, normalize zeros/extremes to safe positive bounds, and preserve
+unknown UI keys. Update every existing `AppUiSettings(...)` reconstruction in both `app_frame.py`
+and `signing_workspace_composition.py` so these fields cannot be lost when appearance, Library
+preferences, rail width, or main-window geometry changes; add regression assertions for each path.
 
 Extend `ReusableObjectLibraryControls` with its splitter. The dialog constructor receives the typed
-initial geometry and sizes, applies them before `show()`, and exposes `capture_ui_settings(settings)`
-that reads the dialog rectangle and splitter sizes through public Qt methods. The capture method
-returns a new `AppSettings` projection and leaves hidden/closed state untouched. The AppFrame passes
-saved values when creating the dialog and calls the dialog capture method before its existing
-window-geometry capture; its atomic save path then persists both. Reusing the hidden dialog must
-restore the latest captured state without changing catalog/sort behavior.
+initial geometry and sizes, resizes from the saved rectangle before layout restore, applies splitter
+sizes immediately before `show()`, and exposes `capture_ui_settings(settings)` that reads the dialog
+rectangle and splitter sizes through public Qt methods. The capture method returns a new `AppSettings`
+projection and leaves hidden/closed state untouched. The AppFrame passes saved values when creating
+the dialog and calls a retained-instance capture helper from `capture_window_geometry()`; it must
+never create or show the Library during shutdown. Its atomic save path then persists both. Reusing
+the hidden dialog must restore the latest captured state without changing catalog/sort behavior.
 
 Add unit tests for absent, malformed, undersized, oversized, round-tripped, and unknown-key-safe
-Library settings. Extend `tests/integration/test_signature_library_topology.py` with a real
-offscreen test that moves the dialog and splitter, invokes AppFrame capture/save, reloads the store,
-and opens a new frame to prove geometry and all three sizes return before the dialog is shown.
-Preserve the existing modeless and nested-editor tests and close every dialog in `finally` blocks.
+Library settings, plus assertions that all three `AppUiSettings` reconstruction paths preserve the
+new fields. Extend `tests/integration/test_signature_library_topology.py` with a real offscreen test
+that moves the dialog and splitter, invokes the production AppFrame capture and
+`AppSettingsStore.save_settings()`, reloads settings into a new frame, asserts the Library stays
+hidden until explicitly opened, then opens it and proves geometry and all three sizes return after
+event-loop layout. Preserve the existing modeless and nested-editor tests, assert the detail column
+still provides its vertical scroll surface, and close every dialog in `finally` blocks.
 
 ## Milestones
 
@@ -149,10 +169,21 @@ and diff checks must pass.
 
 ## Evidence Record
 
-Record the exact UI_SPEC section 12 requirement and SUR03 topology, focused test node/results,
-initial/moved/restored geometry, all three serialized splitter sizes, unknown-key preservation,
-modeless visibility timing, cleanup/process result, and the topology artifact
-`docs/ui/signature-library-presets-exploratory.svg`.
+UI_SPEC §12 requires a 1000x650 minimum and persistence of Library geometry/column widths; SUR03
+requires a modeless three-column master-detail surface whose detail column absorbs resizing and
+scrolls vertically. The focused command
+`QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/unit/test_config_schemas.py
+tests/unit/test_app_settings_storage.py tests/unit/test_qt_app_frame.py
+tests/integration/test_signature_library_topology.py tests/unit/test_qt_signing_workspace_composition.py`
+passed with 120 tests. The real integration node moves a 1120x700 dialog, persists the observed
+geometry and three serialized splitter sizes through `AppSettingsStore`, preserves an unknown UI
+key, verifies the new frame stays closed until explicitly opened, then asserts post-show restoration
+and the `QScrollArea` detail surface. The full suite passed with `1492 passed, 20 skipped, 1
+warning`; Ruff, `pip check`, and `git diff --check` are clean. After both focused and full Qt runs,
+no Python/PySide6/pytest processes remained and all explicit `/tmp/foliaseal-*` roots were removed.
+The integration test's `second_frame._reusable_object_library is None  # noqa: SLF001` assertion is
+a test-only lifecycle seam proving startup does not instantiate the modeless Library; production
+capture and restore use the dialog's public `capture_ui_settings()` boundary.
 
 ## Idempotence and Recovery
 
@@ -176,4 +207,5 @@ startup policy; the Library dialog remains the owner of Qt geometry/splitter sta
 
 Revision note: 2026-08-10 / Codex
 Created after explorer audit identified the remaining UI_SPEC Signature Library geometry/column
-persistence gap.
+persistence gap. Updated after implementation, focused/full validation, compliance review, and
+cleanup on 2026-08-10.

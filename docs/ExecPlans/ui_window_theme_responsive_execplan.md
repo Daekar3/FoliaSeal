@@ -11,8 +11,9 @@ After this bounded follow-up, a user can close and relaunch FoliaSeal and recove
 last valid position, size, and maximized state without reopening a document or dialog. This slice
 implements only the main-frame geometry portion of UI_SPEC section 12 and acceptance scenario 9.
 Rail-divider persistence is now implemented by the dedicated
-`ui_rail_divider_persistence_execplan.md` child; Library, DPI/monitor, and toolbar persistence
-remain explicit follow-up work. The
+`ui_rail_divider_persistence_execplan.md` child; Library layout is implemented by
+`ui_library_geometry_persistence_execplan.md`; DPI/monitor and toolbar persistence remain explicit
+follow-up work. The
 slice is one vertical path through typed settings, the frame lifecycle, focused tests, and
 observable offscreen acceptance, not a generic refactor.
 
@@ -76,9 +77,10 @@ The baseline slice is implemented and this follow-up is now scoped to main-frame
 After completion, a valid saved rectangle and maximized flag round-trip through `AppSettings`,
 restore before the frame is shown, and capture after the event loop exits. Missing, malformed, or
 undersized geometry falls back to the 1100x700 baseline while unknown UI keys survive. Monitor
-clamping, Library minimums/columns, DPI rerender, and toolbar overflow remain explicitly deferred
-to later lifecycle and responsive slices. The remembered rail divider is tracked and validated in
-`ui_rail_divider_persistence_execplan.md`.
+clamping, DPI rerender, and toolbar overflow remain explicitly deferred to later lifecycle and
+responsive slices. Library minimums/columns are tracked and validated in
+`ui_library_geometry_persistence_execplan.md`; the remembered rail divider is tracked and validated
+in `ui_rail_divider_persistence_execplan.md`.
 
 ## Context and Orientation
 
@@ -159,18 +161,19 @@ round-trip through settings; malformed, undersized, or absent geometry falls bac
 baseline; restore happens before the frame is shown; capture happens after normal event-loop return
 and also in the controlled exception cleanup path; and unknown UI keys remain intact. Position is
 clamped when an available Qt screen is exposed, while full multi-monitor resizing remains deferred.
-The existing typed System/Light/Dark and UI-chrome palette behavior must remain green. Library,
-monitor/DPI, and toolbar persistence remain open to later slices; the rail-divider follow-up has
-its own focused evidence record. Focused tests, the full suite, and offscreen Qt evidence must pass
-with clean teardown.
+The existing typed System/Light/Dark and UI-chrome palette behavior must remain green. Full
+monitor/DPI and toolbar persistence remain open to later slices; the rail-divider and Signature
+Library layout follow-ups have their own focused evidence records. Focused tests, the full suite,
+and offscreen Qt evidence must pass with clean teardown.
 
 ## Evidence Record
 
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
 test command/result, geometry input and observed restore/capture/maximized state, evidence path,
 cleanup result, serialized settings result, and compatibility grep proof. This bounded evidence
-explicitly does not claim Library, full monitor/DPI, or toolbar persistence; rail-divider evidence
-is recorded by `ui_rail_divider_persistence_execplan.md`.
+explicitly does not claim full monitor/DPI or toolbar persistence; rail-divider evidence is recorded
+by `ui_rail_divider_persistence_execplan.md`, and Signature Library layout evidence is recorded by
+`ui_library_geometry_persistence_execplan.md`.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
@@ -210,5 +213,5 @@ fallbacks, lifecycle ordering, offscreen recreation evidence, and explicit monit
 deferrals.
 Revision note: 2026-08-09 / Codex
 Narrowed the child to main-window geometry/maximized persistence after the explorer audit identified
-the missing restore/capture lifecycle; rail, Library, monitor/DPI, and toolbar behavior remain
-explicitly deferred.
+the missing restore/capture lifecycle; rail, Library layout, monitor/DPI, and toolbar behavior are
+owned by their focused child plans.
