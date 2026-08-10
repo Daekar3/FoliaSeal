@@ -50,6 +50,7 @@ _EXPORT_MODULES = {
         "horizontal_signature_reservation",
     ),
     "suggest_signed_output_path": "output_path_policy",
+    **dict.fromkeys(("PlacementEditorSession", "PlacementEditorState"), "placement_editor"),
     **dict.fromkeys(("ViewerPerformanceTracker", "ViewerTimingSnapshot"), "performance_timing"),
     **dict.fromkeys(
         ("BackendReservationEvidence", "build_backend_reservation_evidence"),

@@ -12,6 +12,7 @@ from foliaseal.application.reusable_signing_models import (
     AppearanceProfile,
     PlacementProfile,
     PlacementProfileRect,
+    PlacementProfileSourcePage,
     ResolvedSignaturePreset,
     SignaturePreset,
     SignaturePresetCatalog,
@@ -148,6 +149,7 @@ class ReusableCatalogSnapshot:
             )
             raise ConfigValidationError(f"{label} '{normalized}' already exists.")
 
+
 @dataclass(frozen=True)
 class SaveAppearance:
     name: str
@@ -159,6 +161,10 @@ class SaveAppearance:
 class SavePlacement:
     name: str
     rect: PlacementProfileRect
+    source_page: PlacementProfileSourcePage
+    page_number: int
+    pinned: bool = False
+    placement_profile_id: str | None = None
     overwrite: bool = False
 
 
@@ -167,6 +173,8 @@ class SavePreset:
     name: str
     appearance: SignatureAppearance | None = None
     placement_defaults: SignaturePlacementDefaults | None = None
+    placement_source_page: PlacementProfileSourcePage | None = None
+    placement_page_number: int = 1
     appearance_profile_id: str | None = None
     placement_profile_id: str | None = None
     certificate_configuration_id: str | None = None
@@ -314,12 +322,8 @@ class ReusableSigningObjects:
             ReusableObjectKind.APPEARANCE: {
                 item.display_name: item.ref for item in view.appearances
             },
-            ReusableObjectKind.PLACEMENT: {
-                item.display_name: item.ref for item in view.placements
-            },
-            ReusableObjectKind.PRESET: {
-                item.display_name: item.ref for item in view.presets
-            },
+            ReusableObjectKind.PLACEMENT: {item.display_name: item.ref for item in view.placements},
+            ReusableObjectKind.PRESET: {item.display_name: item.ref for item in view.presets},
         }
         return ReusableCatalogSnapshot(
             view=view,
@@ -352,10 +356,12 @@ class ReusableSigningObjects:
         if isinstance(command, SavePlacement):
             name = _require_name(command.name, "Placement profile name is required.")
             profile = PlacementProfile(
-                schema_version=1,
-                placement_profile_id=_stable_id("placement", name),
+                schema_version=2,
+                placement_profile_id=command.placement_profile_id or _stable_id("placement", name),
                 display_name=name,
-                page_selection_mode="current_page",
+                pinned=command.pinned,
+                page_number=command.page_number,
+                source_page=command.source_page,
                 rect=command.rect,
             )
             self._check_duplicate(catalog.placement_profiles, name, command.overwrite, "Placement")
@@ -389,12 +395,12 @@ class ReusableSigningObjects:
                     appearance=command.appearance,
                 )
                 updated = catalog.upsert_appearance_profile(appearance_profile)
-                placement_id = (
-                    existing.placement_profile_id
-                    if existing is not None
-                    else None
-                )
+                placement_id = existing.placement_profile_id if existing is not None else None
                 if command.placement_defaults is not None:
+                    if command.placement_source_page is None:
+                        raise ConfigValidationError(
+                            "A placement source page is required when saving placement defaults."
+                        )
                     placement_id = placement_id or _stable_id("placement", name)
                     existing_placement = (
                         _placement_by_id(catalog, placement_id)
@@ -403,17 +409,31 @@ class ReusableSigningObjects:
                     )
                     updated = updated.upsert_placement_profile(
                         PlacementProfile(
-                            schema_version=1,
+                            schema_version=2,
                             placement_profile_id=placement_id,
                             display_name=(
                                 existing_placement.display_name
                                 if existing_placement is not None
                                 else name
                             ),
-                            page_selection_mode="current_page",
+                            pinned=(
+                                existing_placement.pinned
+                                if existing_placement is not None
+                                else False
+                            ),
+                            page_number=(
+                                existing_placement.page_number
+                                if existing_placement is not None
+                                else command.placement_page_number
+                            ),
+                            source_page=(
+                                existing_placement.source_page
+                                if existing_placement is not None
+                                else command.placement_source_page
+                            ),
                             rect=PlacementProfileRect(
                                 left_pt=0.0,
-                                bottom_pt=0.0,
+                                top_pt=0.0,
                                 width_pt=command.placement_defaults.width_pt,
                                 height_pt=command.placement_defaults.height_pt,
                             ),
@@ -492,9 +512,7 @@ class ReusableSigningObjects:
                 and getattr(entry, "signature_preset_id", None) == object_id
             ):
                 return entry
-        raise ConfigValidationError(
-            f"{kind.value.title()} object '{object_id}' is not available."
-        )
+        raise ConfigValidationError(f"{kind.value.title()} object '{object_id}' is not available.")
 
     def _name_for_ref(self, catalog: SignaturePresetCatalog, ref: ReusableObjectRef) -> str:
         return self._resolve_by_id(

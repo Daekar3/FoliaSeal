@@ -13,8 +13,14 @@ from foliaseal.application.certificate_models import (
     CertificateCatalog,
     CertificateConfiguration,
 )
+from foliaseal.application.coordinate_transform import (
+    PdfRect,
+    pdf_rect_to_visible_page_rect,
+    visible_page_dimensions,
+)
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
+    PlacementProfileSourcePage,
     ResolvedSignaturePreset,
 )
 from foliaseal.application.reusable_signing_models import (
@@ -63,6 +69,7 @@ class VisibleSignaturePlacementDraft:
     width_pt: float
     height_pt: float
     enabled: bool = False
+    source_page: PlacementProfileSourcePage | None = None
 
 
 @dataclass(frozen=True)
@@ -504,6 +511,14 @@ class DefaultSignaturePropertiesCoordinator:
                 name=name,
                 appearance=preset.appearance,
                 placement_defaults=preset.placement_defaults,
+                placement_source_page=(
+                    None
+                    if preset.placement_profile is None
+                    else preset.placement_profile.source_page
+                ),
+                placement_page_number=(
+                    1 if preset.placement_profile is None else preset.placement_profile.page_number
+                ),
                 certificate_configuration_id=preset.preset.certificate_configuration_id,
                 overwrite=command.overwrite,
             )
@@ -549,38 +564,75 @@ class DefaultSignaturePropertiesCoordinator:
                 "Place a signature on the page before saving a placement profile."
             )
         try:
+            context = self.workflow.placement_context
+            if context is None:
+                raise SignaturePropertiesCoordinatorError(
+                    "A visible page context is required before saving a placement profile."
+                )
+            visible_width_pt, visible_height_pt = visible_page_dimensions(
+                context.page_box, context.rotation
+            )
+            left_pt, top_pt, width_pt, height_pt = pdf_rect_to_visible_page_rect(
+                pdf_rect=PdfRect(
+                    x1=placement.left_pt,
+                    y1=placement.bottom_pt,
+                    x2=placement.left_pt + placement.width_pt,
+                    y2=placement.bottom_pt + placement.height_pt,
+                ),
+                page_box=context.page_box,
+                rotation=context.rotation,
+            )
             self.reusable_objects.execute(
                 SavePlacement(
                     name=name,
                     rect=PlacementProfileRect(
-                        left_pt=placement.left_pt,
-                        bottom_pt=placement.bottom_pt,
-                        width_pt=placement.width_pt,
-                        height_pt=placement.height_pt,
+                        left_pt=left_pt,
+                        top_pt=top_pt,
+                        width_pt=width_pt,
+                        height_pt=height_pt,
                     ),
+                    source_page=PlacementProfileSourcePage(
+                        visible_width_pt=visible_width_pt,
+                        visible_height_pt=visible_height_pt,
+                        rotation_degrees=context.rotation,
+                    ),
+                    page_number=placement.page_number,
                     overwrite=command.overwrite,
                 )
             )
-        except ValueError as exc:
+        except (ValueError, SignaturePropertiesCoordinatorError) as exc:
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
         self._refresh_catalogs()
 
     def _build_current_preset(self, name: str) -> ResolvedSignaturePreset:
         appearance = self.workflow.current_signature_appearance
         if appearance is None:
-            raise ValueError(
-                "A signature appearance must exist before saving a signature preset."
-            )
+            raise ValueError("A signature appearance must exist before saving a signature preset.")
         placement_defaults = self.workflow.signature_placement_defaults
         if placement_defaults is None and self.workflow.signature_rect is not None:
             placement_defaults = SignaturePlacementDefaults(
                 width_pt=self.workflow.signature_rect.width_pt,
                 height_pt=self.workflow.signature_rect.height_pt,
             )
+        source_page = None
+        page_number = 1
+        if self.workflow.placement_context is not None:
+            visible_width_pt, visible_height_pt = visible_page_dimensions(
+                self.workflow.placement_context.page_box,
+                self.workflow.placement_context.rotation,
+            )
+            source_page = PlacementProfileSourcePage(
+                visible_width_pt=visible_width_pt,
+                visible_height_pt=visible_height_pt,
+                rotation_degrees=self.workflow.placement_context.rotation,
+            )
+            page_number = self.workflow.placement_context.page_index + 1
         return ResolvedSignaturePreset.from_parts(
             name=name,
             appearance=appearance,
             placement_defaults=placement_defaults,
+            source_page=source_page,
+            page_number=page_number,
             certificate_configuration_id=self.workflow.selected_certificate_configuration_id,
         )
 
@@ -692,15 +744,9 @@ class DefaultSignaturePropertiesCoordinator:
                 page_number=1,
                 left_pt=24.0,
                 bottom_pt=18.0,
-                width_pt=(
-                    placement_defaults.width_pt
-                    if placement_defaults is not None
-                    else 72.0
-                ),
+                width_pt=(placement_defaults.width_pt if placement_defaults is not None else 72.0),
                 height_pt=(
-                    placement_defaults.height_pt
-                    if placement_defaults is not None
-                    else 24.0
+                    placement_defaults.height_pt if placement_defaults is not None else 24.0
                 ),
                 enabled=False,
             )
@@ -745,8 +791,7 @@ def _format_validation_text(
     ):
         return f"Will fail to sign: {blocking_issues[0].message}"
     return "\n".join(
-        f"{issue.severity.value.upper()} {issue.code}: {issue.message}"
-        for issue in blocking_issues
+        f"{issue.severity.value.upper()} {issue.code}: {issue.message}" for issue in blocking_issues
     )
 
 

@@ -22,6 +22,7 @@ from foliaseal.application.document_text_search import DocumentTextMatch
 from foliaseal.application.document_text_selection import DocumentTextSelection
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
+    PlacementProfileSourcePage,
 )
 from foliaseal.application.signing_material_resolver import (
     RepositoryBackedCertificateSigningMaterialPort,
@@ -840,7 +841,7 @@ def test_signing_shell_output_dialog_uses_app_settings_default_directory(
     assert workflow.output_pdf_path == str(selected_path)
     assert bindings.q_file_dialog.save_calls == [
         (
-                widget.widget,
+            widget.widget,
             "Save signed PDF",
             str(default_output_dir / "output.pdf"),
             "PDF files (*.pdf)",
@@ -924,7 +925,7 @@ def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     assert widget.sidebar_surface.sign_result_label.text() == original_result_label
     assert bindings.q_message_box.calls[-1:] == [
         (
-                widget.widget,
+            widget.widget,
             "Overwrite signed PDF?",
             f"Replace existing signed PDF at {existing_output_path}?",
         )
@@ -962,7 +963,7 @@ def test_signing_shell_output_path_overwrite_cancel_prompts_for_current_path(
     assert workflow.output_pdf_path == str(current_output_path)
     assert bindings.q_message_box.calls[-1:] == [
         (
-                widget.widget,
+            widget.widget,
             "Overwrite signed PDF?",
             f"Replace existing signed PDF at {current_output_path}?",
         )
@@ -1045,7 +1046,7 @@ def test_signing_shell_output_path_overwrite_confirm_updates_and_clears_result(
     )
     assert bindings.q_message_box.calls[-1:] == [
         (
-                widget.widget,
+            widget.widget,
             "Overwrite signed PDF?",
             f"Replace existing signed PDF at {existing_output_path}?",
         )
@@ -2721,10 +2722,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.sidebar_surface.choose_output_button.parent
         is widget.sidebar_surface.signing_action_panel
     )
-    assert (
-        widget.sidebar_surface.sign_result_label.parent
-        is widget.sidebar_surface.status_region
-    )
+    assert widget.sidebar_surface.sign_result_label.parent is widget.sidebar_surface.status_region
     assert widget.properties_scroll.widget is widget.properties_panel.container
     assert widget.properties_scroll.widget_resizable is True
     assert len(widget.properties_panel.container.layout.items) == 4
@@ -2947,7 +2945,7 @@ def test_signing_shell_refinement_dialog_saves_placement_profile_without_applyin
 
     saved = store.load_catalog().placement_profile_named("Bottom right")
     assert applied is False
-    assert saved.page_selection_mode == "current_page"
+    assert saved.page_number == 1
     assert saved.rect.width_pt == 130.0
     assert widget.properties_panel._setup_form.build_draft().placement.enabled is False
     assert bindings.q_input_dialog.calls[0][1:3] == (
@@ -2995,10 +2993,12 @@ def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
             "Bottom right",
             PlacementProfileRect(
                 left_pt=11.0,
-                bottom_pt=12.0,
+                top_pt=736.0,
                 width_pt=130.0,
                 height_pt=44.0,
             ),
+            source_page=PlacementProfileSourcePage(612.0, 792.0, 0),
+            page_number=1,
         )
     )
 

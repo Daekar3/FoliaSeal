@@ -1,13 +1,14 @@
 """Application-owned reusable signing-object models and catalog policy.
 
 The models in this module describe reusable signing behavior. JSON encoding and
-filesystem ownership remain at the infrastructure edge, but the model keeps a
-small mapping projection so the existing persistence adapter can migrate without
-changing the stored contract.
+filesystem ownership remain at the infrastructure edge. Placement profiles are
+validated here against the schema-approved fixed-page v2 contract so persistence
+cannot emit the retired current-page/bottom-left shape.
 """
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import asdict, dataclass, replace
 from enum import Enum
@@ -259,19 +260,85 @@ def _deserialize_placement_defaults(
     )
 
 
+def _require_finite_float_value(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ReusableObjectValidationError(f"Field '{field}' must be a number.")
+    normalized = float(value)
+    if not math.isfinite(normalized):
+        raise ReusableObjectValidationError(f"Field '{field}' must be finite.")
+    return normalized
+
+
+@dataclass(frozen=True)
+class PlacementProfileSourcePage:
+    """Visible page geometry captured with a reusable placement."""
+
+    visible_width_pt: float
+    visible_height_pt: float
+    rotation_degrees: int = 0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "visible_width_pt",
+            _require_finite_float_value(self.visible_width_pt, "visible_width_pt"),
+        )
+        object.__setattr__(
+            self,
+            "visible_height_pt",
+            _require_finite_float_value(self.visible_height_pt, "visible_height_pt"),
+        )
+        object.__setattr__(
+            self,
+            "rotation_degrees",
+            _require_int_value(self.rotation_degrees, "rotation_degrees"),
+        )
+        if self.visible_width_pt <= 0 or self.visible_height_pt <= 0:
+            raise ReusableObjectValidationError("Visible source-page dimensions must be positive.")
+        if self.rotation_degrees % 90 != 0:
+            raise ReusableObjectValidationError(
+                "Field 'rotation_degrees' must be a multiple of 90."
+            )
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> PlacementProfileSourcePage:
+        return cls(
+            visible_width_pt=_require_float(payload, "visible_width_pt"),
+            visible_height_pt=_require_float(payload, "visible_height_pt"),
+            rotation_degrees=_require_int(payload, "rotation_degrees"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "visible_width_pt": self.visible_width_pt,
+            "visible_height_pt": self.visible_height_pt,
+            "rotation_degrees": self.rotation_degrees,
+        }
+
+
+DEFAULT_PLACEMENT_SOURCE_PAGE = PlacementProfileSourcePage(
+    visible_width_pt=612.0,
+    visible_height_pt=792.0,
+    rotation_degrees=0,
+)
+
+
 @dataclass(frozen=True)
 class PlacementProfileRect:
+    """Top-left rectangle relative to the visible source page."""
+
     left_pt: float
-    bottom_pt: float
+    top_pt: float
     width_pt: float
     height_pt: float
 
     def __post_init__(self) -> None:
-        for field in ("left_pt", "bottom_pt", "width_pt", "height_pt"):
-            value = getattr(self, field)
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise ReusableObjectValidationError(f"Field '{field}' must be a number.")
-            object.__setattr__(self, field, float(value))
+        for field in ("left_pt", "top_pt", "width_pt", "height_pt"):
+            object.__setattr__(
+                self,
+                field,
+                _require_finite_float_value(getattr(self, field), field),
+            )
         if self.width_pt <= 0 or self.height_pt <= 0:
             raise ReusableObjectValidationError(
                 "Placement rectangle width and height must be positive."
@@ -281,7 +348,7 @@ class PlacementProfileRect:
     def from_dict(cls, payload: dict[str, Any]) -> PlacementProfileRect:
         return cls(
             left_pt=_require_float(payload, "left_pt"),
-            bottom_pt=_require_float(payload, "bottom_pt"),
+            top_pt=_require_float(payload, "top_pt"),
             width_pt=_require_float(payload, "width_pt"),
             height_pt=_require_float(payload, "height_pt"),
         )
@@ -335,9 +402,10 @@ class PlacementProfile:
     schema_version: int
     placement_profile_id: str
     display_name: str
-    page_selection_mode: str
+    pinned: bool
+    page_number: int
+    source_page: PlacementProfileSourcePage
     rect: PlacementProfileRect
-    numeric_fine_tuning_enabled: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -351,27 +419,44 @@ class PlacementProfile:
         object.__setattr__(
             self, "display_name", _require_non_empty_str_value(self.display_name, "display_name")
         )
-        object.__setattr__(
-            self,
-            "page_selection_mode",
-            _require_non_empty_str_value(self.page_selection_mode, "page_selection_mode"),
-        )
+        if self.schema_version != 2:
+            raise ReusableObjectValidationError(
+                "PlacementProfile schema_version 1 requires explicit migration context; "
+                "only schema_version 2 is serialized."
+            )
+        if not isinstance(self.pinned, bool):
+            raise ReusableObjectValidationError("Field 'pinned' must be a bool.")
+        object.__setattr__(self, "page_number", _require_int_value(self.page_number, "page_number"))
+        if self.page_number < 1:
+            raise ReusableObjectValidationError("Field 'page_number' must be one or greater.")
+        if not isinstance(self.source_page, PlacementProfileSourcePage):
+            raise ReusableObjectValidationError(
+                "Field 'source_page' must be a PlacementProfileSourcePage."
+            )
         if not isinstance(self.rect, PlacementProfileRect):
             raise ReusableObjectValidationError("Field 'rect' must be a PlacementProfileRect.")
-        if not isinstance(self.numeric_fine_tuning_enabled, bool):
-            raise ReusableObjectValidationError(
-                "Field 'numeric_fine_tuning_enabled' must be a bool."
-            )
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> PlacementProfile:
+        schema_version = _require_int(payload, "schema_version")
+        if schema_version != 2:
+            if schema_version == 1:
+                raise ReusableObjectValidationError(
+                    "Legacy PlacementProfile requires explicit migration context."
+                )
+            raise ReusableObjectValidationError(
+                f"Unsupported PlacementProfile schema_version {schema_version}; expected 2."
+            )
         return cls(
-            schema_version=_require_int(payload, "schema_version"),
+            schema_version=schema_version,
             placement_profile_id=_require_non_empty_str(payload, "placement_profile_id"),
             display_name=_require_non_empty_str(payload, "display_name"),
-            page_selection_mode=_require_non_empty_str(payload, "page_selection_mode"),
+            pinned=_require_bool(payload, "pinned"),
+            page_number=_require_int(payload, "page_number"),
+            source_page=PlacementProfileSourcePage.from_dict(
+                _require_mapping(payload, "source_page")
+            ),
             rect=PlacementProfileRect.from_dict(_require_mapping(payload, "rect")),
-            numeric_fine_tuning_enabled=_require_bool(payload, "numeric_fine_tuning_enabled"),
         )
 
     @classmethod
@@ -380,17 +465,21 @@ class PlacementProfile:
         *,
         display_name: str,
         placement_defaults: SignaturePlacementDefaults,
-        schema_version: int = 1,
+        source_page: PlacementProfileSourcePage,
+        page_number: int = 1,
+        schema_version: int = 2,
         placement_profile_id: str | None = None,
     ) -> PlacementProfile:
         return cls(
             schema_version=schema_version,
             placement_profile_id=placement_profile_id or _stable_id("placement", display_name),
             display_name=display_name,
-            page_selection_mode="current_page",
+            pinned=False,
+            page_number=page_number,
+            source_page=source_page,
             rect=PlacementProfileRect(
                 left_pt=0.0,
-                bottom_pt=0.0,
+                top_pt=0.0,
                 width_pt=placement_defaults.width_pt,
                 height_pt=placement_defaults.height_pt,
             ),
@@ -401,9 +490,10 @@ class PlacementProfile:
             "schema_version": self.schema_version,
             "placement_profile_id": self.placement_profile_id,
             "display_name": self.display_name,
-            "page_selection_mode": self.page_selection_mode,
+            "pinned": self.pinned,
+            "page_number": self.page_number,
+            "source_page": self.source_page.to_dict(),
             "rect": self.rect.to_dict(),
-            "numeric_fine_tuning_enabled": self.numeric_fine_tuning_enabled,
         }
 
     @property
@@ -411,6 +501,46 @@ class PlacementProfile:
         return SignaturePlacementDefaults(
             width_pt=self.rect.width_pt, height_pt=self.rect.height_pt
         )
+
+
+def migrate_legacy_placement_payload(
+    payload: dict[str, Any],
+    *,
+    source_page: PlacementProfileSourcePage | None,
+    page_number: int | None,
+) -> PlacementProfile:
+    """Convert a v1 bottom-left payload when page context is supplied."""
+
+    schema_version = _require_int(payload, "schema_version")
+    if schema_version != 1:
+        raise ReusableObjectValidationError(
+            f"Legacy placement migration requires schema_version 1, got {schema_version}."
+        )
+    if source_page is None or page_number is None:
+        raise ReusableObjectValidationError(
+            "Legacy PlacementProfile requires explicit migration context: source_page and "
+            "page_number."
+        )
+    rect_payload = _require_mapping(payload, "rect")
+    left_pt = _require_float(rect_payload, "left_pt")
+    bottom_pt = _require_float(rect_payload, "bottom_pt")
+    width_pt = _require_float(rect_payload, "width_pt")
+    height_pt = _require_float(rect_payload, "height_pt")
+    pinned = _require_bool(payload, "pinned") if "pinned" in payload else False
+    return PlacementProfile(
+        schema_version=2,
+        placement_profile_id=_require_non_empty_str(payload, "placement_profile_id"),
+        display_name=_require_non_empty_str(payload, "display_name"),
+        pinned=pinned,
+        page_number=page_number,
+        source_page=source_page,
+        rect=PlacementProfileRect(
+            left_pt=left_pt,
+            top_pt=source_page.visible_height_pt - bottom_pt - height_pt,
+            width_pt=width_pt,
+            height_pt=height_pt,
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -464,7 +594,7 @@ class SignaturePreset:
         appearance_profile_id: str,
         placement_profile_id: str | None = None,
         certificate_configuration_id: str | None = None,
-        schema_version: int = 1,
+        schema_version: int = 2,
         signature_preset_id: str | None = None,
     ) -> SignaturePreset:
         return cls(
@@ -516,8 +646,10 @@ class ResolvedSignaturePreset:
         name: str,
         appearance: SignatureAppearance,
         placement_defaults: SignaturePlacementDefaults | None = None,
+        source_page: PlacementProfileSourcePage | None = None,
+        page_number: int = 1,
         certificate_configuration_id: str | None = None,
-        schema_version: int = 1,
+        schema_version: int = 2,
     ) -> ResolvedSignaturePreset:
         appearance_profile = AppearanceProfile(
             schema_version=schema_version,
@@ -525,11 +657,17 @@ class ResolvedSignaturePreset:
             display_name=name,
             appearance=appearance,
         )
+        if placement_defaults is not None and source_page is None:
+            raise ReusableObjectValidationError(
+                "A placement source_page is required when capturing placement defaults."
+            )
         placement_profile = (
             PlacementProfile.from_defaults(
                 schema_version=schema_version,
                 display_name=name,
                 placement_defaults=placement_defaults,
+                source_page=source_page,
+                page_number=page_number,
             )
             if placement_defaults is not None
             else None

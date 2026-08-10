@@ -76,6 +76,12 @@ def _display_dimensions(page_box: PageBox, rotation: int) -> tuple[float, float]
     return page_box.height, page_box.width
 
 
+def visible_page_dimensions(page_box: PageBox, rotation: int) -> tuple[float, float]:
+    """Return the already-rotated visible page width and height in points."""
+    page_box.validate()
+    return _display_dimensions(page_box, rotation)
+
+
 def _pdf_local_to_display(
     page_box: PageBox,
     rotation: int,
@@ -106,6 +112,58 @@ def _display_to_pdf_local(
     if normalized_rotation == 180:
         return page_box.width - dx, page_box.height - dy
     return dy, page_box.height - dx
+
+
+def pdf_rect_to_visible_page_rect(
+    *,
+    pdf_rect: PdfRect,
+    page_box: PageBox,
+    rotation: int,
+) -> tuple[float, float, float, float]:
+    """Convert a PDF-space rectangle to visible top-left page coordinates."""
+    page_box.validate()
+    normalized = pdf_rect.normalized()
+    corners = (
+        (normalized.x1, normalized.y1),
+        (normalized.x1, normalized.y2),
+        (normalized.x2, normalized.y1),
+        (normalized.x2, normalized.y2),
+    )
+    display_points = tuple(
+        _pdf_local_to_display(page_box, rotation, x - page_box.left, y - page_box.bottom)
+        for x, y in corners
+    )
+    display_width, display_height = _display_dimensions(page_box, rotation)
+    del display_width
+    left = min(point[0] for point in display_points)
+    right = max(point[0] for point in display_points)
+    bottom = min(point[1] for point in display_points)
+    top = max(point[1] for point in display_points)
+    return left, display_height - top, right - left, top - bottom
+
+
+def visible_page_rect_to_pdf_rect(
+    *,
+    left_pt: float,
+    top_pt: float,
+    width_pt: float,
+    height_pt: float,
+    page_box: PageBox,
+    rotation: int,
+) -> PdfRect:
+    """Convert a visible top-left page rectangle into PDF-space coordinates."""
+    page_box.validate()
+    _, display_height = _display_dimensions(page_box, rotation)
+    display_corners = (
+        (left_pt, display_height - top_pt),
+        (left_pt, display_height - top_pt - height_pt),
+        (left_pt + width_pt, display_height - top_pt),
+        (left_pt + width_pt, display_height - top_pt - height_pt),
+    )
+    pdf_points = tuple(_display_to_pdf_local(page_box, rotation, x, y) for x, y in display_corners)
+    xs = tuple(page_box.left + point[0] for point in pdf_points)
+    ys = tuple(page_box.bottom + point[1] for point in pdf_points)
+    return PdfRect(x1=min(xs), y1=min(ys), x2=max(xs), y2=max(ys))
 
 
 def _validate_inputs(*, transform: ViewTransform, page_box: PageBox) -> None:

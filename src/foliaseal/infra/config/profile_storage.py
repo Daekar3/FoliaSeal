@@ -41,10 +41,13 @@ def _migrate_legacy_profiles(payload: dict) -> SignaturePresetCatalog:
             appearance=_deserialize_appearance(appearance_payload),
         )
         defaults = _deserialize_placement_defaults(raw_profile.get("placement_defaults"))
+        # The legacy combined file has no page dimensions or rotation. Preserve
+        # the appearance, but deliberately omit the incompatible placement rather
+        # than inventing a fixed-page geometry.
+        del defaults
         preset = ResolvedSignaturePreset.from_parts(
             name=name,
             appearance=appearance.appearance,
-            placement_defaults=defaults,
         )
         catalog = catalog.upsert_preset(preset)
     return catalog

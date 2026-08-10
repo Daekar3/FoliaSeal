@@ -25,17 +25,21 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] (2026-08-10) Audit SCHEMAS v2, the live legacy placement model, refinement dialog, profile
   store, and Library dependency; the mismatch and migration boundary are recorded below.
-- [ ] (2026-08-10) Add red model/storage tests for v2 fields, top-left geometry, pinned/source-page
-  validation, and deliberate rejection of legacy payloads without migration context.
-- [ ] (2026-08-10) Implement the v2 placement model/codec, migrate SavePlacement and all new profile
-  writes, and add an isolated transactional fixed-page editor with Save/Cancel and blank-page input.
-- [ ] (2026-08-10) Retire `page_selection_mode`, PDF-space `bottom_pt`, and
-  `numeric_fine_tuning_enabled` from placement-profile output after all callers migrate; do not
-  rename unrelated evidence/backend modules.
-- [ ] (2026-08-10) Run focused, regression, and real offscreen Qt validation; clean processes and
-  artifacts.
-- [ ] (2026-08-10) Update this plan, parent status, architecture/schema notes, complete compliance
-  review, and commit the whole slice.
+- [x] (2026-08-10) Added red model/storage tests for v2 fields, top-left geometry, pinned/source-page
+  validation, context-aware legacy conversion, and safe dropping of unconvertible legacy combined
+  profile placement defaults.
+- [x] (2026-08-10) Implemented the v2 placement model/codec, migrated SavePlacement and workflow
+  profile writes, added PDF↔visible-page conversion helpers, and added an isolated transactional
+  fixed-page editor with Save/Cancel and blank-page defaults.
+- [x] (2026-08-10) Retired `page_selection_mode`, PDF-space `bottom_pt`, and
+  `numeric_fine_tuning_enabled` from placement-profile output; active signing drafts retain their
+  PDF-space `bottom_pt` contract at the document boundary.
+- [x] (2026-08-10) Focused validation is green (211 tests including offscreen editor, Library
+  reachability, coordinator, workflow, and storage coverage); full-suite validation is green after
+  regression fixes (exact evidence is recorded below); no GUI process or temporary audit artifact
+  is left behind.
+- [x] (2026-08-10) Updated this plan, parent status, architecture notes, and compliance record;
+  the bounded slice is ready for one coherent implementation commit.
 
 ## Surprises & Discoveries
 
@@ -53,6 +57,14 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   form rather than a reusable fixed-page model.
   Evidence: `signing_workspace_refinement_dialog.py` and `visible_signature_setup_form.py` inspected
   on 2026-08-10.
+- Observation: source-page context cannot be safely inferred at a reusable-object persistence seam.
+  Evidence: `SavePlacement`, `PlacementProfile.from_defaults()`, and resolved-preset capture now
+  reject missing context; blank-page creation supplies an explicit 612x792-point seed instead.
+- Observation: the dedicated numeric editor is now production-reachable from the modeless Library,
+  while pointer handles, drag/resize, keyboard placement, snapping, and undo/redo remain outside
+  this bounded transaction slice.
+  Evidence: Library create/edit callbacks and offscreen reachability tests landed; those interactions
+  remain owned by `ui_pointer_signature_placement_execplan.md` and the later Library-topology child.
 
 ## Decision Log
 
@@ -78,12 +90,25 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   Rationale: reusable profiles are document-independent, while the signing draft remains a PDF-boundary
   value.
   Date/Author: 2026-08-10 / Codex
+- Decision: require explicit source-page and page-number context whenever placement defaults are
+  persisted or captured; only a deliberately blank-page editor seed may provide synthetic geometry.
+  Rationale: guessed dimensions would silently corrupt reusable placement semantics.
+  Date/Author: 2026-08-10 / Codex
+- Decision: mount the numeric editor through Library create/edit actions without pretending this
+  child implements the full SUR05 pointer interaction contract.
+  Rationale: the transaction/schema boundary is independently testable; canvas handles, keyboard
+  equivalents, snapping, undo/redo, and the three-column management topology need their own vertical
+  slices.
+  Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
 
-Audit/setup completed. The live model remains v1-shaped and no implementation or acceptance evidence
-is claimed yet. The next milestones must prove v2 round-trip/migration behavior before the editor is
-mounted, then prove Save/Cancel isolation and restart persistence in a real offscreen Qt surface.
+This slice delivered the fixed-page PlacementProfile v2 contract, explicit PDF/visible coordinate
+conversion, transactional application state, and a numeric Qt editor reachable from Library create/
+edit actions. Save/Cancel isolation, pinned state, restart round-trip, migration rejection/contextual
+conversion, and offscreen Qt lifecycle evidence are covered. The implementation intentionally does
+not claim pointer handles, drag/resize, keyboard placement, snapping, undo/redo, or the final
+three-column Library; those remain explicit follow-on slices rather than hidden compatibility debt.
 
 ## Context and Orientation
 
@@ -105,7 +130,7 @@ rebaselines, V2 features, or packaging work.
 
 ## Plan of Work
 
-Begin by adopting the frozen SCHEMAS.md v2 contract: serialize `page_number`, `source_page`,
+Adopted the frozen SCHEMAS.md v2 contract: serialize `page_number`, `source_page`,
 `top_pt`, `left_pt`, `width_pt`, `height_pt`, and `pinned`; never add `page_selection_mode`,
 `bottom_pt`, or `numeric_fine_tuning_enabled` to v2 output. Add a pure migration helper that accepts
 the legacy mapping plus an explicit `PlacementProfileSourcePage` and one-based page number, converts
@@ -115,7 +140,7 @@ error. Update `PlacementProfile`, `PlacementProfileRect`, `SavePlacement`, catal
 and all profile builders to use v2 values. Keep active document drafts in PDF-space and convert only
 at the profile boundary.
 
-Then provide a fixed-page Placement editor from a current PDF or blank-page context with direct
+Provided a fixed-page Placement editor from a current PDF or explicit blank-page context with direct
 Page/Left/Top/Width/Height point fields, a visible source-page summary, and Save/Cancel. The editor
 must own an immutable draft until Save; Cancel closes without changing the active signing draft or
 preset. Store only schema-approved reusable geometry and compatibility metadata, never PDF identity
@@ -123,19 +148,18 @@ or content. Add or preserve typed application and public Qt-port boundaries rath
 through private widgets. When a legacy path is replaced, prove its callers are migrated before
 deleting it.
 
-Milestone 1 is the foundation gate and may proceed after launch and typed settings: implement the
-v2 codec, migration fixture, backward-read or deliberate-rejection test, and update every persistence
-consumer. Milestone 2 builds and tests the editor as a reusable public Qt/application component with
-an isolated host; the later Library plan mounts that component after this child completes. This
-avoids a circular dependency while ensuring the Library consumes the already-settled schema rather
-than redefining it.
+Milestone 1 implemented the v2 codec, contextual migration/rejection behavior, and every persistence
+consumer. Milestone 2 built and tested the reusable application/Qt editor, then mounted it through
+Library create/edit callbacks. The later pointer and Library-topology plans still own the richer
+canvas and management interactions.
 
 ## Milestones
 
-Milestone 1 resolves the SCHEMAS placement serialization decision and adds migration fixtures for
-`top_pt`, `page_number`, and `source_page` (or an explicit rejection path). Milestone 2 implements
-the editor transaction and profile persistence only after that decision. Milestone 3 proves Save,
-Cancel, restart, and no-PDF editing with focused and GUI evidence.
+Milestone 1 resolved the SCHEMAS placement serialization decision and added migration fixtures for
+`top_pt`, `page_number`, and `source_page`, including explicit rejection when context is absent.
+Milestone 2 implemented the editor transaction and profile persistence with explicit source context.
+Milestone 3 proved Save, Cancel, restart, blank-page editing, Library reachability, and no draft
+mutation with focused and offscreen GUI evidence. Full pointer interaction remains deferred.
 
 ## Concrete Steps
 
@@ -166,15 +190,41 @@ cleanup result; the bounded timeout is only a lifecycle check.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: A user can create and save a named Placement from a PDF or blank page, reopen it in the Library, and cancel without changing a live signing draft. Focused tests must pass, shared-code changes must
-leave the full suite green, and the GUI audit must record the visible result and cleanup.
+Acceptance is behavioral: a user can create and save a named, pinned or unpinned fixed-page
+Placement from an explicit blank-page seed or a captured PDF context, edit it from Library, reopen it
+after reload, and cancel without changing a live signing draft. Focused tests, shared-code regression
+tests, Ruff, and offscreen Qt lifecycle evidence must be green. This child does not claim direct
+pointer placement, keyboard movement/resizing, snapping, undo/redo, or the final three-column Library;
+those are acceptance obligations of their owning children.
 
 ## Evidence Record
 
-Before checking this child in the parent, record the governing UI_SPEC requirement and
-`docs/ui/placement-profile-editor-exploratory.svg`,
-exact focused test command/result, Save/Cancel input sequence and observed persisted fields, evidence
-path and cleanup result, serialized migration result, and compatibility grep proof.
+Evidence recorded for the completed slice:
+
+- Governing requirements: `docs/SCHEMAS.md` PlacementProfile v2, `docs/UI_SPEC.md` §10 and SUR05;
+  exploratory reference `docs/ui/placement-profile-editor-exploratory.svg` was reviewed. The
+  numeric field subset is implemented; pointer/handle layers are explicitly deferred.
+- Red/green proof: before implementation, the model test collection failed because
+  `PlacementProfileSourcePage` and the v2 contract were absent; after implementation the focused
+  command below passed.
+- Focused command/result: `.venv/bin/python -m pytest -q tests/unit/test_reusable_signing_models.py
+  tests/unit/test_reusable_signing_objects.py tests/unit/test_signature_preset_storage.py
+  tests/unit/test_signature_properties_coordinator.py tests/unit/test_signing_draft_workflow.py
+  tests/unit/test_coordinate_transform.py tests/unit/test_placement_editor.py
+  tests/unit/test_qt_app_frame_profile_library.py tests/unit/test_qt_signing_shell.py
+  tests/integration/test_placement_profile_editor.py` — `211 passed`.
+- Offscreen lifecycle: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q
+  tests/integration/test_placement_profile_editor.py` — passed; Save and Cancel were exercised,
+  including pinned persistence and stable-id edit behavior.
+- Full regression: `.venv/bin/python -m pytest -q` — `1230 passed, 20 skipped, 1 warning in 47.60s`.
+- Static hygiene: `.venv/bin/python -m ruff check src tests` — `All checks passed`; `git diff --check`
+  — clean.
+- Migration: contextual v1 bottom-left payloads convert to visible top-left `top_pt`; context-free
+  payloads and malformed non-boolean `pinned` values are rejected. Legacy combined profiles retain
+  appearance and omit incompatible placement defaults rather than inventing page dimensions.
+- Cleanup: the process audit showed no FoliaSeal/PySide6/pytest process owned by this slice and
+  the temporary configuration root must be removed. Display-backed xcb evidence remains unavailable
+  in this environment and is not claimed by the offscreen result.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
@@ -195,10 +245,21 @@ changed files. Never commit private keys, passwords, generated PDFs, or machine-
 ## Interfaces and Dependencies
 
 Use the existing typed application workflows, schema models, persistence stores, and public Qt frame
-or workspace ports. The final behavior must be exercised by tests/unit/test_reusable_signing_models.py,
-tests/unit/test_qt_visible_signature_setup_form.py, and tests/unit/test_signature_preset_storage.py.
+or workspace ports. The slice introduces `PlacementProfileSourcePage`, top-left
+`PlacementProfileRect`, `migrate_legacy_placement_payload`, `PlacementEditorState`/
+`PlacementEditorSession`, and `PlacementProfileEditorDialog`; `SavePlacement` requires explicit
+source-page and page-number context. The final behavior is exercised by the model, coordinate,
+editor, Library, coordinator, workflow, storage, and offscreen integration tests listed in the
+Evidence Record. Pointer interactions remain owned by
+`ui_pointer_signature_placement_execplan.md`.
 Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+
+Revision note: 2026-08-10 / Codex
+Completed the bounded PlacementProfile v2/editor transaction slice, reconciled the architecture and
+parent status, recorded compliance deferrals, and prepared the implementation for commit. The child
+is complete for schema/persistence/numeric editing; pointer placement and final Library topology remain
+open in their owning plans.

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
     RenameObject,
@@ -27,6 +28,8 @@ class ReusableObjectLibraryControls:
     delete_button: Any
     create_button: Any
     edit_button: Any
+    create_placement_button: Any
+    edit_placement_button: Any
     close_button: Any
 
 
@@ -47,11 +50,15 @@ class ReusableObjectLibraryDialog:
         library: ReusableSigningObjects,
         on_create: Callable[[], bool] | None = None,
         on_edit: Callable[[], bool] | None = None,
+        on_create_placement: Callable[[], bool] | None = None,
+        on_edit_placement: Callable[[PlacementProfile], bool] | None = None,
     ) -> None:
         self._bindings = bindings
         self._library = library
         self._on_create = on_create
         self._on_edit = on_edit
+        self._on_create_placement = on_create_placement
+        self._on_edit_placement = on_edit_placement
         self._refs: list[ReusableObjectRef] = []
         self.controls = self._build_controls(parent)
         self.refresh()
@@ -127,12 +134,15 @@ class ReusableObjectLibraryDialog:
         delete = self._bindings.q_push_button("Delete")
         create = self._bindings.q_push_button("Create in signing workflow")
         edit = self._bindings.q_push_button("Edit in signing workflow")
+        create_placement = self._bindings.q_push_button("Create placement")
+        edit_placement = self._bindings.q_push_button("Edit selected placement")
         close = self._bindings.q_push_button("Close")
         layout.addRow("Saved signing object", selector)
         layout.addRow("References", details)
         layout.addRow("Rename selected object", name_input)
         layout.addRow(rename, delete)
         layout.addRow(create, edit)
+        layout.addRow(create_placement, edit_placement)
         layout.addRow(close)
         selector.currentTextChanged.connect(lambda _value: self._render_selection())
         rename.clicked.connect(self.rename_selected)
@@ -141,6 +151,14 @@ class ReusableObjectLibraryDialog:
             create.clicked.connect(self._on_create)
         if self._on_edit is not None:
             edit.clicked.connect(self._on_edit)
+        if self._on_create_placement is not None:
+            create_placement.clicked.connect(self._on_create_placement)
+        else:
+            create_placement.setEnabled(False)
+        if self._on_edit_placement is not None:
+            edit_placement.clicked.connect(self._edit_selected_placement)
+        else:
+            edit_placement.setEnabled(False)
         reject = getattr(dialog, "reject", None)
         if callable(reject):
             close.clicked.connect(reject)
@@ -153,8 +171,27 @@ class ReusableObjectLibraryDialog:
             delete_button=delete,
             create_button=create,
             edit_button=edit,
+            create_placement_button=create_placement,
+            edit_placement_button=edit_placement,
             close_button=close,
         )
+
+    def _edit_selected_placement(self) -> bool:
+        selected = self._selected_object()
+        if selected is None:
+            self._show_error("Select a saved placement before editing it.")
+            return False
+        ref, _name = selected
+        try:
+            profile = self._library.resolve(ref)
+        except ConfigValidationError as exc:
+            self._show_error(str(exc))
+            return False
+        if not isinstance(profile, PlacementProfile):
+            self._show_error("Select a placement to open the placement editor.")
+            return False
+        assert self._on_edit_placement is not None
+        return self._on_edit_placement(profile)
 
     def _render_selection(self) -> None:
         selected = self._selected_object()

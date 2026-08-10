@@ -48,7 +48,7 @@ Foundation tranche:
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
 - [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
 - [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
-- [ ] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
+- [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
 
 Document-flow tranche:
 
@@ -121,6 +121,12 @@ Release tranche:
   Settings callbacks now use the shared typed registry with unique mnemonics, stable IDs/object
   names, Qt descriptions, and callback-routing tests. Edit, Signing, Help, and remaining View
   commands remain open until their truthful behavior seams exist.
+- [x] (2026-08-10) Completed the bounded placement foundation slice: PlacementProfile v2 now stores
+  explicit source-page metadata, fixed page number, pinned state, and visible top-left geometry;
+  PDF↔visible conversion is centralized; SavePlacement/workflow capture require explicit context;
+  transactional numeric editing is reachable from Library create/edit actions and survives reload.
+  Pointer handles, keyboard placement, snapping/undo, and the final three-column Library remain open
+  in their owning children.
 - [ ] (2026-08-09) Document-lifecycle slice implemented and validated: dirty projection protects
   placement, appearance/content, and confirmed output-path changes; typed maintenance verbs clear
   drafts/secrets; Open composes candidates before the discard decision; File Close, Exit, and native

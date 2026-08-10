@@ -5,6 +5,7 @@ import pytest
 
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
+    PlacementProfileSourcePage,
     _serialize_appearance,
 )
 from foliaseal.application.reusable_signing_objects import (
@@ -30,10 +31,12 @@ def test_typed_boundary_lists_and_renames_objects_without_prefix_parsing(tmp_pat
             "Bottom right",
             PlacementProfileRect(
                 left_pt=10.0,
-                bottom_pt=12.0,
+                top_pt=744.0,
                 width_pt=120.0,
                 height_pt=36.0,
             ),
+            source_page=PlacementProfileSourcePage(612.0, 792.0, 0),
+            page_number=1,
         )
     )
     view = service.view()
@@ -60,6 +63,28 @@ def test_typed_boundary_lists_and_renames_objects_without_prefix_parsing(tmp_pat
 
     with pytest.raises(ConfigValidationError, match="referenced"):
         service.execute(DeleteObject(ref=appearance_ref))
+
+
+def test_save_placement_round_trips_v2_geometry_across_store_reload(tmp_path: Path) -> None:
+    store = SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles")
+    service = ReusableSigningObjects(store)
+    service.execute(
+        SavePlacement(
+            "Board approval",
+            PlacementProfileRect(left_pt=360.0, top_pt=666.0, width_pt=180.0, height_pt=54.0),
+            source_page=PlacementProfileSourcePage(612.0, 792.0, 0),
+            page_number=3,
+            pinned=True,
+        )
+    )
+
+    reloaded = SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles").load_catalog()
+    saved = reloaded.placement_profile_named("Board approval")
+
+    assert saved.schema_version == 2
+    assert saved.pinned is True
+    assert saved.page_number == 3
+    assert saved.rect.top_pt == 666.0
 
 
 def test_boundary_preserves_ids_and_does_not_cascade_preset_delete(tmp_path: Path) -> None:
@@ -163,7 +188,9 @@ def test_inline_preset_overwrite_preserves_custom_preset_id(tmp_path: Path) -> N
     assert service.view().presets[0].ref.object_id == "custom-preset-id"
 
 
-def test_legacy_profile_payload_is_read_and_migration_is_tested(tmp_path: Path) -> None:
+def test_legacy_profile_payload_drops_unconvertible_placement_without_page_context(
+    tmp_path: Path,
+) -> None:
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles")
     store.catalog_path.parent.mkdir(parents=True)
     legacy = {
@@ -185,6 +212,7 @@ def test_legacy_profile_payload_is_read_and_migration_is_tested(tmp_path: Path) 
 
     assert catalog.preset_names() == ("Legacy",)
     assert catalog.appearance_profile_named("Legacy").display_name == "Legacy"
+    assert catalog.placement_profiles == ()
 
 
 def test_catalog_load_rejects_dangling_preset_reference(tmp_path: Path) -> None:

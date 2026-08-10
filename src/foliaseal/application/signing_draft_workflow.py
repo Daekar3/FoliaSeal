@@ -18,8 +18,12 @@ from foliaseal.application.coordinate_transform import (
     ViewTransform,
     validate_pdf_rect_within_page,
     view_rect_to_pdf_rect,
+    visible_page_dimensions,
 )
-from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
+from foliaseal.application.reusable_signing_models import (
+    PlacementProfileSourcePage,
+    ResolvedSignaturePreset,
+)
 from foliaseal.application.signing_material_resolver import SigningMaterial
 from foliaseal.application.visible_signature_fit_validator import (
     BackendVisibleSignatureFitValidator,
@@ -218,9 +222,7 @@ class SigningDraftWorkflow:
             or width_pt is None
             or height_pt is None
         ):
-            raise ValueError(
-                "A signature rectangle must exist before fine-tuning partial values."
-            )
+            raise ValueError("A signature rectangle must exist before fine-tuning partial values.")
 
         current = self.signature_rect
         if current is None:
@@ -291,14 +293,12 @@ class SigningDraftWorkflow:
         self,
         name: str,
         *,
-        schema_version: int = 1,
+        schema_version: int = 2,
         placement_defaults: SignaturePlacementDefaults | None = None,
     ) -> ResolvedSignaturePreset:
         """Capture the current setup as a resolved reusable signature preset."""
         if self.signature_appearance is None:
-            raise ValueError(
-                "A signature appearance must exist before saving a signature preset."
-            )
+            raise ValueError("A signature appearance must exist before saving a signature preset.")
 
         effective_placement_defaults = placement_defaults
         if effective_placement_defaults is None:
@@ -309,11 +309,27 @@ class SigningDraftWorkflow:
                 height_pt=self.signature_rect.height_pt,
             )
 
+        source_page = None
+        page_number = 1
+        if self.placement_context is not None:
+            visible_width_pt, visible_height_pt = visible_page_dimensions(
+                self.placement_context.page_box,
+                self.placement_context.rotation,
+            )
+            source_page = PlacementProfileSourcePage(
+                visible_width_pt=visible_width_pt,
+                visible_height_pt=visible_height_pt,
+                rotation_degrees=self.placement_context.rotation,
+            )
+            page_number = self.placement_context.page_index + 1
+
         return ResolvedSignaturePreset.from_parts(
             schema_version=schema_version,
             name=name,
             appearance=self.signature_appearance,
             placement_defaults=effective_placement_defaults,
+            source_page=source_page,
+            page_number=page_number,
             certificate_configuration_id=self.selected_certificate_configuration_id,
         )
 
@@ -354,9 +370,7 @@ class SigningDraftWorkflow:
         signing_material: SigningMaterial,
     ) -> None:
         """Apply a resolved certificate configuration to the current draft."""
-        self.selected_certificate_configuration_id = (
-            configuration.certificate_configuration_id
-        )
+        self.selected_certificate_configuration_id = configuration.certificate_configuration_id
         self.certificate_path = signing_material.certificate_path
         self.passphrase = signing_material.passphrase
         self.certificate_alias = signing_material.certificate_alias
@@ -451,8 +465,7 @@ class SigningDraftWorkflow:
         """Build the final signing request or raise with validation issues."""
         issues = self.validation_issues()
         if any(
-            issue.severity == _contracts.SigningDraftValidationSeverity.ERROR
-            for issue in issues
+            issue.severity == _contracts.SigningDraftValidationSeverity.ERROR for issue in issues
         ):
             raise _contracts.SigningDraftValidationError(issues)
 

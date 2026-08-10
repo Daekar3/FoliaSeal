@@ -18,8 +18,10 @@ from foliaseal.application.certificate_models import (
     ManagedCertificateSubjectSummary,
 )
 from foliaseal.application.reusable_signing_models import (
+    DEFAULT_PLACEMENT_SOURCE_PAGE,
     AppearanceProfile,
     PlacementProfile,
+    PlacementProfileSourcePage,
     ResolvedSignaturePreset,
     SignaturePreset,
     SignaturePresetCatalog,
@@ -216,10 +218,11 @@ def build_signature_appearance(
 
 def build_signature_preset(
     *,
-    schema_version: int = 1,
+    schema_version: int = 2,
     name: str = "default",
     appearance: SignatureAppearance | None = None,
     placement_defaults: SignaturePlacementDefaults | None = None,
+    source_page: PlacementProfileSourcePage = DEFAULT_PLACEMENT_SOURCE_PAGE,
     certificate_configuration_id: str | None = None,
 ) -> ResolvedSignaturePreset:
     """Build a representative resolved signature preset for shell tests."""
@@ -233,6 +236,7 @@ def build_signature_preset(
             height_pt=80.0,
             anchor=SignatureAnchor.BOTTOM_RIGHT,
         ),
+        source_page=source_page,
         certificate_configuration_id=certificate_configuration_id,
     )
 
@@ -296,10 +300,11 @@ def build_appearance_profile(
 
 def build_placement_profile(
     *,
-    schema_version: int = 1,
+    schema_version: int = 2,
     placement_profile_id: str = "placement-default",
     display_name: str = "Default",
     placement_defaults: SignaturePlacementDefaults | None = None,
+    source_page: PlacementProfileSourcePage = DEFAULT_PLACEMENT_SOURCE_PAGE,
 ) -> PlacementProfile:
     """Build a canonical placement profile from width/height defaults."""
     return PlacementProfile.from_defaults(
@@ -312,6 +317,7 @@ def build_placement_profile(
             height_pt=80.0,
             anchor=SignatureAnchor.BOTTOM_RIGHT,
         ),
+        source_page=source_page,
     )
 
 

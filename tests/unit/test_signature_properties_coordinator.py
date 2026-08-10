@@ -8,6 +8,7 @@ from foliaseal.application import (
     SigningDraftWorkflow,
 )
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
@@ -30,6 +31,7 @@ from foliaseal.application.signature_properties_coordinator import (
 from foliaseal.application.signature_properties_coordinator import (
     DefaultSignaturePropertiesCoordinator as _DefaultSignaturePropertiesCoordinator,
 )
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.application.signing_material_resolver import (
     RepositoryBackedCertificateSigningMaterialPort,
 )
@@ -86,6 +88,13 @@ def _ready_workflow(tmp_path: Path) -> SigningDraftWorkflow:
             bottom_pt=18.0,
             width_pt=180.0,
             height_pt=48.0,
+        )
+    )
+    workflow.set_placement_context(
+        SignaturePlacementContext(
+            page_index=0,
+            page_box=PageBox(left=0, bottom=0, right=612, top=792),
+            rotation=0,
         )
     )
     return workflow
@@ -1034,7 +1043,7 @@ def test_coordinator_save_current_appearance_profile_rejects_blank_and_duplicate
         coordinator.reconcile(SaveCurrentAppearanceProfile(name="Contract approval"))
 
 
-def test_coordinator_save_current_placement_profile_persists_rectangle_as_current_page(
+def test_coordinator_save_current_placement_profile_persists_fixed_visible_geometry(
     tmp_path: Path,
 ) -> None:
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
@@ -1059,9 +1068,11 @@ def test_coordinator_save_current_placement_profile_persists_rectangle_as_curren
     )
 
     saved = store.load_catalog().placement_profile_named("Bottom right")
-    assert saved.page_selection_mode == "current_page"
+    assert saved.page_number == 9
+    assert saved.source_page.visible_width_pt == 612.0
+    assert saved.source_page.visible_height_pt == 792.0
     assert saved.rect.left_pt == 11.0
-    assert saved.rect.bottom_pt == 12.0
+    assert saved.rect.top_pt == 736.0
     assert saved.rect.width_pt == 130.0
     assert saved.rect.height_pt == 44.0
 

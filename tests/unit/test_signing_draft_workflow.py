@@ -10,7 +10,10 @@ from cryptography.x509.oid import NameOID
 
 from foliaseal.application.certificate_preview import CertificatePreviewValues
 from foliaseal.application.coordinate_transform import PageBox, ViewRect, ViewTransform
-from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
+from foliaseal.application.reusable_signing_models import (
+    DEFAULT_PLACEMENT_SOURCE_PAGE,
+    ResolvedSignaturePreset,
+)
 from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftValidationError,
@@ -342,9 +345,7 @@ def test_workflow_blocks_compact_rectangles_that_backend_will_reject(
     preview = workflow.preview()
 
     assert preview.can_submit is False
-    assert any(
-        issue.code.startswith("visible_signature_layout") for issue in preview.issues
-    )
+    assert any(issue.code.startswith("visible_signature_layout") for issue in preview.issues)
     with pytest.raises(SigningDraftValidationError):
         workflow.build_signing_request()
 
@@ -475,6 +476,13 @@ def test_workflow_can_capture_and_apply_signature_setup(tmp_path: Path) -> None:
     )
     workflow.set_signature_appearance(appearance)
     workflow.signature_placement_defaults = placement_defaults
+    workflow.set_placement_context(
+        SignaturePlacementContext(
+            page_index=0,
+            page_box=PageBox(left=0, bottom=0, right=612, top=792),
+            rotation=0,
+        )
+    )
     workflow.selected_certificate_configuration_id = "cert-config-default"
 
     captured = workflow.capture_current_signature_setup("Team Standard")
@@ -512,6 +520,7 @@ def test_workflow_preserves_certificate_selection_for_partial_preset(
             width_pt=180.0,
             height_pt=72.0,
         ),
+        source_page=DEFAULT_PLACEMENT_SOURCE_PAGE,
     )
 
     workflow.apply_resolved_signature_preset(preset)
@@ -559,6 +568,13 @@ def test_workflow_captures_placement_defaults_from_current_rectangle(
             bottom_pt=18.0,
             width_pt=160.0,
             height_pt=64.0,
+        )
+    )
+    workflow.set_placement_context(
+        SignaturePlacementContext(
+            page_index=0,
+            page_box=PageBox(left=0, bottom=0, right=612, top=792),
+            rotation=0,
         )
     )
 

@@ -7,9 +7,11 @@ from foliaseal.application.coordinate_transform import (
     ViewTransform,
     pdf_point_to_view,
     pdf_rect_to_view_rect,
+    pdf_rect_to_visible_page_rect,
     validate_pdf_rect_within_page,
     view_point_to_pdf,
     view_rect_to_pdf_rect,
+    visible_page_rect_to_pdf_rect,
 )
 
 
@@ -125,3 +127,23 @@ def test_validate_pdf_rect_within_page_rejects_invalid_page_box() -> None:
             PdfRect(0, 0, 10, 10),
             page_box=PageBox(left=0, bottom=5, right=10, top=5),
         )
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_visible_page_geometry_round_trip(rotation: int) -> None:
+    page_box = PageBox(left=20, bottom=40, right=620, top=840)
+    original = PdfRect(x1=100, y1=120, x2=280, y2=210)
+
+    left, top, width, height = pdf_rect_to_visible_page_rect(
+        pdf_rect=original, page_box=page_box, rotation=rotation
+    )
+    recovered = visible_page_rect_to_pdf_rect(
+        left_pt=left,
+        top_pt=top,
+        width_pt=width,
+        height_pt=height,
+        page_box=page_box,
+        rotation=rotation,
+    )
+
+    assert recovered == pytest.approx(original)

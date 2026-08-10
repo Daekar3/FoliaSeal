@@ -11,9 +11,12 @@ from typing import Any
 
 from foliaseal.application import (
     CertificateManager,
+    PlacementEditorState,
     ReusableSigningObjects,
     SigningDraftWorkflow,
 )
+from foliaseal.application.reusable_signing_models import PlacementProfile
+from foliaseal.application.reusable_signing_objects import SavePlacement
 from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialPort,
     RepositoryBackedCertificateSigningMaterialPort,
@@ -62,6 +65,9 @@ from foliaseal.presentation.qt.app_frame_workspace_open import (
     WorkspaceOpenService,
 )
 from foliaseal.presentation.qt.document_signatures_dialog import DocumentSignaturesDialog
+from foliaseal.presentation.qt.placement_profile_editor_dialog import (
+    PlacementProfileEditorDialog,
+)
 from foliaseal.presentation.qt.signing_shell import (
     SigningRequestExecutor,
 )
@@ -117,6 +123,8 @@ class QtAppFrameBindings:
     q_vbox_layout: type[Any] | None = None
     q_list_widget: type[Any] | None = None
     q_text_edit: type[Any] | None = None
+    q_double_spin_box: type[Any] | None = None
+    q_spin_box: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -222,9 +230,7 @@ class AppSettingsDialog:
             appearance_mode.addItem(mode.value.title(), mode.value)
         current_mode = self._settings.ui_settings.appearance_mode.value
         mode_index = next(
-            index
-            for index, mode in enumerate(AppearanceMode)
-            if mode.value == current_mode
+            index for index, mode in enumerate(AppearanceMode) if mode.value == current_mode
         )
         appearance_mode.setCurrentIndex(mode_index)
         save_button = self._bindings.q_push_button("Save")
@@ -540,10 +546,7 @@ class FoliaSealAppFrame:
             if ready_to_sign
             else f"{action_text} without saving"
         )
-        body = (
-            "Continue editing, discard this unsigned signing draft, or "
-            f"{choice_text}?"
-        )
+        body = f"Continue editing, discard this unsigned signing draft, or {choice_text}?"
         decision = self._ask_workspace_decision(
             message_box,
             parent=self.window,
@@ -639,9 +642,7 @@ class FoliaSealAppFrame:
         try:
             continue_button = add_button("Continue editing", role_type.RejectRole)
             discard_button = add_button("Discard draft", role_type.DestructiveRole)
-            save_button = (
-                add_button("Sign and save", role_type.AcceptRole) if offer_save else None
-            )
+            save_button = add_button("Sign and save", role_type.AcceptRole) if offer_save else None
             dialog.setWindowTitle(title)
             dialog.setText(text)
             set_default = getattr(dialog, "setDefaultButton", None)
@@ -765,6 +766,8 @@ class FoliaSealAppFrame:
             library=self._reusable_objects,
             on_create=self._open_reusable_object_editor,
             on_edit=self._open_reusable_object_editor,
+            on_create_placement=self._open_placement_profile_editor,
+            on_edit_placement=self._edit_placement_profile,
         )
         self._dialog_compatibility = AppFrameDialogCompatibilityState(
             settings_dialog=self.settings_dialog,
@@ -833,6 +836,50 @@ class FoliaSealAppFrame:
             self._emit_error("Open a PDF before creating or editing reusable signing objects.")
             return False
         return workspace.maintenance.open_reusable_object_editor()
+
+    def _open_placement_profile_editor(self) -> bool:
+        """Open a document-independent placement editor from the Library."""
+        initial = PlacementEditorState.from_blank_page(
+            visible_width_pt=612.0,
+            visible_height_pt=792.0,
+        )
+        return self._run_placement_profile_editor(initial)
+
+    def _edit_placement_profile(self, profile: PlacementProfile) -> bool:
+        return self._run_placement_profile_editor(PlacementEditorState.from_profile(profile))
+
+    def _run_placement_profile_editor(self, initial: PlacementEditorState) -> bool:
+        if self._bindings.q_double_spin_box is None or self._bindings.q_spin_box is None:
+            self._emit_error("The placement editor requires the Qt numeric-input bindings.")
+            return False
+        saved = False
+
+        def save(profile: PlacementProfile) -> None:
+            nonlocal saved
+            self._reusable_objects.execute(
+                SavePlacement(
+                    name=profile.display_name,
+                    rect=profile.rect,
+                    source_page=profile.source_page,
+                    page_number=profile.page_number,
+                    pinned=profile.pinned,
+                    placement_profile_id=profile.placement_profile_id,
+                    overwrite=initial.placement_profile_id is not None,
+                )
+            )
+            saved = True
+            if self._reusable_object_library is not None:
+                self._reusable_object_library.refresh()
+
+        editor = PlacementProfileEditorDialog(
+            bindings=self._bindings,
+            parent=self.window,
+            initial=initial,
+            on_save=save,
+            on_error=self._emit_error,
+        )
+        editor.open()
+        return saved
 
     def _install_menus(self) -> None:
         menu_bar = self.window.menuBar()
@@ -1138,9 +1185,7 @@ class FoliaSealAppFrame:
         self._with_current_session_port(lambda session_port: session_port.fit_width_view())
 
     def _focus_document_search(self) -> None:
-        self._with_current_session_port(
-            lambda session_port: session_port.focus_document_search()
-        )
+        self._with_current_session_port(lambda session_port: session_port.focus_document_search())
 
     def _copy_selected_text_from_action(self) -> str | None:
         return self._with_current_shell_port(
@@ -1272,10 +1317,7 @@ class FoliaSealAppFrame:
         if not callable(geometry_getter):
             return self._app_settings
         rectangle = geometry_getter()
-        values = {
-            name: _qt_rect_value(rectangle, name)
-            for name in ("x", "y", "width", "height")
-        }
+        values = {name: _qt_rect_value(rectangle, name) for name in ("x", "y", "width", "height")}
         if any(value is None for value in values.values()):
             return self._app_settings
         try:
@@ -1330,9 +1372,7 @@ class FoliaSealAppFrame:
         )
 
     def _refresh_shell_signature_profiles(self) -> None:
-        self._with_current_shell_port(
-            lambda shell_port: shell_port.refresh_signature_profiles()
-        )
+        self._with_current_shell_port(lambda shell_port: shell_port.refresh_signature_profiles())
 
     def _with_current_shell_port(
         self,
@@ -1351,6 +1391,7 @@ class FoliaSealAppFrame:
         if workspace is None:
             return None
         return action(workspace.session)
+
 
 def _qt_rect_value(rectangle: Any, name: str) -> int | None:
     """Read a QRect-like integer property from real or fake Qt objects."""
@@ -1557,6 +1598,8 @@ class QtAppFrameAdapter:
             q_vbox_layout=getattr(qt_widgets, "QVBoxLayout"),
             q_list_widget=getattr(qt_widgets, "QListWidget"),
             q_text_edit=getattr(qt_widgets, "QTextEdit"),
+            q_double_spin_box=getattr(qt_widgets, "QDoubleSpinBox"),
+            q_spin_box=getattr(qt_widgets, "QSpinBox"),
         )
 
 
