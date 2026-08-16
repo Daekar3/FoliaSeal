@@ -1,5 +1,9 @@
 # Extend the Phase 3 harness workspace boundary for request, result, and capture reads
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -25,7 +29,7 @@ The architectural win is that the harness will stop reading request/result/captu
 - [x] (2026-06-11 12:01Z) Ran focused validation with `.venv/bin/python -m pytest -q tests/unit/test_qt_phase3_harness_workspace.py tests/unit/test_phase3_harness.py tests/unit/test_phase3_harness_session_runner.py`, `.venv/bin/python -m ruff check ...`, and `git diff --check`; all passed.
 - [x] (2026-06-11 12:05Z) Reconciled `docs/ARCHITECTURE.md` and this ExecPlan to the deeper workspace-boundary ownership split.
 - [x] (2026-06-11 12:07Z) Reviewed the slice against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan; no corrective follow-on was required because the slice remained behavior-preserving and left lifecycle/reporting ownership unchanged.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Historical publication marker closed; implementation commit `a10ddce66` is recorded above and this plan is archival.
 
 ## Surprises & Discoveries
 

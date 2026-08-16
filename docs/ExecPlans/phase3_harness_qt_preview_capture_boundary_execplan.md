@@ -1,5 +1,9 @@
 # Move the live Phase 3 preview-capture helper behind the workspace boundary
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -27,7 +31,7 @@ The architectural win is that the last live Qt preview-capture helper that reads
 - [x] (2026-06-11 13:24Z) Ran focused validation with `.venv/bin/python -m pytest -q tests/unit/test_qt_phase3_harness_workspace.py tests/unit/test_phase3_harness.py`, `.venv/bin/python -m ruff check ...`, and `git diff --check`; all passed.
 - [x] (2026-06-11 13:37Z) Reconciled `docs/ARCHITECTURE.md` and this ExecPlan to the implemented ownership split.
 - [x] (2026-06-11 13:35Z) Ran the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan; the only finding was a stale ExecPlan status entry, which has now been corrected. No code changes were required.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Historical publication marker closed; implementation commit `7602aa623` is recorded above and this plan is archival.
 
 ## Surprises & Discoveries
 

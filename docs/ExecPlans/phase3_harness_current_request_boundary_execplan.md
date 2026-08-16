@@ -1,5 +1,9 @@
 # Move live-shell current-request extraction behind a narrow workspace boundary
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -28,7 +32,7 @@ The architectural win is one more removed reach-through. `src/foliaseal/presenta
 - [x] (2026-06-23 22:36Z) Ran adjacent regression checks with `.venv/bin/python -m pytest -q tests/unit/test_phase3_signed_acceptance_matrix_runner.py tests/unit/test_phase3_harness_session_runner.py`; both passed.
 - [x] (2026-06-23 22:36Z) Updated `docs/ARCHITECTURE.md` and the stale notes in `docs/ExecPlans/phase3_harness_timestamp_boundary_execplan.md` so they no longer describe `current_request()` as a private-workflow leak.
 - [x] (2026-06-23 22:37Z) Completed the required `explorer-light` architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and the affected ExecPlans; the reviewer found the slice compliant and no corrective follow-on was required.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Historical publication marker closed; implementation commit `0ab01f604` is recorded above and this plan is archival.
 
 ## Surprises & Discoveries
 

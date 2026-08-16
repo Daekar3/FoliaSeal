@@ -1,5 +1,9 @@
 # Extract Phase 3 harness scenario application behind a narrow workspace boundary
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -25,7 +29,7 @@ The architectural win is that scenario mutation will stop being implemented twic
 - [x] (2026-06-07 21:02Z) Ran focused validation with `.venv/bin/python -m pytest -q tests/unit/test_qt_phase3_harness_workspace.py tests/unit/test_phase3_harness.py`, `.venv/bin/python -m ruff check ...`, and `git diff --check`; all passed.
 - [x] (2026-06-07 21:11Z) Reconciled `docs/ARCHITECTURE.md` to the implemented ownership split so the repo now names `phase3_harness_workspace.py` as the preview-scenario owner and keeps `phase3_harness_session_runner.py` as the intentional interactive lifecycle boundary.
 - [x] (2026-06-07 21:15Z) Ran the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan through a fresh `explorer-light` pass; no findings were reported.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Historical publication marker closed; implementation commit `0361563b9` is recorded above and this plan is archival.
 
 ## Surprises & Discoveries
 

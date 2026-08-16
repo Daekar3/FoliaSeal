@@ -1,5 +1,9 @@
 # Re-anchor Phase 3 signed-acceptance scenario execution on the workspace boundary
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -26,7 +30,7 @@ The architectural gain is narrower ownership: `phase3_signed_acceptance_scenario
 - [x] (2026-06-11 12:36Z) Ran focused validation with `.venv/bin/python -m pytest -q tests/unit/test_phase3_signed_acceptance_scenario_executor.py tests/unit/test_qt_phase3_harness_workspace.py tests/unit/test_phase3_signed_acceptance_matrix_runner.py tests/unit/test_phase3_harness.py`, `.venv/bin/python -m ruff check ...`, and `git diff --check`; all passed.
 - [x] (2026-06-11 12:44Z) Reconciled `docs/ARCHITECTURE.md` and this ExecPlan to the implemented ownership split.
 - [x] (2026-06-11 12:45Z) Ran the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan; the review found no issues and no corrective follow-on was required.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Historical publication marker closed; implementation commit `214f48361` is recorded above and this plan is archival.
 
 ## Surprises & Discoveries
 

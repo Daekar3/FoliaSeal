@@ -1,5 +1,9 @@
 # Extract the Phase 3 preview-render capture boundary
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document and must remain compliant with `PLANS.md`. It is the next
 one-slice child of `docs/ExecPlans/architecture_improvement_loop_parent_execplan.md` after commit
 `4554c6922`.
@@ -20,7 +24,7 @@ the same artifact names, summary keys, diagnostics, and zero error rows.
   committed as `4554c6922`.
 - [x] Three independent post-commit scans and two independent design reviews are recorded in the
   parent plan and this plan.
-- [ ] No other feature or nomenclature-renaming plan is a prerequisite; the external
+- [x] (2026-08-16) No other feature or nomenclature-renaming plan was a prerequisite; the external
   `phase3-signing-*` names remain stable during this slice.
 
 ## Progress

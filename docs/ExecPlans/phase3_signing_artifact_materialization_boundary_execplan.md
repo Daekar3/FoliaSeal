@@ -1,5 +1,9 @@
 # Move Concrete Signing-Artifact Materialization Behind the Existing Layout Adapter
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This living ExecPlan follows `.agents/skills/write-execplan/PLANS.md` and the fixed architecture
 loop in `docs/ExecPlans/architecture_improvement_loop_parent_execplan.md`. It is one complete DevLoop
 slice: move concrete PyHanko/Pillow artifact construction behind the existing application materializer,
@@ -49,8 +53,9 @@ adapter boundary tests, the full suite, and the offscreen signed acceptance matr
   the one-way dependency into neutral layout, and the dated backend-delegate retirement criterion.
 - [x] (2026-08-06) Added direct owner-boundary tests for concrete metrics, import isolation, exact-once
   materializer memoization, and option propagation.
-- [ ] Run compliance review, full/offscreen validation, documentation update, cleanup, measurement,
-  commit, and a fresh architecture rescan.
+- [x] (2026-08-16) Compliance review, full/offscreen validation, documentation update, cleanup,
+  measurement, commit, and architecture rescan are recorded in the completed outcomes below;
+  implementation commit `cf1a8d0a1` is archival.
 
 ## Surprises & Discoveries
 

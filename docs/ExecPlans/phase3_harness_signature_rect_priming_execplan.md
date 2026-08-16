@@ -1,5 +1,9 @@
 # Move live-shell signature-rect priming behind the compatibility surface
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -27,7 +31,7 @@ The architectural win is that `src/foliaseal/presentation/qt/phase3_harness_work
 - [x] (2026-06-22 22:47Z) Ran the adjacent regression checks recommended by the explorer: `.venv/bin/python -m pytest -q tests/unit/test_phase3_harness_session_runner.py tests/unit/test_phase3_signed_acceptance_matrix_runner.py`; both passed.
 - [x] (2026-06-22 22:47Z) Reconciled `docs/ARCHITECTURE.md` and this ExecPlan to the narrower ownership split so the compatibility surface now explicitly owns the live-shell signature-rect priming choreography.
 - [x] (2026-06-22 22:47Z) Ran the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan; no corrective follow-on was required.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Historical publication marker closed; implementation commit `5cfdd4de9` is recorded above and this plan is archival.
 
 ## Surprises & Discoveries
 

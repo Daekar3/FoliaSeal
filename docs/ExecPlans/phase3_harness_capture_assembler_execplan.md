@@ -1,5 +1,9 @@
 # Extract Phase 3 Harness Capture Assembler
 
+> **Archived completed plan (2026-08-16).** Retained for provenance; current
+> work belongs to the durable acceptance/evidence owners. Do not execute as an
+> active implementation queue.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
@@ -11,7 +15,7 @@ After this slice, the interactive Phase 3 harness will still behave the same fro
 ## Child ExecPlan Dependencies
 
 - [x] `docs/ExecPlans/phase3_evidence_service_program_execplan.md` is complete and already established the reporting boundary, the session-runner boundary, and the caller-facing evidence service.
-- [ ] No child ExecPlans are planned for this slice. Keep the implementation narrow enough to land as one behavior-change commit plus any required documentation/status follow-up.
+- [x] (2026-08-16) No child ExecPlans were required; the completed slice is archived after implementation, validation, documentation, and commit `537a8dc9c`.
 
 ## Progress
 
