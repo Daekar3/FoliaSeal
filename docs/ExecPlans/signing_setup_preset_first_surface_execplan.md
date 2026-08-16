@@ -23,7 +23,9 @@ The result must be observable in two ways. First, the right-hand setup surface s
 - [x] (2026-05-27 00:44Z) Ran focused validation with `pytest`, `ruff check`, and `git diff --check`.
 - [x] (2026-05-27 00:48Z) Ran the required post-implementation compliance review against `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/ARCHITECTURE.md`; the only gap was documentation drift.
 - [x] (2026-05-27 00:52Z) Updated documentation, including this ExecPlan and `docs/ARCHITECTURE.md`, to final state.
-- [ ] Commit the slice with a narrow behavior-oriented commit message.
+- [x] (2026-08-16) Revalidated the preset-first/reduced-appearance surface in the focused
+  preset/form suite and confirmed the completed implementation is present in the clean checkout;
+  this plan's stale commit marker is now reconciled in the closeout documentation commit.
 
 ## Surprises & Discoveries
 
@@ -49,7 +51,11 @@ The result must be observable in two ways. First, the right-hand setup surface s
 
 ## Outcomes & Retrospective
 
-The slice achieved the intended MVP simplification. The signing setup is now visibly preset-first, the visible-signature editor no longer exposes the low-level appearance controls that had already fallen out of the intended product model, and preview/signing behavior still preserves hidden loaded appearance values. Compliance review found no mismatch against `docs/SPEC.md` or `docs/SCHEMAS.md`; only `docs/ARCHITECTURE.md` and this ExecPlan needed final-state updates.
+The slice achieved the intended MVP simplification. The signing setup is now visibly preset-first, the
+visible-signature editor no longer exposes the low-level appearance controls that had already fallen
+out of the intended product model, and preview/signing behavior still preserves hidden loaded
+appearance values. Compliance review found no mismatch against `docs/SPEC.md` or `docs/SCHEMAS.md`;
+the stale historical commit marker is reconciled.
 
 ## Context and Orientation
 

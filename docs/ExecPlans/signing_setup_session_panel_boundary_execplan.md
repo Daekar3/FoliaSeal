@@ -24,7 +24,9 @@ The architectural win is narrower caller ownership. `SigningSetupSession` alread
 - [x] (2026-06-23 23:02Z) Ran focused validation with the exact shell save tests, `test_signing_setup_session.py -k save_preset`, `ruff check`, and `git diff --check`; all passed.
 - [x] (2026-06-23 23:04Z) Completed the required `explorer-light` compliance review; it found the slice architecture/spec compliant but surfaced one stale shell test that still asserted `result.name`.
 - [x] (2026-06-23 23:05Z) Fixed the stale shell test and reran the expanded shell save set plus `ruff check` and `git diff --check`; all passed.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Revalidated the current save boundary with the focused preset/form suite and
+  confirmed the completed implementation is present in the clean checkout; this plan's stale
+  commit marker is now reconciled in the closeout documentation commit.
 
 ## Surprises & Discoveries
 
@@ -51,8 +53,10 @@ The architectural win is narrower caller ownership. `SigningSetupSession` alread
 
 Implementation and focused validation are complete. Panel callers no longer depend on `ResolvedSignaturePreset` for the save path; `save_current_signature_preset()` now returns refreshed `SignaturePropertiesViewState | None`, which matches the existing `SigningSetupSession.save_preset(...)` boundary.
 
-The slice stayed narrow. It did not change workflow/schema/storage internals or the persisted preset format. The only remaining work is the compliance review and final commit.
-The slice stayed narrow. It did not change workflow/schema/storage internals or the persisted preset format. The compliance review found one stale shell test outside the original focused set; after correcting that assertion, the slice remained compliant. Only the final commit remains.
+The slice stayed narrow. It did not change workflow/schema/storage internals or the persisted preset
+format. The compliance review found one stale shell test outside the original focused set; after
+correcting that assertion, the slice remained compliant. Current callers and tests confirm the
+boundary, and the historical commit marker is reconciled.
 
 ## Context and Orientation
 

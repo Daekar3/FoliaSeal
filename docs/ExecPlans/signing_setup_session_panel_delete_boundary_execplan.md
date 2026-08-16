@@ -23,7 +23,9 @@ The architectural win is symmetry and narrower caller ownership. The save path a
 - [x] (2026-06-23 23:14Z) Updated the panel delete boundary to return `SignaturePropertiesViewState | None` and corrected the stale older ExecPlan interface note.
 - [x] (2026-06-23 23:15Z) Ran focused validation with the two shell delete tests, `ruff check`, and `git diff --check`; all passed.
 - [x] (2026-06-23 23:16Z) Completed the required `explorer-light` compliance review; the reviewer found the slice compliant with `docs/ARCHITECTURE.md` and `docs/SPEC.md`, and no further correction was needed.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Revalidated the current delete boundary with the focused preset/form suite
+  and confirmed the completed implementation is present in the clean checkout; this plan's stale
+  commit marker is now reconciled in the closeout documentation commit.
 
 ## Surprises & Discoveries
 
@@ -47,7 +49,10 @@ The architectural win is symmetry and narrower caller ownership. The save path a
 
 Implementation and focused validation are complete. Panel callers no longer depend on `SignaturePresetCatalog` for the delete path; `delete_current_signature_preset()` now returns refreshed `SignaturePropertiesViewState | None`, matching the existing `SigningSetupSession.delete_preset(...)` boundary.
 
-The slice stayed narrow. It did not change coordinator/workflow/store internals or the persisted preset format. The compliance review confirmed the current architecture/spec docs already match this boundary. Only the final commit remains.
+The slice stayed narrow. It did not change coordinator/workflow/store internals or the persisted
+preset format. The compliance review confirmed the current architecture/spec docs already match
+this boundary. Current callers and tests confirm the boundary, and the historical commit marker is
+reconciled.
 
 ## Context and Orientation
 

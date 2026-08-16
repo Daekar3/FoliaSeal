@@ -23,7 +23,9 @@ The result is observable in three ways. First, the `Certificate configuration` g
 - [x] (2026-05-27 01:04Z) Ran focused validation with `pytest`, `ruff check`, and `git diff --check`.
 - [x] (2026-05-27 01:04Z) Ran the required compliance review against `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/ARCHITECTURE.md`, then fixed any gaps.
 - [x] (2026-05-27 01:04Z) Updated documentation, including this ExecPlan and `docs/ARCHITECTURE.md`, to final state.
-- [ ] Commit the slice with one narrow commit.
+- [x] (2026-08-16) Revalidated the on-demand certificate-password surface in the focused
+  preset/form suite and confirmed the completed implementation is present in the clean checkout;
+  this plan's stale commit marker is now reconciled in the closeout documentation commit.
 
 ## Surprises & Discoveries
 
@@ -42,7 +44,10 @@ The result is observable in three ways. First, the `Certificate configuration` g
 
 ## Outcomes & Retrospective
 
-This section is complete. The slice is implemented, validated, reviewed for compliance, and documented; only the final commit remains. The main user-visible simplification is that certificate password entry is no longer a permanent setup-field distraction, while the underlying certificate-selection capability remains intact.
+This section is complete. The slice is implemented, validated, reviewed for compliance, and
+documented. The main user-visible simplification is that certificate password entry is no longer a
+permanent setup-field distraction, while the underlying certificate-selection capability remains
+intact. The stale historical commit marker is reconciled.
 
 ## Context and Orientation
 
