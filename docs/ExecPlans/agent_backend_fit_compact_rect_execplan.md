@@ -1,5 +1,10 @@
 # Backend fit correction for compact visible-signature rectangles
 
+> **Retired historical child (2026-08-16).** Current fit validation belongs to
+> `src/foliaseal/application/signing_backend.py` and modern preview/signing
+> plans. This historical worker record is retained for provenance only; its
+> remaining body is archival and must not be executed.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 

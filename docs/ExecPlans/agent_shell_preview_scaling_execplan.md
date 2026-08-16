@@ -1,5 +1,10 @@
 # Shell Preview Scaling and Fixed-Width Contract
 
+> **Retired historical child (2026-08-16).** The current Qt shell and preview
+> fidelity plan own this behavior. The old worker record is retained for
+> provenance only and must not direct edits to obsolete paths. Its remaining
+> implementation instructions are archival.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 

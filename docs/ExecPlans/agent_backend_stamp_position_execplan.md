@@ -1,5 +1,10 @@
 # Backend Stamp Position and Visible Signature Layout Fixes
 
+> **Retired historical child (2026-08-16).** Current stamp placement belongs
+> to `src/foliaseal/application/signing_backend.py` and modern layout plans.
+> This historical worker record is not an active implementation queue; its
+> remaining body is archival.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 

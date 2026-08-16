@@ -1,5 +1,18 @@
 # Visible Signature Output Analysis and Corrective Wave
 
+> **Retired historical plan (2026-08-16).** This March-April corrective wave
+> is preserved for rationale only. Its original source paths and `phase3`
+> nomenclature are obsolete; current work belongs to
+> `ui_preview_fidelity_fit_validation_execplan.md`,
+> `ui_appearance_content_layout_execplan.md`, and
+> `ui_product_support_and_release_execplan.md`.
+> The remaining narrative and command examples below are archival context, not
+> an active implementation queue.
+
+This file is historical and non-actionable. Do not execute its old steps or
+edit its removed `phase3` paths. Use the current owner plans and modules named
+below for any new work.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
@@ -7,17 +20,10 @@ This document must be maintained in accordance with `.agents/skills/write-execpl
 
 ## Purpose / Big Picture
 
-The current visible-signature flow now signs PDFs successfully and no longer crashes in the basic
-`Stamp Position` paths, but the harness run shows that preview fidelity and final PDF appearance are
-still not trustworthy enough for real use. After this wave, a user should be able to draw a normal
-signature rectangle, choose a `Stamp Position`, and rely on the preview as an honest representation
-of what the PDF will show. The final PDF should no longer massively overscale the stamp image in
-ordinary cases, the preview panel should not widen itself to accommodate overflowing content, and
-our tooling should let us inspect the actual PDF appearance instead of guessing from symptoms.
-
-This work matters because the current problems are not just cosmetic. They make it hard to tell
-whether the app is respecting the user’s requested layout, and they force repeated manual harness
-runs without enough evidence to diagnose the real failure mode.
+Historically, this wave targeted visible-signature preview/output discrepancies
+and harness diagnostics. Those goals were superseded by the current preview,
+signing-backend, and release plans; the historical user-facing target is
+retained below only as provenance.
 
 ## Progress
 
@@ -28,25 +34,24 @@ runs without enough evidence to diagnose the real failure mode.
   into the backend appearance type before summarizing it.
 - [x] (2026-03-31 23:59Z) Added actual-output inspection helpers that capture the signed PDF’s
   annotation rectangle, appearance stream facts, and image XObject summaries.
-- [ ] Inspect the current shell preview sizing path to stop the side panel from widening itself.
-- [ ] Correct the preview contract so it never stretches the preview container to “fit” oversized
-  text; it must instead show overflow honestly inside a fixed-size preview card.
-- [ ] Correct the backend single-line stamp-image sizing for `Top` and `Bottom` so the image is
-  constrained by the true remaining rectangle space.
+- [x] (2026-08-16) Superseded the historical shell-sizing tasks with the
+  current `signing_shell.py` preview contract and
+  `ui_preview_fidelity_fit_validation_execplan.md`.
+- [x] (2026-08-16) Superseded the historical vertical stamp-fit task with
+  current `signing_backend.py` behavior and its modern signing-backend tests.
 - [x] (2026-04-01 00:00Z) Launched the next corrective wave with three explicit ownership slices:
   shell preview sizing, harness/output diagnostics, and backend fit correction.
 - [x] (2026-03-31 23:59Z) Ran focused verification on the harness slice that exercises the new
   capture fields.
 - [x] (2026-04-01 00:15Z) Integrated the first three-worker corrective wave and verified the
   merged shell, harness, and backend slices together (`64 passed`, `ruff` clean).
-- [ ] Fix the preview card so it scales to the available panel width instead of staying at a small
-  fixed viewport that can render text effectively invisible.
-- [ ] Fix the preview card/body sizing contract so the card is not fixed to the inner body height
-  and does not clip title/detail content into an apparently empty preview.
-- [ ] Improve `single_line` horizontal (`Left`/`Right`) stamp sizing so the backend uses the real
-  wrapped text footprint more effectively and does not leave excessive unused space beside the text.
-- [ ] Run the narrow harness rerun on `single_line` `Top`, `Bottom`, and `Left` when the shell
-  preview and backend fit work are stable enough to interpret together.
+- [x] (2026-08-16) Superseded the historical preview-card scaling/body tasks
+  with the current fixed-width Qt-shell tests and modern preview-fidelity plan.
+- [x] (2026-08-16) Superseded the historical horizontal stamp-fit task with
+  current `signing_backend.py` reservation/ink-fit behavior and regression tests.
+- [x] (2026-08-16) Superseded the historical manual rerun marker with current
+  source-tree/offscreen preview, signing-parity, and X11 evidence; no new
+  manual run is required by this retired plan.
 - [x] (2026-04-01 00:40Z) Recorded the proposed next instrumentation upgrade wave so the current
   preview/output work has a clear follow-on path once the remaining Phase 3 parity issues settle.
 
@@ -145,30 +150,26 @@ runs without enough evidence to diagnose the real failure mode.
 
 ## Outcomes & Retrospective
 
-The harness/output-analysis slice is now providing the key evidence the wave needed: request-side
-layout, backend reservation data, and actual signed-PDF visible-appearance facts are all captured in
-one place. The first backend follow-up also brought `single_line` `Top` and `Bottom` much closer to
-acceptable output. The remaining work is now narrower: make the preview card scale and clip
-honestly inside the available panel width, and improve horizontal `Left`/`Right` stamp fit so the
-stamp uses the reserved area more effectively. A future instrumentation upgrade should build on this
-foundation with preview snapshots, rendered output crops, and deterministic replay support.
+This document is retired rather than an active implementation queue. Its
+diagnostic helpers, fixed preview sizing, and stamp-fit work were absorbed into
+the current module layout and modern ExecPlans. Historical observations remain
+below for provenance, but no contributor should edit the removed source paths.
+
+The harness/output-analysis evidence and corrective work were absorbed into
+current owners. No remaining work is actionable from this retired wave.
 
 ## Context and Orientation
 
 The main files involved are:
 
 - `src/foliaseal/presentation/qt/signing_shell.py`
-- `src/foliaseal/presentation/qt/phase3_harness.py`
-- `src/foliaseal/application/phase3_signing_backend.py`
+- `src/foliaseal/presentation/qt/interactive_harness.py` and its evidence modules
+- `src/foliaseal/application/signing_backend.py`
 - `tests/unit/test_qt_signing_shell.py`
-- `tests/unit/test_phase3_harness.py`
-- `tests/unit/test_phase3_signing_backend.py`
+- current interactive/evidence and signing-backend tests
 
-The Qt shell renders a live preview card. The backend uses pyHanko to build the actual visible
-signature that gets embedded in the signed PDF. Right now those two paths are both trying to be
-helpful, but they still disagree in important cases. The preview panel can widen itself to
-accommodate content, the harness diagnostics path is still asking the wrong object for reservation
-data, and the actual PDF can overscale the stamp image in ways the preview does not explain.
+The Qt shell and signing backend now own the current behavior. The historical
+disagreements below are retained as evidence, not as an open defect queue.
 
 “Actual output analysis” in this repository should mean code that inspects the produced signed PDF
 and extracts useful, machine-readable facts about the visible appearance. That can include the
@@ -178,37 +179,15 @@ inside tests; the goal is enough objective evidence to explain why the output lo
 
 ## Plan of Work
 
-Start with the shell preview contract again, but now target the remaining specific failure. In
-`src/foliaseal/presentation/qt/signing_shell.py`, the preview should scale to the available panel
-width while preserving the selected rectangle’s aspect ratio. The preview card itself should not be
-fixed to the inner body height; only the body region should be constrained. The goal is a preview
-that stays stable, uses the available horizontal space, and clips/overflows honestly instead of
-collapsing into an empty-looking miniature card.
-
-Then tighten the backend’s horizontal `single_line` fit logic in
-`src/foliaseal/application/phase3_signing_backend.py`. The current `Left`/`Right` path measures a
-text box and reserves width conservatively, which leaves too much unused space and makes the stamp
-smaller than necessary. The next pass should use the real wrapped body footprint more effectively so
-the stamp can grow when the text occupies less width than the current reservation assumes.
+No implementation work remains in this retired plan. Current contributors
+should follow `ui_preview_fidelity_fit_validation_execplan.md`,
+`ui_appearance_content_layout_execplan.md`, the signing-backend owner plans,
+or `ui_product_support_and_release_execplan.md` as appropriate.
 
 ## Concrete Steps
 
-From `/home/daekar/FoliaSeal`:
-
-1. Inspect and patch the shell preview card/body sizing behavior in
-   `src/foliaseal/presentation/qt/signing_shell.py`.
-2. Tighten backend `single_line` horizontal image-fit logic in
-   `src/foliaseal/application/phase3_signing_backend.py`.
-5. Run focused tests:
-
-       ./.venv/bin/python -m pytest -q tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py
-       ./.venv/bin/ruff check src/foliaseal/presentation/qt/signing_shell.py src/foliaseal/application/phase3_signing_backend.py tests/unit/test_qt_signing_shell.py tests/unit/test_phase3_signing_backend.py
-
-6. Perform a narrow harness rerun covering:
-   - `single_line / Top`
-   - `single_line / Bottom`
-   - `single_line / Left`
-   - `single_line / Right`
+There are no runnable steps in this retired plan. Do not recreate the old
+`phase3` commands or source paths; consult the current owner plans instead.
 
 ## Validation and Acceptance
 
@@ -252,9 +231,8 @@ already much better than today’s state.
 No new third-party dependencies are required by default. Use the existing pyHanko and PDF reader
 stack already in the environment.
 
-If a helper module is added, keep it close to `src/foliaseal/application/phase3_signing_backend.py`
-so the harness can use the same inspection logic as the signing backend without duplicating PDF
-parsing rules.
+If new evidence work is needed, add it under the current interactive/evidence
+owners and their modern ExecPlans rather than reviving the historical wave.
 
 Any spawned agent in this wave must:
 

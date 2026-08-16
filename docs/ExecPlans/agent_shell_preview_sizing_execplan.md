@@ -1,5 +1,10 @@
 # Shell Preview Sizing Fixes for Visible Signature Output
 
+> **Retired historical child (2026-08-16).** The fixed-width preview behavior
+> is now owned by `signing_shell.py`, its current tests, and the modern preview
+> fidelity ExecPlan; this old worker record is not an implementation queue. The
+> remaining body is archival and must not be executed.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 

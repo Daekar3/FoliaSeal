@@ -1,5 +1,10 @@
 # Visible Signature Output Analysis and Corrective Wave
 
+> **Retired historical child (2026-08-16).** The referenced legacy harness
+> module and nomenclature were removed. Current evidence capture is owned by
+> the interactive/evidence harness modules and the modern release ExecPlans.
+> The remaining implementation instructions are archival and must not be run.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
@@ -34,8 +39,9 @@ stream need to be visible in one capture so we can stop guessing at why a signat
   tests.
 - [x] (2026-03-31 23:59Z) Ran focused verification and style checks on the harness and backend
   surfaces.
-- [ ] Schedule the next narrow manual harness rerun when the surrounding shell/output parity work
-  is stable enough to interpret the new capture fields interactively.
+- [x] (2026-08-16) Superseded the historical manual rerun marker with the
+  current source-tree/offscreen evidence and release-audit records. This child
+  is retained as rationale, not as an open interactive task.
 
 ## Surprises & Discoveries
 

@@ -1,5 +1,11 @@
 # Fix backend stamp image sizing for visible signatures
 
+> **Retired historical child (2026-08-16).** Backend fit behavior now belongs
+> to `src/foliaseal/application/signing_backend.py` and its current tests. The
+> old worker record is retained for provenance only; its legacy paths and
+> nomenclature are not active implementation targets. The remaining body is
+> archival and must not be executed.
+
 This ExecPlan is a living document. It must be maintained in accordance with [`.agents/skills/write-execplan/PLANS.md`](/home/daekar/FoliaSeal/.agents/skills/write-execplan/PLANS.md), and it must stay self-contained so a newcomer can pick it up without any prior context.
 
 ## Purpose / Big Picture

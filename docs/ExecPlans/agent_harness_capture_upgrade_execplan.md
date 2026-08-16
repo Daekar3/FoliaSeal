@@ -1,5 +1,11 @@
 # Harness Capture Upgrade for Pre-Submit Diagnostics
 
+> **Retired historical child (2026-08-16).** Its legacy harness paths and
+> terminology are preserved only as historical rationale. Current capture
+> ownership is distributed across the interactive/evidence harness modules and
+> current release plans. The implementation instructions below are archival
+> and must not be executed against the current checkout.
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
