@@ -31,7 +31,8 @@ No lifecycle or readiness behavior is added here.
   review states, source-safety blocking, caveats, and `Saved but not verified` recovery projection.
 - [x] Rewrite stale dependency, deferred-behavior, outcome, and acceptance wording in both children.
 - [x] Reconcile parent markers and architecture records without closing display/HITL or release gates.
-- [x] Run documentation/static validation, clean artifacts, and prepare the reconciliation for commit.
+- [x] (2026-08-16) Run documentation/static validation, clean artifacts, and prepare the reconciliation for commit. Ruff, compileall, `git diff --check`, focused lifecycle/readiness coverage (`28 passed`), and process cleanup are green.
+- [x] (2026-08-16) Commit the five-file reconciliation as `d27c23114`; the worktree is clean.
 
 ## Surprises & Discoveries
 
@@ -112,7 +113,8 @@ source. Remove no user files or ignored QA artifacts.
 ## Artifacts and Notes
 
 Record the current source/test evidence, changed plan paths, architecture history note if needed, and
-the commit hash. Do not commit PDFs, certificates, screenshots, caches, or package roots.
+the commit hash (`d27c23114`). Do not commit PDFs, certificates, screenshots, caches, or package
+roots.
 
 ## Interfaces and Dependencies
 
