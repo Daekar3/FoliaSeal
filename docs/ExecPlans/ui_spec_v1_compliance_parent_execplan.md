@@ -724,6 +724,12 @@ Release tranche:
   skipped, 1 warning`). This closes only the audit-harness friction; screen-reader speech,
   high-contrast/physical-DPI/monitor interpretation, privileged installation, and final release
   signoff remain external, and Wayland remains deferred.
+- [x] (2026-08-16) Completed the canonical-preview cleanup follow-up: focused preview/evidence/
+  parity validation passed (`67 passed`), the full suite passed (`1584 passed, 20 skipped, 1
+  warning`), and the final exact-prefix canonical-preview root check was empty. Adapter exception
+  cleanup, direct-renderer test cleanup, and explicit renderer-failure/adapter
+  success-and-exception ownership tests are complete; display-backed, privileged-host, final
+  release, and Mint 22.3 Wayland gates remain as previously recorded.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

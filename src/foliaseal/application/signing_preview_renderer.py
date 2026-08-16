@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -307,6 +308,39 @@ def render_canonical_signature_preview(
     flatten_to_white: bool = True,
     use_horizontal_ink_reservation: bool = True,
 ) -> CanonicalSignaturePreviewSnapshot | None:
+    """Render the visible signature and remove a partial temp root on failure."""
+
+    temp_dir = Path(mkdtemp(prefix="foliaseal-canonical-preview-"))
+    try:
+        snapshot = _render_canonical_signature_preview_in_dir(
+            preview,
+            temp_dir,
+            zoom=zoom,
+            render_port=render_port,
+            render_backend=render_backend,
+            include_border=include_border,
+            flatten_to_white=flatten_to_white,
+            use_horizontal_ink_reservation=use_horizontal_ink_reservation,
+        )
+        if snapshot is None:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        return snapshot
+    except Exception:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
+
+
+def _render_canonical_signature_preview_in_dir(
+    preview: SigningDraftPreview,
+    temp_dir: Path,
+    *,
+    zoom: float,
+    render_port: PreviewRasterRenderer | None,
+    render_backend: Any | None,
+    include_border: bool,
+    flatten_to_white: bool,
+    use_horizontal_ink_reservation: bool,
+) -> CanonicalSignaturePreviewSnapshot | None:
     """Render the visible signature using the canonical stamp engine."""
 
     if render_port is not None and render_backend is not None:
@@ -324,7 +358,6 @@ def render_canonical_signature_preview(
     ):
         return None
 
-    temp_dir = Path(mkdtemp(prefix="foliaseal-canonical-preview-"))
     full_style = _canonical_preview_stamp_style(
         preview,
         include_text=True,

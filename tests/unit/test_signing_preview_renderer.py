@@ -1,4 +1,5 @@
 import json
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -79,6 +80,31 @@ def _workflow(tmp_path: Path) -> SigningDraftWorkflow:
         timestamp_required=True,
         certificate_alias="signing-cert",
     )
+
+
+def test_renderer_removes_partial_temp_root_when_rasterizer_fails(tmp_path: Path) -> None:
+    class _FailingRenderer:
+        def render_page(self, _request):
+            raise RuntimeError("rasterizer failed")
+
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    workflow.set_signature_rect(build_signature_rect())
+    preview = workflow.preview()
+    before = {
+        path
+        for path in Path(tempfile.gettempdir()).iterdir()
+        if path.is_dir() and path.name.startswith("foliaseal-canonical-preview-")
+    }
+    with pytest.raises(RuntimeError, match="rasterizer failed"):
+        render_canonical_signature_preview(preview, render_port=_FailingRenderer())
+
+    roots = {
+        path
+        for path in Path(tempfile.gettempdir()).iterdir()
+        if path.is_dir() and path.name.startswith("foliaseal-canonical-preview-")
+    }
+    assert roots <= before
 
 
 def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:

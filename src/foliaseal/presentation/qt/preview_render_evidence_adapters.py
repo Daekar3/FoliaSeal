@@ -93,6 +93,35 @@ def build_qt_preview_render_capture_payload(
     artifacts_dir: str | None,
     artifact_basename: str,
 ) -> dict[str, Any]:
+    """Build Qt evidence while always releasing the temporary analysis snapshot."""
+
+    snapshot_holder: dict[str, Any] = {"snapshot": None}
+    try:
+        return _build_qt_preview_render_capture_payload(
+            dependencies=dependencies,
+            preview_controls=preview_controls,
+            canonical_preview_render_backend=canonical_preview_render_backend,
+            preview=preview,
+            artifacts_dir=artifacts_dir,
+            artifact_basename=artifact_basename,
+            register_analysis_snapshot=lambda snapshot: snapshot_holder.__setitem__(
+                "snapshot", snapshot
+            ),
+        )
+    finally:
+        dependencies.cleanup_canonical_preview_tempdir(snapshot_holder["snapshot"])
+
+
+def _build_qt_preview_render_capture_payload(
+    *,
+    dependencies: PreviewRenderEvidenceDependencies,
+    preview_controls: Any,
+    canonical_preview_render_backend: Any,
+    preview: Any,
+    artifacts_dir: str | None,
+    artifact_basename: str,
+    register_analysis_snapshot: Callable[[Any], None],
+) -> dict[str, Any]:
     render_canonical_signature_preview = dependencies.render_canonical_signature_preview
     build_preview_analysis_engine = dependencies.build_preview_analysis_engine
     write_widget_capture_png = dependencies.write_widget_capture_png
@@ -107,7 +136,6 @@ def build_qt_preview_render_capture_payload(
     preview_text_color_rgba = dependencies.preview_text_color_rgba
     preview_padding_for_capture = dependencies.preview_padding_for_capture
     layout_spacing = dependencies.layout_spacing
-    cleanup_canonical_preview_tempdir = dependencies.cleanup_canonical_preview_tempdir
 
     card_container = preview_controls.card_container
     single_body = preview_controls.single_body_container
@@ -138,6 +166,7 @@ def build_qt_preview_render_capture_payload(
                     canonical_preview_render_backend
                 )
             analysis_snapshot = render_canonical_signature_preview(preview, **render_kwargs)
+            register_analysis_snapshot(analysis_snapshot)
             analysis_image_path = str(target_dir / f"{artifact_basename}_analysis.png")
             if analysis_snapshot is not None:
                 shutil.copyfile(analysis_snapshot.image_path, analysis_image_path)
@@ -263,7 +292,6 @@ def build_qt_preview_render_capture_payload(
         analysis_values=analysis_values,
         dependencies=dependencies,
     )
-    cleanup_canonical_preview_tempdir(analysis_snapshot)
     return payload
 
 
@@ -274,12 +302,35 @@ def capture_headless_preview_render(
     artifacts_dir: str | None,
     artifact_basename: str,
 ) -> dict[str, Any]:
+    """Build headless evidence while always releasing its temporary snapshot."""
+
+    snapshot_holder: dict[str, Any] = {"snapshot": None}
+    try:
+        return _capture_headless_preview_render(
+            dependencies=dependencies,
+            preview=preview,
+            artifacts_dir=artifacts_dir,
+            artifact_basename=artifact_basename,
+            register_snapshot=lambda snapshot: snapshot_holder.__setitem__("snapshot", snapshot),
+        )
+    finally:
+        dependencies.cleanup_canonical_preview_tempdir(snapshot_holder["snapshot"])
+
+
+def _capture_headless_preview_render(
+    *,
+    dependencies: PreviewRenderEvidenceDependencies,
+    preview: Any,
+    artifacts_dir: str | None,
+    artifact_basename: str,
+    register_snapshot: Callable[[Any], None],
+) -> dict[str, Any]:
     render_canonical_signature_preview = dependencies.render_canonical_signature_preview
     build_preview_analysis_engine = dependencies.build_preview_analysis_engine
-    cleanup_canonical_preview_tempdir = dependencies.cleanup_canonical_preview_tempdir
     preview_text_color_rgba = dependencies.preview_text_color_rgba
     preview_padding_for_capture = dependencies.preview_padding_for_capture
     canonical_snapshot = render_canonical_signature_preview(preview)
+    register_snapshot(canonical_snapshot)
     image_path = None
     analysis_image_path = None
     image_error = None
@@ -371,7 +422,6 @@ def capture_headless_preview_render(
         analysis_values=analysis_values,
         dependencies=dependencies,
     )
-    cleanup_canonical_preview_tempdir(canonical_snapshot)
     return payload
 
 

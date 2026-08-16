@@ -219,6 +219,12 @@ Qt surface, focused tests, and observable acceptance.
   `foliaseal-canonical-preview-*` temporary image roots from direct preview-render consumers;
   all were verified idle, removed as exact owned cleanup targets, and recorded as cleanup
   friction for future preview-lifecycle hardening. No unrelated `/tmp` entries were removed.
+- [x] (2026-08-16) Completed the canonical-preview cleanup child: focused preview/evidence/parity
+  validation passed (`67 passed`), the full suite passed (`1584 passed, 20 skipped, 1 warning`),
+  and the final exact-prefix canonical-preview root check was empty. Exception-safe adapter
+  cleanup, test-scoped direct-renderer cleanup, and explicit renderer-failure/adapter
+  success-and-exception ownership tests are complete; display-backed accessibility, privileged
+  host installation, final release acceptance, and Mint 22.3 Wayland deferral remain unchanged.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor
