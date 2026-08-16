@@ -203,6 +203,13 @@ Qt surface, focused tests, and observable acceptance.
   failure is therefore retained as intermittent desktop focus/input friction rather than treated
   as an AppFrame defect; product code and Qt shortcut wiring remain unchanged. The temporary
   report root was removed during closeout and no FoliaSeal-owned processes or windows remained.
+- [x] (2026-08-16) Repeated the supported X11 audit with Orca present (`46.1`) and inspected the
+  exact Qt-owned screenshot. One native-F1 attempt opened Help; the two-monitor frame reported
+  `1100x700`, primary `1920x1080`, DPR `1.0`, and logical DPI `96`, with no clipping in the menu,
+  empty-state message, Open, or Library controls. AT-SPI remained unavailable because the session
+  bus lacks `org.a11y.atspi.Registry`; this strengthens machine/X11 evidence only and does not
+  close human speech/contrast, physical-DPI interpretation, privileged installation, final release,
+  or deferred Wayland gates. The exact report/screenshot root and owned processes were cleaned.
 - [x] (2026-08-16) Re-ran the automated release gates from a fresh build: full suite `1574 passed,
   20 skipped, 1 warning`, Ruff/compile checks clean, PyInstaller bundle successful, and fresh
   Debian extraction plus private `dpkg --unpack` smoke passed with five offline Help topics,

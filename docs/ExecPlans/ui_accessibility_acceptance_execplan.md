@@ -66,6 +66,13 @@ as environment-dependent rather than being falsely claimed by headless tests.
   native input. This closes the source-tree native-X11 keyboard/Help evidence slice, not human
   screen-reader speech, high contrast, physical-DPI interpretation, packaged GUI, privileged
   installation, final release acceptance, or Wayland.
+- [x] (2026-08-16) Repeated the bounded X11 audit with Orca present (`orca 46.1`) and captured one
+  inspected Qt-owned frame on the two-monitor Cinnamon session. The audit passed in one native-F1
+  attempt with `1100x700` geometry, `1920x1080` primary display, DPR `1.0`, logical DPI `96`,
+  full-width Open/Library controls, accessible Help controls, and clean teardown. The optional
+  AT-SPI probe remained `unavailable` because the session bus does not advertise
+  `org.a11y.atspi.Registry`; this is machine evidence only and does not close human speech,
+  contrast, physical-DPI, or final-release gates. The exact screenshot/report root was removed.
 
 ## Surprises & Discoveries
 
