@@ -214,6 +214,9 @@ Release tranche:
 - [x] docs/ExecPlans/ui_accessibility_acceptance_execplan.md — focused real-Qt/offscreen
   accessibility acceptance is implemented and validated; display-backed screen-reader,
   high-contrast, DPI/monitor, package-install, and final release gates remain open.
+- [ ] docs/ExecPlans/ui_installed_package_hitl_release_matrix_execplan.md — AFK preparation and
+  scenario mapping are complete; the installed-package human matrix and final release signoff
+  remain open, while privileged host installation is separate.
 - [x] docs/ExecPlans/release_readiness_reconciliation_execplan.md — active-plan status
   reconciliation verifies completed behavior and preserves genuine release/HITL gates.
 
@@ -767,6 +770,17 @@ Release tranche:
   minimal Qt registration is discoverable by process ID, while FoliaSeal's larger tree still hits
   the bounded host timeout at an individual child call; no complete accessibility-tree or human
   screen-reader claim is inferred.
+- [x] (2026-08-16) Recorded the Mint Screen Reader/Orca minimal-PySide6 baseline and created the
+  installed-package HITL release-matrix child. Qt warnings are now explicitly non-blocking unless
+  FoliaSeal exhibits a user-visible accessibility failure; the remaining release work is the
+  packaged human matrix, separate privileged installation, and final signoff.
+- [x] (2026-08-16) Rebuilt and audited the current Debian package in offline and Cinnamon/X11
+  display-backed modes. Both audits passed Help/resource/Poppler/startup checks and cleanup; the
+  generated package and build roots were removed. The next required action is the installed-package
+  HITL matrix, not another AFK accessibility-harness loop.
+- [x] (2026-08-16) Repeated the package evidence through the private `dpkg --unpack` install-root
+  path; extraction and install-root parity passed with clean owned-root/process teardown. This
+  does not modify or certify the host package database and does not replace the human matrix.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

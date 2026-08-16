@@ -30,9 +30,9 @@ success when the environment cannot provide it.
 - [x] A real display-backed packaged desktop launch is covered by
   `packaged_x11_gui_acceptance_execplan.md`; its supported-X11 startup evidence
   is complete.
-- [ ] Human screen-reader, high-contrast, physical-DPI, and monitor observations
-  remain an external evidence gate and are intentionally classified rather than
-  faked here.
+- [ ] `docs/ExecPlans/ui_installed_package_hitl_release_matrix_execplan.md` owns the
+  remaining installed-package human matrix, including screen-reader, high-contrast,
+  physical-DPI, monitor, and full workflow observations.
 
 ## Progress
 
@@ -57,6 +57,13 @@ success when the environment cannot provide it.
   conversion, and clean owned-process/root teardown. This closes packaged-X11
   startup evidence only; human accessibility, privileged host installation,
   and final release acceptance remain open.
+- [x] (2026-08-16) Reconciled the successful minimal PySide6/Orca accessibility baseline with
+  this package boundary. Qt AT-SPI warnings remain diagnostic context only; installed-package
+  speech and workflow behavior belong to the dedicated HITL matrix child.
+- [x] (2026-08-16) Rebuilt the current package and passed both offline and display-backed audits
+  with five Help topics, 18 fonts, two runtime icons, Poppler conversion, `gui_startup.status=started`
+  under `offscreen` and `xcb`, and clean generated-root/process teardown. The known optional
+  PyInstaller warnings remain recorded as nonblocking.
 
 ## Surprises & Discoveries
 

@@ -59,6 +59,9 @@ Qt surface, focused tests, and observable acceptance.
 - [x] docs/ExecPlans/ui_accessibility_acceptance_execplan.md — focused real-Qt/offscreen keyboard,
   names/roles, menu-mnemonic, support-dialog, Settings, minimum-size, and Unicode-path acceptance
   passes; display-backed screen-reader/high-contrast/DPI and package-install gates remain open.
+- [ ] docs/ExecPlans/ui_installed_package_hitl_release_matrix_execplan.md — AFK package/evidence
+  preparation is defined; the installed-package human matrix remains the primary remaining
+  cross-surface gate, with privileged host installation tracked separately.
 
 ## Progress
 
@@ -286,17 +289,31 @@ Qt surface, focused tests, and observable acceptance.
   final normal/forced X11 audits that passed native F1 and cleanup, and full validation of `1597
   passed, 20 skipped, 1 warning`; the installed-package HITL/release matrix remains the only
   corresponding release gate.
-- [ ] (remaining release gate) Close one installed-package HITL/release-matrix session. The
-  focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
-  controlled AT-SPI comparison is complete but remains unavailable at the session bridge. The
-  installed-package session owns screen-reader,
-  high-contrast, physical-DPI/monitor interpretation, human GUI workflow, and package behavior.
+- [x] (2026-08-16) Defined `ui_installed_package_hitl_release_matrix_execplan.md` as the single
+  installed-package HITL matrix. It records the minimal PySide6/Orca baseline, maps all ten UI_SPEC
+  scenarios and the SPEC release bar to observations, and explicitly treats Qt AT-SPI warnings as
+  non-blocking unless FoliaSeal has a user-visible behavior failure.
+- [x] (2026-08-16) Rebuilt `foliaseal_0.1.0_amd64.deb` and passed both offline and
+  Cinnamon/X11 display-backed package audits. Five Help topics, 18 fonts, two runtime icons,
+  Poppler conversion, packaged startup (`offscreen` and `xcb`), and cleanup all passed; generated
+  package/build/staging roots were removed. Known optional PyInstaller warnings for `pycparser`
+  generated tables and `libtiff.so.5` remain nonblocking.
+- [x] (2026-08-16) Repeated the fresh package run through the private `dpkg --unpack` install-root
+  audit. Extraction and install-root parity both passed Help/resource/font/icon/Poppler/startup
+  checks and cleanup without touching the host package database; this remains supporting evidence,
+  not installed-package HITL or privileged host acceptance.
+- [ ] (remaining primary cross-surface gate) Close the installed-package HITL/release-matrix
+  session. The focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are
+  complete; the controlled AT-SPI comparison is complete but remains unavailable at the session
+  bridge. The installed-package session owns screen-reader speech, high contrast, physical-DPI and
+  monitor interpretation, human GUI workflow, and packaged behavior.
   Keep the packaged GUI probe explicitly limited by its isolated `SingleInstanceUnavailable`
   boundary, state the V1 Linux acceptance target as Cinnamon/X11 with Wayland intentionally
   deferred to a later compatibility tranche, and clean processes and artifacts after each
   attempt.
-- [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
-  corpus after the controlled AT-SPI comparison and installed-package session close.
+- [ ] (remaining release gate) Complete privileged host installation separately if desired, then
+  update this plan and relevant docs and commit the final release corpus after the installed-package
+  session closes.
 
 ## Surprises & Discoveries
 
