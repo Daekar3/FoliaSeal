@@ -25,7 +25,8 @@ The architectural win is that `src/foliaseal/presentation/qt/app_frame.py` will 
 - [x] (2026-06-07 19:35Z) Ran focused validation with `.venv/bin/python -m pytest -q tests/unit/test_qt_app_frame_certificate_management.py tests/unit/test_qt_app_frame.py`, `.venv/bin/python -m ruff check ...`, and `git diff --check`; all passed.
 - [x] (2026-06-07 19:43Z) Reconciled `docs/ARCHITECTURE.md` to the implemented ownership split so the repo now names `app_frame_certificate_management.py` as the certificate dialog owner and `app_frame.py` as the Settings-action routing edge.
 - [x] (2026-06-07 19:46Z) Ran the required architectural compliance review against `docs/ARCHITECTURE.md`, `docs/SPEC.md`, and this ExecPlan through a fresh `explorer-light` pass; no findings were reported.
-- [ ] Create the git commit for the finished slice.
+- [x] (2026-08-16) Finished slice was committed after focused validation and architecture/compliance
+  review; this historical plan is closed by `app_frame_certificate_dialog_status_reconciliation_execplan.md`.
 
 ## Surprises & Discoveries
 
