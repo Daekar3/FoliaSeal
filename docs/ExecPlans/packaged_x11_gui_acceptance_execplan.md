@@ -54,6 +54,13 @@ packaged signing, privileged host installation, or final release acceptance.
 - [x] (2026-08-16) Reconciled package/release/parent/architecture status and
   obtained two independent GO reviews. The focused slice is committed as
   `14b21061b` (`test: validate packaged X11 startup`).
+- [x] (2026-08-16) Re-ran the fresh package audit from the current checkout in the
+  supported Cinnamon/X11 session. The report passed with `display_backed=true`,
+  `qt_platform=xcb`, `gui_startup.status=started`, five offline Help topics,
+  18 fonts, two runtime icons, Poppler fixture conversion, and clean owned-root/
+  child-process teardown. This is packaged-X11 startup evidence only; human
+  accessibility, privileged installation, final release acceptance, and Wayland
+  remain outside this child.
 
 ## Surprises & Discoveries
 

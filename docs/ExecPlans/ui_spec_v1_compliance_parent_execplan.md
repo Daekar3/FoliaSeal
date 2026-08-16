@@ -739,6 +739,11 @@ Release tranche:
   `git diff --check` passed, and no FoliaSeal-owned processes or `/tmp/foliaseal-*` roots remained.
   This closes the AFK regression check only; display-backed human acceptance, privileged host
   installation, final release signoff, and deferred Mint 22.3 Wayland remain open.
+- [x] (2026-08-16) Refreshed the packaged-X11 audit from a fresh Debian artifact in the supported
+  Cinnamon/X11 session. Payload, offline Help, fonts, icons, Poppler conversion, and installed
+  GUI startup all passed (`display_backed=true`, `qt_platform=xcb`, `gui_startup.status=started`);
+  the owned package root and child process were removed. This does not close human accessibility,
+  privileged host installation, final release signoff, or deferred Mint 22.3 Wayland.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

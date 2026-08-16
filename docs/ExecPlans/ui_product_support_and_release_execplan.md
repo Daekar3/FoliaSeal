@@ -241,6 +241,12 @@ Qt surface, focused tests, and observable acceptance.
   and `git diff --check` all passed, and no FoliaSeal-owned processes or `/tmp/foliaseal-*` roots
   remained. This closes the AFK regression check only; it does not promote the display-backed,
   human, privileged-host, or deferred Wayland gates to complete.
+- [x] (2026-08-16) Re-ran the fresh Debian package audit in the supported Cinnamon/X11 session.
+  The report passed with `display_backed=true`, `qt_platform=xcb`, `gui_startup.status=started`,
+  five offline Help topics, 18 fonts, two runtime icons, Poppler fixture conversion, and clean
+  extraction/process teardown. This refreshes packaged-X11 startup evidence only; it does not
+  close human accessibility, privileged host installation, final release acceptance, or deferred
+  Mint 22.3 Wayland.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor
