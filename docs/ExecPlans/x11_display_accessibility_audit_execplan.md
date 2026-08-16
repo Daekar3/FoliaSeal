@@ -51,6 +51,11 @@ installation, or Wayland support.
   session as unavailable because the session bus lacks
   `org.a11y.atspi.Registry`; native F1, semantic Qt evidence, and cleanup still
   pass. This does not claim an accessible-tree or screen-reader result.
+- [x] (2026-08-16) Repeated the owned X11 audit at `QT_SCALE_FACTOR=2` with
+  `QT_AUTO_SCREEN_SCALE_FACTOR=0`; DPR `2.0`, the `1100x700` logical frame,
+  two-screen context, native F1, and teardown all remained green. The exact
+  screenshot/geometry interpretation is owned by the high-DPI child and does
+  not close AT-SPI, physical-readability, or human acceptance.
 - [x] (2026-08-16) Reconciled the accessibility/release/parent plans and obtained
   independent architecture/documentation review; the focused slice is committed
   as `746025bcb` (`test: audit X11 accessibility input path`).

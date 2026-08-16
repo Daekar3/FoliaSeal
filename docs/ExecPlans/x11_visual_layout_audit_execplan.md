@@ -187,3 +187,9 @@ evidence slice while AT-SPI and subjective accessibility remain HITL.
 
 Revision note: 2026-08-16 / Codex: completed the X11 geometry/screenshot run;
 rejected the desktop-helper capture and switched to exact Qt widget capture.
+
+Revision note: 2026-08-16 / Codex: repeated the exact Qt-owned geometry and
+ screenshot audit at `QT_SCALE_FACTOR=2` in the supported Cinnamon/X11
+ session; the high-DPI observations are tracked by the child
+ `x11_high_dpi_display_audit_execplan.md` and do not expand this plan's
+ physical-readability or human-acceptance claims.

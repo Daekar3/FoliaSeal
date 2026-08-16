@@ -662,6 +662,14 @@ Release tranche:
   `org.a11y.atspi.Registry` is absent from the session bus; native F1, semantic
   Qt evidence, and cleanup remained green. Human screen-reader and visual
   acceptance remain open, and Wayland remains deferred.
+- [x] (2026-08-16) Repeated the owned X11 geometry audit at Qt scale 2. The
+  report retained DPR `2.0`, a `1100x700` logical frame, two-screen context,
+  native F1, and clean teardown; direct screenshot inspection found the menu,
+  empty state, Open, and Library controls unclipped. This closes geometry
+  evidence only. The desktop exposed `960x540` available logical geometry,
+  below the `1100x700` minimum, so whole-window monitor fit/restoration,
+  physical readability, screen-reader, privileged, final release, and Wayland
+  gates remain open or deferred.
 - [x] (2026-08-16) Completed a source/spec consumer audit for the remaining
   compatibility and nomenclature gate. No `phase3` references remain in
   product source, scripts, or tests; active `Acceptance*` evidence contracts

@@ -153,6 +153,13 @@ window. It returned a bounded `unavailable` classification because the session
 bus does not advertise `org.a11y.atspi.Registry`; native F1 and teardown still
 passed. This is an environment limitation, not screen-reader speech evidence.
 
+The same owned X11 frame was rerun at Qt device-pixel ratio 2.0 with two
+monitors present. The report retained the 1100x700 logical frame and native F1;
+the inspected Qt-owned image kept the menu row, empty-state message, Open
+button, and Library button visible without clipping. This is geometry evidence
+only and does not establish physical-DPI readability, contrast perception, or
+screen-reader behavior.
+
 ## Context and Orientation
 
 `src/foliaseal/presentation/qt/app_frame.py` constructs the real `QMainWindow`, typed menu actions,

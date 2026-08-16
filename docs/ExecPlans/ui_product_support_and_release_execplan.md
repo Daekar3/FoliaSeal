@@ -149,6 +149,14 @@ Qt surface, focused tests, and observable acceptance.
   host probe safely reported `unavailable` because the session bus lacks
   `org.a11y.atspi.Registry`; the source-tree native-X11 and cleanup evidence
   remained green. No screen-reader speech or visual acceptance claim was made.
+- [x] (2026-08-16) Repeated the supported source-tree X11 audit at Qt scale 2.
+  DPR `2.0`, the `1100x700` logical frame, two-screen context, native F1, and
+  owned cleanup passed; direct inspection found no clipping in the primary
+  menu, empty-state, Open, or Library surfaces. This closes high-DPI geometry
+  evidence only. The desktop exposed `960x540` available logical geometry
+  against the `1100x700` minimum, so whole-window monitor fit/restoration,
+  physical readability, human accessibility, privileged packaging, and final
+  release acceptance remain open.
 - [x] (2026-08-16) Completed a fresh compatibility and nomenclature consumer audit. No `phase3`
   references remain in `src/`, `scripts/`, or `tests/`; the remaining `Acceptance*` CLI/DTO/JSON/
   artifact names are active developer/release contracts, `build_qt_signing_shell` remains consumed
