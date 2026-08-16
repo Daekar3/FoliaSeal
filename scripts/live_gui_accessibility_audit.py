@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -43,6 +44,12 @@ class _X11Input:
             ctypes.c_ulong,
         ]
         self._x11.XSetInputFocus.restype = ctypes.c_int
+        self._x11.XGetInputFocus.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_ulong),
+            ctypes.POINTER(ctypes.c_int),
+        ]
+        self._x11.XGetInputFocus.restype = ctypes.c_int
         self._x11.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
         self._x11.XKeysymToKeycode.restype = ctypes.c_ubyte
         self._x11.XFlush.argtypes = [ctypes.c_void_p]
@@ -85,6 +92,72 @@ class _X11Input:
                 raise RuntimeError("XTestFakeKeyEvent failed for F1")
             self._x11.XFlush(display)
             time.sleep(0.05)
+
+    def focused_window_id(self) -> int | None:
+        """Return the X11 input-focus window currently observed by this display."""
+
+        if not self._display:
+            raise RuntimeError("X11 display is not open")
+        focus_window = ctypes.c_ulong()
+        revert_to = ctypes.c_int()
+        self._x11.XGetInputFocus(
+            self._display,
+            ctypes.byref(focus_window),
+            ctypes.byref(revert_to),
+        )
+        return int(focus_window.value)
+
+
+def _deliver_native_f1_with_retries(
+    *,
+    window_id: int,
+    x11: Any,
+    activate_window: Callable[[int], bool],
+    wait_for_help: Callable[[float], bool],
+    max_attempts: int = 3,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Deliver native F1 with bounded WM-focus retries and JSON-safe diagnostics."""
+
+    if max_attempts <= 0:
+        raise ValueError("max_attempts must be positive")
+    attempts: list[dict[str, Any]] = []
+    for attempt_number in range(1, max_attempts + 1):
+        focus_before = x11.focused_window_id()
+        attempt: dict[str, Any] = {
+            "attempt": attempt_number,
+            "wmctrl_activation": False,
+            "focus_window_before": focus_before,
+            "focus_window_after": None,
+            "help_opened": False,
+        }
+        try:
+            activated = bool(activate_window(window_id))
+            attempt["wmctrl_activation"] = activated
+            if activated:
+                x11.focus_and_press_f1(window_id)
+                attempt["help_opened"] = bool(wait_for_help(2.0))
+        except Exception as exc:  # pragma: no cover - live X11 boundary
+            attempt["error"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            try:
+                attempt["focus_window_after"] = x11.focused_window_id()
+            except Exception as exc:  # pragma: no cover - live X11 boundary
+                attempt["focus_observation_error"] = f"{type(exc).__name__}: {exc}"
+        attempts.append(attempt)
+        if attempt["help_opened"]:
+            return {
+                "opened": True,
+                "attempt_count": attempt_number,
+                "attempts": attempts,
+            }
+        if attempt_number < max_attempts:
+            sleep(0.1)
+    return {
+        "opened": False,
+        "attempt_count": len(attempts),
+        "attempts": attempts,
+    }
 
 
 def _run_context(command: list[str]) -> str | None:
@@ -315,6 +388,16 @@ def _help_command_id() -> Any:
     return AppFrameCommandId.HELP
 
 
+def _wait_for_help(app: Any, frame: Any, timeout_seconds: float) -> bool:
+    """Pump Qt until the modeless Help viewer exists or the bounded wait expires."""
+
+    deadline = time.monotonic() + timeout_seconds
+    while frame.help_viewer is None and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.025)
+    return frame.help_viewer is not None
+
+
 def run_audit(
     artifacts_dir: Path,
     timeout_seconds: float,
@@ -392,12 +475,17 @@ def run_audit(
                     if not wmctrl_activation:
                         raise RuntimeError("wmctrl could not reactivate the audit-owned window")
                     with _X11Input() as x11:
-                        x11.focus_and_press_f1(int(frame.window.winId()))
-                    deadline = time.monotonic() + 2.0
-                    while frame.help_viewer is None and time.monotonic() < deadline:
-                        app.processEvents()
-                        time.sleep(0.025)
-                    if frame.help_viewer is None:
+                        report["native_input"]["focus_window_before_f1"] = (
+                            x11.focused_window_id()
+                        )
+                        native_result = _deliver_native_f1_with_retries(
+                            window_id=int(frame.window.winId()),
+                            x11=x11,
+                            activate_window=_activate_window,
+                            wait_for_help=lambda timeout: _wait_for_help(app, frame, timeout),
+                        )
+                    report["native_input"].update(native_result)
+                    if not native_result["opened"]:
                         raise AssertionError("native X11 F1 did not open the Help viewer")
                     report["help"] = {
                         "opened": True,

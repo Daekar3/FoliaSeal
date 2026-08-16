@@ -718,6 +718,12 @@ Release tranche:
   left 104 idle FoliaSeal-owned canonical-preview roots; they were removed during
   closeout. Only the external human/display, privileged-host, and final release
   gates remain, with Wayland deferred for Mint 22.3.
+- [x] (2026-08-16) Added bounded X11 focus diagnostics and native-F1 retry handling to the
+  audit-only script. The live run observed a first-attempt delivery miss followed by a successful
+  second attempt, while Qt product tests and the full suite remained green (`1578 passed, 20
+  skipped, 1 warning`). This closes only the audit-harness friction; screen-reader speech,
+  high-contrast/physical-DPI/monitor interpretation, privileged installation, and final release
+  signoff remain external, and Wayland remains deferred.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
