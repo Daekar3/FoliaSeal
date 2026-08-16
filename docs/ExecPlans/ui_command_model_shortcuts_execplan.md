@@ -7,13 +7,14 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-This child establishes the typed Edit registry and native Cut, Copy, Paste, and Select All for the
-currently focused `QLineEdit` or `QTextEdit`, using Ctrl+X, Ctrl+C, Ctrl+V, and Ctrl+A. The existing
-focus-sensitive Undo/Redo boundary remains unchanged: native editors own their local text history,
-while viewer or placement focus routes Undo/Redo to the public placement-history boundary. The same
-Select All action now delegates to the completed document-selection child when no native text editor
-owns focus; Help is implemented by its separate packaged-support child. This is a
-bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
+This child now records the complete typed desktop command model required by UI_SPEC section 7 and
+the keyboard portions of acceptance scenario 8. The registry covers File, Edit, View, Signing,
+Settings, and Help. `FoliaSealAppFrame` turns those definitions into Qt actions, while public
+workspace/session ports and focused editor boundaries own behavior and capability state. Native
+editors retain local text history; viewer and placement focus route Undo/Redo through placement
+history; document Select All, Pan, navigation, zoom, search, review, signing, settings, and Help
+route through their owning typed seams. The remaining project work is release/display acceptance,
+not additional command-model behavior.
 
 ## Child ExecPlan Dependencies
 
@@ -28,24 +29,25 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
 - [x] (2026-08-09) Run focused, regression, and real-Qt validation; record evidence and clean up.
 - [x] (2026-08-09) Historical broad completion gate superseded by dependency-ordered command slices;
   each completed increment now reconciles its owning architecture/status records and commit evidence.
-- [x] (2026-08-09) Loop 5: add typed View Previous Page and Next Page commands through the public
-  session port; keep Fit/zoom/search/history commands deferred until their truthful seams exist.
+- [x] (2026-08-09) Historical Loop 5 increment: add typed View Previous Page and Next Page
+  commands through the public session port; Fit/zoom/search/history were deferred at that time and
+  were completed by later owning slices.
 - [x] (2026-08-09) Loop 5 compliance fixes: synchronize boundary capability after viewer-owned
   navigation, use explicit registry lookup, and prove Page Up/Page Down single-dispatch behavior.
 - [x] (2026-08-09) Removed the unused per-menu definition lookup helpers after confirming there
   were no remaining repository callers; `command_definition()` is now the sole frame lookup.
-- [x] (2026-08-09) Loop 5 architecture/status documentation updated; the command-model child remains
-  open for the deferred menus and signed-state policy.
-- [x] (2026-08-09) Loop 8: migrated the existing Settings actions to the shared typed command
-  registry with unique mnemonics, stable IDs/object names, Qt descriptions, and callback-routing
-  coverage. Edit, Signing, and remaining View commands remain deferred until truthful
-  behavior seams exist.
+- [x] (2026-08-09) Historical Loop 5 architecture/status documentation update; the child remained
+  open then for menus and signed-state policy that later increments completed.
+- [x] (2026-08-09) Historical Loop 8 increment: migrated existing Settings actions to the shared
+  typed registry with unique mnemonics, stable IDs/object names, Qt descriptions, and callback
+  routing. Edit, Signing, and remaining View commands were deferred at that time and were completed
+  by later truthful seams.
 - [x] (2026-08-09) Loop 8 focused validation passed (`44 passed`), full validation passed
   (`1185 passed, 20 skipped, 1 warning`), and the bounded launch audit cleaned its isolated root
   with no lingering FoliaSeal/PySide6 process; the launch remains limited by the local
   `SingleInstanceUnavailable` endpoint error.
-- [x] (2026-08-09) Architecture and parent-plan status documentation were reconciled; the bounded
-  Settings outcome is ready for commit while the broader child remains open.
+- [x] (2026-08-09) Historical architecture and parent-plan status reconciliation; the bounded
+  Settings outcome was ready for commit while the broader child remained open at that time.
 - [x] (2026-08-09) Re-audited the remaining raw actions against UI_SPEC: Select Text is currently
   under Edit but belongs under View, and Copy is currently raw but belongs under Edit.
 - [x] (2026-08-09) Add red registry/menu-topology tests for typed Select Text and Copy.
@@ -54,8 +56,8 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
 - [x] (2026-08-09) Focused validation passed (`165 passed`), full validation passed (`1193 passed,
   20 skipped, 1 warning`), Ruff and diff checks passed, and the real-Qt no-document menu test
   passed; the bounded launch remains limited by the known local QLocalServer endpoint error.
-- [x] (2026-08-09) Kept unsupported Undo/Redo/Cut/Paste/Help/Signing commands out while the
-  existing truthful View seams were incrementally migrated.
+- [x] (2026-08-09) Historical guardrail: kept commands without truthful seams out while View was
+  incrementally migrated; later slices added every required command with a truthful boundary.
 - [x] (2026-08-10) Added the typed View zoom command child: Zoom In/Out use `Ctrl++`/`Ctrl+-`,
   Reset Zoom is a real menu action without a conflicting shortcut, and all three route through the
   public session port while reusing the existing clamped viewer zoom policy.
@@ -74,8 +76,8 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   exited at the known isolated `SingleInstanceUnavailable` endpoint before frame creation. No
   matching FoliaSeal/PySide6/pytest process remained and the owned temporary root was removed.
 - [x] (2026-08-10) Committed the Back/Forward increment as `168124466`.
-- [x] (2026-08-10) Selected the initial truthful Signing increment: add a Signing menu with
-  Signature Library and Sign and save; placement commands were deferred until their public seam.
+- [x] (2026-08-10) Historical initial Signing increment: add Signature Library and Sign and save;
+  placement commands were deferred until their public seam and were completed by the next slice.
 - [x] (2026-08-10) Added the Signing menu definitions/actions and corrected Sign and save enablement
   to use the public `can_submit_sign_request()` readiness capability rather than mere workspace-open
   state; readiness-changing runtime events refresh the menu action and active signing disables it.
@@ -96,11 +98,11 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   lifecycle clearing.
 - [x] (2026-08-10) Added direct viewer `PlacementHistory` public-method coverage and native text
   editor Redo coverage; the focused command/viewer/runtime/session/offscreen set is `112 passed`.
-- [x] (2026-08-10) Reconciled architecture/status documentation for the public Undo/Redo boundary,
+- [x] (2026-08-10) Historical reconciliation of architecture/status documentation for the public Undo/Redo boundary,
   focus-sensitive native text routing, and placement-history semantics. Full validation is `1443
   passed, 20 skipped, 1 warning`; the bounded GUI audit exits at `SingleInstanceUnavailable`, with
   no matching processes or temporary audit root remaining. Commit and remaining command-family
-  status remain the parent handoff gates.
+  status were then the parent handoff gates; the command-model closeout has since completed them.
 - [x] (2026-08-10) Fresh-scan selected native-editor Cut, Copy, Paste, and Select All as the next truthful
   Edit increment; viewer Select All remains integrated here, while packaged Help is owned by its
   completed support child.
@@ -117,13 +119,18 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
 - [x] (2026-08-10) Reconciled the viewer keyboard contract with UI_SPEC §8: Page Up/Page Down
   remain page-relative commands, while only `Ctrl+Home`/`Ctrl+End` jump to the first/last page and
   bare Home/End pass through to the focused widget hierarchy. The navigation child owns the
-  implementation and its fake/real Qt evidence; this parent remains open for unrelated deferred
-  command families and release gates.
+  implementation and its fake/real Qt evidence; unrelated release gates remain with the parent.
 - [x] (2026-08-15) Implemented the typed View → Pan command over the existing public
   `set_viewer_interaction_mode("pan")` seam. The frame owns registry metadata and open-workspace
   enablement; the runtime clears text-selection mode and preserves placement state. Focused red→green
   tests prove one exact `"pan"` transition, and the production offscreen AppFrame test proves text-mode
   exit and unchanged placement through the published workspace ports.
+- [x] (2026-08-16) Audited the live registry, AppFrame wiring, public session/runtime seams, focused
+  tests, and architecture records. All UI_SPEC command families are implemented; no additional
+  command behavior is selected. The remaining work was stale status wording and parent/architecture
+  reconciliation.
+- [x] (2026-08-16) Reconciled this child’s purpose, outcomes, validation, and historical deferred
+  wording; recorded current focused/full evidence and the display-backed acceptance limitation.
 
 ## Surprises & Discoveries
 
@@ -188,11 +195,10 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   Evidence: the compliance review found an unready Sign and save action enabled immediately after
   open; `SigningWorkspaceSessionPort.can_submit_sign_request()` now projects `preview().can_submit`.
 - Observation: native Cut, Copy, Paste, and Select All are dependency-ready at the AppFrame edge because
-  `_focused_text_editor()` already identifies the only widgets that may own these operations.
-  Evidence: the current frame routes Undo/Redo through the same focus seam, while the viewer's public
-  selection API has no current-page “select all extractable text” operation. This slice must therefore
-  keep the new commands disabled without a focused native editor and leave viewer Select All to a
-  later document-selection child.
+  `_focused_text_editor()` already identifies the only widgets that may own native editing operations.
+  Evidence: the current frame routes those actions through Qt editor methods, while the no-editor
+  Select All path now delegates to the completed public document-selection contract. This child
+  preserves native-editor precedence and does not duplicate viewer selection policy.
 
 ## Decision Log
 
@@ -261,28 +267,25 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   exit, and the frame has no truthful current-mode query. A non-checkable action avoids stale state
   while preserving completed placement geometry across mode changes.
   Date/Author: 2026-08-10 / Codex
+- Decision: close this child as a complete command-model plan after reconciling all later command
+  increments into one current registry description; do not add a new behavior slice here.
+  Rationale: every UI_SPEC §7 command family now has a live definition and owning behavior seam, so
+  further implementation would duplicate existing code. Display-backed and release acceptance are
+  parent-owned gates.
+  Date/Author: 2026-08-16 / Codex
 
 ## Outcomes & Retrospective
 
-The File command foundation is implemented but this child is not complete: a novice can open a PDF,
-choose an explicit output path on first Save, invoke signing through subsequent Save, choose Save As,
-close the workspace, or exit the application. Focused and real-Qt checks are green (`35 passed` for
-the app-frame/state/integration slice; `142 passed` including shell regressions). Loop 5 adds a
-typed View menu with Previous Page and Next Page, Page Up/Page Down shortcuts, boundary-aware
-enablement, public session-port routing, and callback synchronization after viewer-owned navigation.
-The offscreen Qt shortcut test proves exactly one transition per key. Loop 8 also migrates the five
-existing Settings callbacks into `SETTINGS_COMMAND_DEFINITIONS`, including unique mnemonics, stable
-object names, Qt descriptions, and trigger-routing tests. The remaining gap is the rest of the
-UI_SPEC command registry and its parent scenario evidence: Help content/actions and remaining View
-behavior remain deferred to their owning viewer/document/support children. The current increment
-wires document-internal Back/Forward, completes all five Signing actions, and adds focus-sensitive
-  Undo/Redo over native text-editor and placement histories; browser navigation, viewer Select All,
-  Help, and other unsupported command families remain out of scope. The native-editor Cut/Copy/Paste/
-  Select All increment now has focused and real offscreen coverage. Final evidence for the prior
-  increment is `1443 passed, 20 skipped, 1 warning` for the
-full suite and `112 passed` for focused command/viewer/runtime/session/offscreen coverage; the
-bounded launch returned `gui_rc=1` with
-`SingleInstanceUnavailable`, then left no matching process or temporary root.
+The typed command model is complete. `ALL_COMMAND_DEFINITIONS` contains the full File/Edit/View/
+Signing/Settings/Help families, and AppFrame routes each action through an existing public behavior
+seam or the focused native-editor contract. Focused tests cover registry metadata, menu topology,
+shortcuts, enablement, callback routing, placement history, document selection, Help, and real
+offscreen AppFrame behavior. The closeout command/AppFrame/session/launch run passed `81 tests`; the
+broader prior command/runtime/offscreen evidence was `112 passed`. The latest full regression is
+`1535 passed, 20 skipped, 1 warning`. The bounded `foliaseal gui` audit
+still exits before frame creation when the isolated QLocalServer endpoint cannot be claimed, and a
+display-backed human audit remains open in the release/evidence plans. Those are independent
+environment/release gates, not missing command behavior.
 
 ## Context and Orientation
 
@@ -367,27 +370,17 @@ touch viewer geometry or add a duplicate interaction-mode model at the frame edg
 
 ## Milestones
 
-Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
-Select Text and Copy metadata and menu routing through the frame boundary. Milestone 3 verifies
-menu/enablement parity in focused and real-Qt tests and records the remaining unsupported command
-families as deferred. Milestone 4 adds internal-link Back/Forward to the same registry, proves
-capability transitions (visit → Back → Forward and branch-clears-Forward), and runs the real
-offscreen menu/action test. The parent command-model acceptance remains open until all named menus
-have their owning slices and scenario evidence. Milestone 5 adds the two supported Signing actions,
-proves no-document Library availability and readiness-aware Sign and save enablement/routing, and
-runs a real offscreen menu-topology test. Milestone 6 adds Place Signature, Adjust Placement, and
-Remove Placement over the public placement seam, proves fixed-field protection and truthful state
-transitions, and runs the real offscreen Signing-menu test. Milestone 7 adds Edit Undo/Redo, proves
-focus-sensitive native-text versus placement-history routing and capability transitions, and runs a
-real offscreen menu/action test that creates, mutates, undoes, and redoes a placement.
-Milestone 8 adds native-editor Cut, Paste, and Select All, proves focus-sensitive enablement and
-  shortcut dispatch against a real `QLineEdit`, and records packaged Help as a separate completed
-remaining dependency gaps.
-Milestone 9 adds the missing typed View → Pan action, proves that no-document frames disable it and
-open workspaces dispatch exactly one public mode transition, and uses a real offscreen viewer to
-prove text mode exits while an existing placement rectangle remains unchanged. The milestone is
-complete only after the command registry, frame action state, focused tests, real offscreen test,
-documentation, and cleanup all pass.
+The historical milestones built the command model incrementally: File lifecycle first, then View
+navigation/zoom/history, Settings, Signing and placement, focus-sensitive Edit operations, document
+Select All, packaged Help, and finally View Pan. Each increment added a typed definition, a truthful
+owning seam, focused tests, and real offscreen Qt coverage. Earlier milestones intentionally recorded
+commands as deferred until those seams existed; those statements are historical and no longer define
+the current registry.
+
+The final milestone is this closeout. It verifies that `ALL_COMMAND_DEFINITIONS` contains every
+UI_SPEC §7 command family, reconciles the child/parent/architecture records, records current focused
+and full-suite evidence, and preserves explicit environment qualifiers for display-backed and
+privileged release gates. It does not add a new QAction or change runtime behavior.
 
 ## Concrete Steps
 
@@ -418,27 +411,19 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     rm -rf "$audit_root"
     test ! -e "$audit_root"
 
-Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+The implementation milestones used focused tests and offscreen Qt walkthroughs. The current
+closeout records those results and preserves the separate display-backed HITL requirement; it must
+not turn an offscreen run into a claim about human visual acceptance. Record the exact test commands,
+counts, environment limitation, and cleanup result.
 
 ## Validation and Acceptance
 
-Acceptance for this increment is behavioral: View Select Text, Back, and Forward plus Edit Copy are
-defined by the one typed registry, appear in the normative menus, retain correct document-dependent
-enablement/check state, and reach their existing public ports exactly once. Back is disabled until an
-internal link creates history; Back moves to the prior internal destination and enables Forward;
-Forward returns to the next destination; a new internal destination after Back clears Forward. File,
-View page/zoom actions, and Settings remain green under their prior contracts. The full child
-acceptance remains open for Help, remaining View behavior, signed-state policy,
-and parent scenario requirements. Record final focused/full test counts, Ruff, diff checks,
-and the real-Qt menu/action evidence; the display-backed audit remains environment-limited by the
-known QLocalServer/`SingleInstanceUnavailable` failure. The Signing increment is complete: the menu
-exposes all five commands in UI_SPEC order, keeps Library available with no document, enables Place
-only for a new editable placement, enables Adjust/Remove only for an existing editable placement,
-protects fixed unsigned fields, and disables placement actions during active signing. Sign and save
-remains readiness/transaction gated; production Qt action routing and state transitions are covered
-by the focused and real offscreen tests.
+Acceptance is now the complete command surface: every command required by UI_SPEC §7 appears in the
+typed registry, is mounted in its normative menu, and has a truthful callback/capability boundary.
+Focused and offscreen tests prove metadata, shortcuts, routing, state changes, native-editor
+precedence, placement-history behavior, document selection, signing readiness, Help, and lifecycle
+clearing. The command child does not claim display-backed accessibility, two-process launch, or
+privileged package installation; those remain parent/release gates.
 
 For the Undo/Redo increment, Edit presents Undo and Redo before Copy with the stated shortcuts.
 With a placement-focused viewer, creating or moving a placement enables Undo, Ctrl+Z restores the
@@ -455,39 +440,39 @@ Ctrl+V, and Ctrl+A. With a focused `QLineEdit` containing selected text, Cut rem
 and places it on the native clipboard, Paste inserts clipboard text, and Select All selects the full
 editor value. The same actions are enabled/disabled from the editor's native capability state and
 dispatch through the menu while native keyboard shortcuts retain Qt's built-in editor semantics.
-With the viewer, a button, or no native editor focused, Cut/Paste/Select All remain disabled and do not mutate placement or
-document-selection state. Viewer Select All is explicitly not claimed by this increment.
+With the viewer, a button, or no native editor focused, Cut/Paste remain disabled and do not mutate
+placement or document-selection state; Select All delegates to the completed current-page
+document-selection boundary when no native editor owns focus. The separate document-selection child
+owns that viewer behavior, while this child owns native-editor precedence.
 
-For the Pan increment, a no-document frame must expose a disabled `AppFrameCommandId.PAN` action.
-After opening a real workspace, triggering that action must call the session port exactly once with
-`"pan"`; the runtime must leave any completed placement rectangle unchanged and must turn off
-document text-selection mode. The focused test must be red before the registry/action exists and
-green afterward, and the real offscreen test must observe the viewer's Pan mode and unchanged
-placement geometry without relying on a display-backed GUI.
+For the completed Pan behavior, a no-document frame exposes a disabled `AppFrameCommandId.PAN`
+action. With an open workspace, the action calls the session port exactly once with `"pan"`; the
+runtime leaves completed placement geometry unchanged and turns off document text-selection mode.
+The focused and real offscreen tests prove this without requiring a display-backed GUI.
 
 ## Evidence Record
 
-Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
-test command/result, keyboard/menu input sequence and observed File action state, evidence path and
-cleanup result, and compatibility grep proof. Loop 2 evidence is the offscreen real-Qt integration
+The closeout evidence is the governing UI_SPEC requirement, exact focused test command/result,
+keyboard/menu input sequence and observed action state, evidence path and cleanup result, and
+compatibility grep proof. Loop 2 evidence is the offscreen real-Qt integration
 assertion for File labels, shortcuts, tooltip/status descriptions, mnemonic text, and no-document
 enablement; Loop 5 adds `tests/integration/test_view_navigation_shortcuts.py`, whose offscreen
 QTest Page Down/Page Up sequence produced exactly one page transition and one render per key. The
 Loop 8 Settings focused pass is `44 passed`; the prior Select Text/Copy increment's focused pass was
 `165 passed`. The Back/Forward and Signing increments record their focused results and red-to-green
-registry/state tests, along with the final full-suite count, Ruff, and diff results. The current
-Signing focused command was `.venv/bin/pytest -q tests/unit/test_qt_app_frame.py
+registry/state tests, along with the final full-suite count, Ruff, and diff results. The closeout
+command was `.venv/bin/pytest -q tests/unit/test_qt_app_frame.py
 tests/unit/test_qt_signing_workspace_runtime.py tests/unit/test_signing_workspace_session_port.py
-tests/integration/test_gui_launch_no_document.py` (`112 passed`), including production QAction
+tests/integration/test_gui_launch_no_document.py` (`81 passed`), including production QAction
 Undo/Redo and Place/Adjust/Remove routing. The
 bounded `foliaseal gui` launch remains environment-limited because QLocalServer cannot claim its
 isolated endpoint (`Unknown error 1`/`SingleInstanceUnavailable`), and the audit found no lingering
 FoliaSeal/PySide6 processes after cleanup.
 
 The contributing UI_SPEC scenarios are 3 (create/adjust/remove/undo/restore one placement) and 8
-(keyboard-only signing workflow); this increment changes command behavior but adds no new SVG, so
-the evidence record explicitly uses the existing command-model topology drawings without a new
-SVG artifact.
+(keyboard-only signing workflow). This closeout changes no source behavior and adds no SVG or other
+generated artifact; it records the existing command-model tests and preserves the separate
+display-backed evidence requirement.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 
@@ -524,15 +509,14 @@ reach-through. The final interface must be exercised by tests/unit/test_qt_app_f
 tests/unit/test_app_frame_workspace_action_state.py, tests/integration/test_gui_launch_no_document.py,
 and the command-state assertions added for Settings. The Undo/Redo increment additionally requires
 tests/unit/test_placement_history.py, tests/unit/test_qt_signing_workspace_runtime.py, and
-tests/unit/test_signing_workspace_session_port.py. `QtSigningWorkspaceSessionPort` must expose
+tests/unit/test_signing_workspace_session_port.py. `QtSigningWorkspaceSessionPort` exposes
 `can_undo_placement()`, `can_redo_placement()`, `undo_placement()`, and `redo_placement()`;
 `SigningWorkspaceRuntime` must provide the corresponding typed methods and leave placement
 application/history ownership in the viewer boundary.
-The native-edit increment keeps Cut/Copy/Paste/Select All at the `FoliaSealAppFrame` edge: the frame
-queries `_focused_text_editor()`, subscribes to native selection/clipboard changes, and calls only the
-focused editor's native `cut()`, `copy()`, `paste()`, or `selectAll()` methods. No new
-`SigningWorkspaceSessionPort` method is allowed for this increment; viewer Select All will require a
-separate typed document-text-selection contract.
+The native-edit increment keeps Cut/Copy/Paste/Select All at the `FoliaSealAppFrame` edge for native
+editors: the frame queries `_focused_text_editor()`, subscribes to native selection/clipboard changes,
+and calls only the focused editor's native methods. The no-editor Select All path is now delegated to
+the separate typed document-text-selection contract owned by the document-selection child.
 Any compatibility workspace adapter retained temporarily must have a named consumer and a retirement
 condition recorded in this plan.
 

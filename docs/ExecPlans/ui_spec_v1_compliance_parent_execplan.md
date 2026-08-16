@@ -45,14 +45,15 @@ before any reusable-object or signing UI is allowed to persist data.
 Foundation tranche:
 
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed File/View/Signing and Edit
-  commands now route through public seams or focused-editor behavior with capability-driven enablement;
-  viewer Select All now uses the public document-text fallback, and View Pan is complete over the
-  published session port with focused and production offscreen evidence. Final parent scenario
-  evidence and unrelated command/release gates remain open; packaged Help is complete in its release child.
+- [x] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — complete typed File/Edit/View/Signing/
+  Settings/Help registry, public-seam or focused-editor routing, capability-driven enablement,
+  document Select All, and View Pan are implemented and covered by focused/offscreen evidence. The
+  command child is closed; display-backed GUI, final scenario, and packaged-release gates remain
+  independently open in the parent/release plans.
 - [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
-  route through the public workspace session port; broader View Back/Forward and remaining command
-  families remain open with their owning children.
+  route through the public workspace session port; the command-model child subsequently completed
+  View Back/Forward and the remaining UI_SPEC command families. Display-backed and release gates
+  remain independently open.
 - [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md — fixed 320px signing rail, protected
   read-only status region, typed recommended action, and offscreen geometry evidence are complete
   in `8d67d1652`; asynchronous/state-machine follow-up remains open.
@@ -248,14 +249,13 @@ Release tranche:
   environment, which still reports `SingleInstanceUnavailable` with an isolated endpoint.
 - [x] (2026-08-09) Completed the first foundation slice: no-document launch now exposes direct Open
   PDF and Signature Library actions with focused unit/integration evidence and clean teardown.
-- [x] (2026-08-09) Completed the File-command foundation slice: a typed registry now routes Open,
-  Save, Save As, Close, and Exit with shortcuts, mnemonics, Qt-supported descriptions, and an
-  explicit first-Save output-path seam; the command-model child remains open for its remaining
-  menus and signed-state policy.
-- [x] (2026-08-09) Loop 5 completed: the typed command registry now includes truthful View Previous
-  Page and Next Page actions through the public workspace session port, with boundary-aware
-  enablement and viewer-owned navigation synchronization; Fit/zoom/search behavior remains deferred
-  to dependent viewer/document seams.
+- [x] (2026-08-09) Historical File-command foundation slice: a typed registry routed Open, Save,
+  Save As, Close, and Exit with shortcuts, mnemonics, Qt-supported descriptions, and an explicit
+  first-Save output-path seam; later command-model increments completed the remaining menus.
+- [x] (2026-08-09) Historical Loop 5 completion: the typed command registry added truthful View
+  Previous Page and Next Page actions through the public workspace session port, with
+  boundary-aware enablement and viewer-owned navigation synchronization; Fit/zoom/search were
+  subsequently completed by dependent viewer/document seams.
 - [x] (2026-08-09) Loop 6 completed its bounded signing-rail correction: the fixed 320px rail now
   separates interactive signing controls from a read-only protected status region, exposes typed
   recommended-action styling/accessibility, and has coordinator plus real offscreen sidebar evidence.
@@ -266,15 +266,14 @@ Release tranche:
   event loop (including controlled cleanup), and preserves unknown UI keys. Rail-divider and
   Signature Library layout now have dedicated completed children; full monitor/DPI and toolbar
   persistence remain open in the responsive/release gates.
-- [x] (2026-08-09) Loop 8 completed the bounded Settings command-model increment: the five existing
-  Settings callbacks now use the shared typed registry with unique mnemonics, stable IDs/object
-  names, Qt descriptions, and callback-routing tests. Edit, Signing, Help, and remaining View
-  commands remain open until their truthful behavior seams exist.
-- [x] (2026-08-10) Added the typed View Back/Forward command increment: `Alt+Left`/`Alt+Right`
-  route through `SigningWorkspaceSessionPort`, and AppFrame action state follows internal-link
+- [x] (2026-08-09) Historical Loop 8 completion: the five existing Settings callbacks migrated to
+  the shared typed registry with unique mnemonics, stable IDs/object names, Qt descriptions, and
+  callback-routing tests; later truthful seams completed Edit, Signing, Help, and remaining View
+  commands.
+- [x] (2026-08-10) Historical View Back/Forward command increment: `Alt+Left`/`Alt+Right` route
+  through `SigningWorkspaceSessionPort`, and AppFrame action state follows internal-link
   activation, Back, Forward, unavailable outcomes, branching, replacement, and close. Focused and
-  real offscreen Qt coverage are green; the command-model child remains open for unsupported command
-  families and final scenario evidence.
+  real offscreen Qt coverage are green; final scenario evidence remains a separate release gate.
 - [x] (2026-08-10) Added the bounded real-Qt accessibility acceptance child: offscreen evidence now
   covers no-document accessible names, unique typed View mnemonics, menu metadata/disabled state,
   F1 Help, modeless support dialogs, Settings Restore defaults, minimum geometry, and Unicode XDG
@@ -419,14 +418,14 @@ Release tranche:
   coordinator/output-policy/bridge/shell coverage is `136 passed`, current full suite is `1440
   passed, 20 skipped, 1 warning`, and the typed summary/authorization/staging boundaries are
   documented. The bounded dialog audit remains limited by `SingleInstanceUnavailable`.
-- [x] (2026-08-10) Added the typed Edit Undo/Redo increment inside the still-open command-model
-  child: `Ctrl+Z`/`Ctrl+Shift+Z` now route through native focused text-editor history or the public
+- [x] (2026-08-10) Historical typed Edit Undo/Redo increment inside the then-open command-model
+  child: `Ctrl+Z`/`Ctrl+Shift+Z` route through native focused text-editor history or the public
   placement-history session boundary, with capability-driven QAction state and real offscreen
   coverage, including direct viewer history replay and native editor Redo. Current focused
   command/viewer/runtime coverage is `112 passed`; the current full suite is `1443 passed, 20
-  skipped, 1 warning`. Native Edit Cut/Copy/Paste/Select All are implemented in the follow-on slice;
-  viewer Select All, Help, and remaining command-family evidence
-  remain open in their owning plans.
+  skipped, 1 warning`. Native Edit Cut/Copy/Paste/Select All, viewer Select All, Help, and the
+  remaining command families were completed by follow-on slices; final scenario evidence remains a
+  separate release gate.
 - [x] (2026-08-10) Added native focused-editor Edit Cut/Copy/Paste/Select All with Ctrl+X/Ctrl+C/
   Ctrl+V/Ctrl+A, signal-driven selection/clipboard enablement, and fake plus real offscreen coverage.
   Full validation is `1449 passed, 20 skipped, 1 warning`; viewer Select All was completed by the
@@ -582,12 +581,15 @@ Release tranche:
   evidence proves bare Home/End are not consumed or rendered as page jumps, while Ctrl+Home/End
   perform exactly one first/last-page transition. The combined viewer/navigation validation is
   `47 passed`; unrelated display-backed, package-install, and acceptance nomenclature gates remain open.
-- [x] (2026-08-15) Completed the typed View → Pan increment: `AppFrameCommandId.PAN` is registered
+- [x] (2026-08-15) Historical typed View → Pan increment: `AppFrameCommandId.PAN` is registered
   without a shortcut, disabled until a workspace is open, and routed exactly once through the
   public session port. Focused tests prove Pan exits text mode without mutating placement; a real
-  offscreen production AppFrame test proves the same postconditions. Architecture and child-plan
-  evidence are reconciled; the command-model child remains open for final scenario evidence and
-  other release gates.
+  offscreen production AppFrame test proves the same postconditions. Final scenario evidence and
+  other release gates remain separate from command-model completion.
+- [x] (2026-08-16) Closed the command-model child after a fresh source/spec audit confirmed that
+  every UI_SPEC §7 File/Edit/View/Signing/Settings/Help command is already registered, routed, and
+  covered by focused/offscreen evidence. Stale deferred-command wording was reconciled in the child
+  and architecture records; display-backed and final release gates remain separate.
 - [x] (2026-08-16) Re-ran the current signed-evidence harness audit through
   `docs/ExecPlans/manual_harness_current_audit_execplan.md`: the strict headless gates pass with
   18/18 parity signings and 3/3 matched fit rejections, and the four tracer artifacts are coherent.
