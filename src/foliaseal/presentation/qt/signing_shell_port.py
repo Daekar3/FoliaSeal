@@ -89,6 +89,9 @@ class SigningWorkspacePort(Protocol):
     def refresh_signature_profiles(self) -> None:
         """Refresh reusable signing-profile and preset choices."""
 
+    def refresh_source_safety(self) -> Any:
+        """Poll source identity and refresh the recovery banner."""
+
     def open_reusable_object_editor(self) -> bool:
         """Open the contextual reusable-object editor for the active PDF."""
 
@@ -251,6 +254,9 @@ class QtSigningWorkspacePort:
 
     def refresh_signature_profiles(self) -> None:
         self.shell_widget.refresh_signature_profiles()
+
+    def refresh_source_safety(self) -> Any:
+        return self.shell_widget.refresh_source_safety()
 
     def open_reusable_object_editor(self) -> bool:
         return self.shell_widget.open_reusable_object_editor()

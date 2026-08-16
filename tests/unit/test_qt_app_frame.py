@@ -789,6 +789,7 @@ class _FakeShell:
         self.selected_signature_preset_id_value = None
         self.selected_appearance_profile_id_value = None
         self.selected_placement_profile_id_value = None
+        self.refresh_source_safety_calls = 0
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -816,6 +817,9 @@ class _FakeShell:
 
     def selected_placement_profile_id(self):
         return self.selected_placement_profile_id_value
+
+    def refresh_source_safety(self) -> None:
+        self.refresh_source_safety_calls += 1
 
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
@@ -997,6 +1001,9 @@ class _FakeShellPort:
 
     def refresh_signature_profiles(self) -> None:
         self.shell_widget.refresh_signature_profiles()
+
+    def refresh_source_safety(self):
+        return self.shell_widget.refresh_source_safety()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self.shell_widget.set_document_text_selection_mode(enabled)
@@ -1328,6 +1335,7 @@ def test_app_frame_source_reload_and_ignore_preserve_the_authored_draft(
     source.parent.mkdir(parents=True)
     source.write_bytes(b"original")
     frame.open_pdf_path(source)
+    assert frame._with_current_workspace(lambda workspace: workspace) is frame.current_workspace
     workflow = frame.current_signing_workflow
     assert workflow is not None
     workflow.passphrase = "keep-this-secret"
@@ -1351,6 +1359,19 @@ def test_app_frame_source_reload_and_ignore_preserve_the_authored_draft(
     assert frame.current_signing_workflow.signature_rect == snapshot.signature_rect
     assert frame.current_signing_workflow.has_unsaved_changes is True
     assert frame.current_signing_workflow.document_safety_decision().status.value == "unchanged"
+
+
+def test_app_frame_workspace_capability_is_null_safe_before_open(tmp_path: Path) -> None:
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    assert frame._with_current_workspace(lambda workspace: workspace) is None
+    assert frame._ignore_source_change() is False
 
 
 def test_app_frame_locates_missing_source_before_replacing_workspace(tmp_path: Path) -> None:
@@ -1394,6 +1415,7 @@ def test_app_frame_locates_missing_source_before_replacing_workspace(tmp_path: P
     assert ignore() is True
     assert frame.current_shell is current_shell
     assert frame.current_signing_workflow.document_safety_decision().status.value == "unchanged"
+    assert second.refresh_source_safety_calls == 1
 
 
 def test_app_frame_replacing_workspace_closes_previous_shell(

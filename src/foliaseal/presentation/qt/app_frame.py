@@ -1018,16 +1018,16 @@ class FoliaSealAppFrame:
 
     def _ignore_source_change(self) -> bool:
         """Acknowledge the observed source identity without remounting it."""
-        workflow = self.current_signing_workflow
-        if workflow is None or workflow.document_source_monitor is None:
-            return False
-        workflow.document_source_monitor.acknowledge_current_source()
-        shell = self.current_shell
-        refresh = getattr(shell, "refresh_source_safety", None)
-        if callable(refresh):
-            refresh()
-        self._handle_status_change("document_source_acknowledged")
-        return True
+        def acknowledge(workspace: WorkspaceHandle) -> bool:
+            monitor = workspace.signing_workflow.document_source_monitor
+            if monitor is None:
+                return False
+            monitor.acknowledge_current_source()
+            workspace.maintenance.refresh_source_safety()
+            self._handle_status_change("document_source_acknowledged")
+            return True
+
+        return bool(self._with_current_workspace(acknowledge))
 
     def _locate_missing_source(self) -> Any | None:
         """Choose a replacement PDF for a missing source and preserve the draft."""
@@ -2874,6 +2874,16 @@ class FoliaSealAppFrame:
         if workspace is None:
             return None
         return action(workspace.maintenance)
+
+    def _with_current_workspace(
+        self,
+        action: Callable[[WorkspaceHandle], Any | None],
+    ) -> Any | None:
+        """Run one lifecycle operation against the typed active workspace."""
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return None
+        return action(workspace)
 
     def _with_current_workspace_view(
         self,
