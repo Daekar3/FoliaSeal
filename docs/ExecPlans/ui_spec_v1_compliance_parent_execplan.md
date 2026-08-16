@@ -651,6 +651,12 @@ Release tranche:
   green. This closes only concrete X11 visual geometry evidence; human
   screen-reader/contrast/DPI/monitor, privileged, final-release, and Wayland
   gates remain open or deferred.
+- [x] (2026-08-16) Reconciled stale active-child publication markers against
+  current commits and tests. Signing progress (`8208f6666`), atomic signing's
+  confirmation dependency (`def5ce0f5`), Document Signatures (`9a064669b`),
+  and per-signature review guidance (`8cddd7546`, `4cb84e52a`, `5d05e71b5`)
+  are complete. Historical plans remain historical; external release gates
+  remain open or deferred.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

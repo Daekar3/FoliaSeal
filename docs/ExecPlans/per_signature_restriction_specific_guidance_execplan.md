@@ -24,7 +24,8 @@ This slice matters because `docs/SPEC.md` requires plain-language guidance and e
 - [x] (2026-05-23T14:08:00Z) Added focused tests for restricted failed-validation guidance, restricted not-evaluated guidance, a restricted shell render-through assertion, and a regression check that restricted but locally verified signatures remain action-free.
 - [x] (2026-05-23T14:10:00Z) Ran focused validation: `pytest tests/unit/test_document_review.py tests/unit/test_qt_signing_shell.py`, `ruff check src/foliaseal/application/document_review.py tests/unit/test_document_review.py tests/unit/test_qt_signing_shell.py`, and `git diff --check`.
 - [x] (2026-05-23T14:13:00Z) Completed the required `explorer-light` compliance review, then closed the final verified-local regression gap and refreshed this ExecPlan to completion-state wording.
-- [ ] Create the commit for this slice and record the next remaining review-ergonomics gap after the restriction-specific guidance lands.
+- [x] (2026-05-23) Created and recorded the implementation commit
+  `4cb84e52a`; any richer review surface remains a separate follow-on.
 
 ## Surprises & Discoveries
 
@@ -149,4 +150,4 @@ Created this ExecPlan from the required `explorer-light` audit for the next narr
 
 Change note: 2026-05-23 / Codex
 
-Updated this ExecPlan after implementation and compliance review so the progress log, retrospective, and validation evidence now match the completed restriction-aware guidance behavior. The commit itself is still the only pending publication step.
+Updated this ExecPlan after implementation and compliance review so the progress log, retrospective, and validation evidence match the completed restriction-aware guidance behavior committed as `4cb84e52a`.

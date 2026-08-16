@@ -141,6 +141,10 @@ Qt surface, focused tests, and observable acceptance.
   discarded as contaminated by the underlying editor. Human assistive
   technology, contrast, physical-DPI/monitor interpretation, privileged host
   installation, final release acceptance, and Wayland remain open/deferred.
+- [x] (2026-08-16) Reconciled active signing/review publication markers with
+  current implementation commits and focused evidence. No new AFK product
+  implementation gap was found; the remaining unchecked release items are
+  human/display, privileged-host, or final-release gates.
 - [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
   cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager

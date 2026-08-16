@@ -84,9 +84,8 @@ The slice now provides a typed final confirmation summary, collision-safe defaul
 Cancel-lossless output selection, explicit source-overwrite authorization, consequence-labeled
 confirmation controls, and verified staged same-source replacement. The summary is derived from
 the synchronized draft, frozen preview time, and warning issues; the authorization is session-local
-and resets when the output path changes. Implementation and compliance-review gates are complete;
-the remaining work is the closeout commit and future display-backed acceptance once the environment
-can claim the single-instance endpoint.
+and resets when the output path changes. Implementation and compliance-review gates are complete in
+commit `def5ce0f5`; future display-backed acceptance remains an external release gate.
 
 ## Context and Orientation
 
@@ -198,5 +197,7 @@ Implemented and reviewed the confirmation/output-policy vertical slice after the
 red/green tests; updated the acceptance contract, compatibility note, and evidence requirements.
 Current focused evidence is `136 passed`; full regression and cleanup are recorded; display-backed
 acceptance is explicitly environment-blocked. Documentation closeout is committed as
-`def5ce0f5`; the next dependency-ordered blocker is display-backed acceptance when a usable
-single-instance GUI environment is available.
+`def5ce0f5`; the remaining gates are human/display and release evidence.
+
+Revision note: 2026-08-16 / Codex: reconciled the stale outcome wording with
+the recorded implementation commit.

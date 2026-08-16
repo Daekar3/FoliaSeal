@@ -14,9 +14,9 @@ Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md — the existing action bridge
+- [x] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md — the existing action bridge
   already prompts before a ready request and confirms an existing destination, but the full
-  confirmation-summary and source-overwrite policy remains open.
+  confirmation-summary and source-overwrite policy are implemented and committed in `def5ce0f5`.
 
 ## Progress
 
@@ -32,8 +32,9 @@ Qt surface, focused tests, and observable acceptance.
   1 warning`; Ruff and `git diff --check` are clean. The bounded launch reports the known
   `SingleInstanceUnavailable` socket limitation with `launch_rc=1`, then cleanup succeeds.
 - [x] (2026-08-10) Updated this plan, `docs/ARCHITECTURE.md`, and the parent plan; committed the
-  bounded increment. Explicit source overwrite, richer frozen-time confirmation, asynchronous
-  progress/recovery, and package acceptance remain incomplete.
+  bounded increment. Explicit source overwrite and richer frozen-time confirmation are supplied by
+  `ui_sign_confirmation_output_policy_execplan.md`; asynchronous progress/recovery are supplied by their
+  completed children. Package and external acceptance remain with the release plan.
 
 ## Surprises & Discoveries
 
@@ -68,9 +69,12 @@ Qt surface, focused tests, and observable acceptance.
 The default GUI composition now supplies `LazySigningRequestExecutor`, so a ready request no longer
 silently returns without execution. `SignPdfUseCase` writes to a sibling `.tmp`, verifies that path,
 and atomically replaces the requested destination only after verification; all failure paths remove
-the temporary file and preserve an existing destination. The plan remains open for explicit
-same-source overwrite, richer frozen-time confirmation contents, asynchronous progress/recovery,
-and installed-package acceptance.
+the temporary file and preserve an existing destination. The completed confirmation/output-policy,
+transaction-progress, and recovery children supply explicit same-source authorization, frozen-time
+summary, non-blocking execution, and verified artifact recovery. Remaining work is release evidence.
+
+Revision note: 2026-08-16 / Codex: reconciled the completed confirmation dependency and follow-on
+progress/recovery implementation against current commits; no runtime behavior changed.
 
 ## Context and Orientation
 

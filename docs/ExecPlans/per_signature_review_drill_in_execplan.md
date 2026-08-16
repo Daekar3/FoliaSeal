@@ -21,7 +21,8 @@ This slice matters because `docs/SPEC.md` requires signature inspection and plai
 - [x] (2026-05-22T21:15:00Z) Completed the required `explorer-light` audit and fixed the target slice to an inline selector-based drill-in inside the existing `Document review` card.
 - [x] (2026-05-22T21:19:00Z) Reviewed `docs/SPEC.md`, `docs/ARCHITECTURE.md`, `src/foliaseal/application/document_review.py`, `src/foliaseal/presentation/qt/signing_shell.py`, and the current review tests before writing this plan.
 - [x] (2026-05-22T21:35:00Z) The selector-driven drill-in behavior is already implemented in the tree; this plan now records that completed state instead of describing a future implementation.
-- [ ] Refresh the remaining publication steps for this slice, including the commit, without changing the behavior again.
+- [x] (2026-05-22) Refreshed the publication record; the implemented slice
+  is committed as `8cddd7546`.
 
 ## Surprises & Discoveries
 
@@ -107,7 +108,9 @@ The proof points are:
 - `tests/unit/test_qt_signing_shell.py` passes and includes a shell-level test that changes the selected signature and proves the drill-in detail label updates accordingly.
 - `ruff check` and `git diff --check` pass.
 
-This slice is complete when those proofs hold and the documentation review confirms that the implemented behavior is accurately described without widening the trust claims made by the current local verification path. The commit itself is still pending in the current working tree.
+This slice is complete: the focused proofs and documentation review hold, and
+the implementation is committed as `8cddd7546` without widening the trust
+claims made by the current local verification path.
 
 ## Idempotence and Recovery
 

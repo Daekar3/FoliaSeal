@@ -37,7 +37,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Run focused, regression, and real offscreen Qt validation; clean processes and
   artifacts.
 - [x] (2026-08-10) Update this plan and architecture/status documentation and complete the compliance
-  review. Commit is the final handoff gate for this slice.
+  review; implementation is committed as `9a064669b`.
 - [x] (2026-08-16) Reconciled the stale publication marker against current
   review/application/Qt tests; no richer V2 browser or certificate-path
   surface is claimed by this child.
@@ -104,8 +104,10 @@ The compact review card remains available, and this slice now adds the separate 
 surface. The application projection carries stable IDs, signed-visible/signed-invisible/unsigned
 items, PDF-space geometry where available, explicit integrity status, claimed signing time, and a
 trusted-timestamp value only when PyHanko validates one. The AppFrame owns one modeless dialog and
-clears its independent review overlay on close or replacement. Focused and real offscreen tests are
-green; broader parent-plan acceptance and the remaining V1 GUI corpus are still open.
+clears its independent review overlay on close or replacement. Focused and
+real offscreen tests are green; implementation is committed as `9a064669b`.
+Broader parent-plan acceptance and the remaining external release gates remain
+open.
 
 ## Context and Orientation
 
@@ -294,4 +296,5 @@ Document Signatures compliance from the compact sidebar alone.
 Revision note: 2026-08-10 / Codex
 Implemented the model/application/Qt path, added explicit integrity-status classification and
 bridge-routed offscreen acceptance, updated architecture documentation, and recorded focused/full
-suite evidence. Broader parent compliance remains open; this child is ready for commit.
+suite evidence. Implementation is committed as `9a064669b`; broader parent
+and release compliance remains open.

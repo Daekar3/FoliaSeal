@@ -23,7 +23,8 @@ This slice matters because `docs/SPEC.md` requires plain-language verification g
 - [x] (2026-05-23T16:52:46Z) Confirmed the working tree already includes the status-sensitive `Recommended next step:` line in `DocumentSignatureReviewItem.drill_in_detail`.
 - [x] (2026-05-23T16:52:46Z) Updated `docs/ARCHITECTURE.md` so the document-review summary/drill-in contract matches the current implementation.
 - [x] (2026-05-23T16:52:46Z) Revised this ExecPlan so the progress and outcome wording describe the shipped behavior without claiming the commit is finished.
-- [ ] Create the commit for this slice.
+- [x] (2026-05-23) Created and recorded the implementation commit
+  `5d05e71b5`.
 
 ## Surprises & Discoveries
 
@@ -52,7 +53,12 @@ This slice matters because `docs/SPEC.md` requires plain-language verification g
 
 ## Outcomes & Retrospective
 
-The intended outcome has been achieved in the working tree: non-verified signatures no longer leave the user at a dead end, because the selected signature detail now states one concrete, plain-language next step that fits the current local-verification outcome without overstating trust or inventing new review workflows. This documentation pass brought `docs/ARCHITECTURE.md` and this ExecPlan back into sync with that implementation. The remaining open item is the commit.
+The intended outcome has been achieved: non-verified signatures no longer leave
+the user at a dead end, because the selected signature detail now states one
+concrete, plain-language next step that fits the current local-verification
+outcome without overstating trust or inventing new review workflows. This
+documentation pass brought `docs/ARCHITECTURE.md` and this ExecPlan back into
+sync with the implementation committed as `5d05e71b5`.
 
 ## Context and Orientation
 
@@ -87,13 +93,18 @@ After the documentation refresh, verify the diff is limited to the two doc files
 
 ## Validation and Acceptance
 
-Acceptance is documentation accuracy. The architecture doc should say that `DocumentSignatureReviewItem.drill_in_detail` includes a conservative `Recommended next step:` line for non-verified signatures, while the plan should no longer describe that wording as pending implementation. The only remaining incomplete item should be the commit itself.
+Acceptance is documentation accuracy. The architecture doc says that
+`DocumentSignatureReviewItem.drill_in_detail` includes a conservative
+`Recommended next step:` line for non-verified signatures, and this plan no
+longer describes that wording or its commit as pending.
 
 No runtime tests are expected for this documentation-only refresh.
 
 ## Idempotence and Recovery
 
-This refresh is safe to repeat because it only changes prose. If the wording drifts again, rerun the same doc edits and make sure the plan still distinguishes between the shipped behavior and the not-yet-performed commit.
+This refresh is safe to repeat because it only changes prose. If the wording
+drifts again, rerun the same doc edits and make sure the plan still distinguishes
+between the shipped behavior and future review-ergonomics follow-ons.
 
 ## Artifacts and Notes
 
@@ -126,4 +137,7 @@ The intended behavior is that `drill_in_detail` includes a next-action line only
 
 Change note: 2026-05-23 / Codex
 
-Revised this ExecPlan after confirming the application-layer implementation is already present in the working tree. The earlier plan text was still written as if the next-action guidance was pending; this update keeps the document aligned with the shipped behavior while leaving the commit itself open.
+Revised this ExecPlan after confirming the application-layer implementation and
+commit `5d05e71b5` are present. The earlier plan text was still written as if
+the next-action guidance and publication were pending; this update keeps the
+document aligned with the shipped behavior.

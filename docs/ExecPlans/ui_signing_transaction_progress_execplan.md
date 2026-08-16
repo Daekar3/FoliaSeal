@@ -47,7 +47,8 @@ or failure—without claiming backend progress that the executor cannot report.
   path has fake-Qt coverage for timer ownership and worker cleanup.
 - [x] (2026-08-10) Reconcile architecture, parent/child plans, and acceptance evidence.
 - [x] (2026-08-10) Run focused/full validation, bounded GUI audit, cleanup, and compliance review.
-- [ ] Commit the completed slice and record the final revision.
+- [x] (2026-08-10) Commit the completed slice as `8208f6666` and record the
+  final revision.
 
 ## Surprises & Discoveries
 
@@ -84,15 +85,15 @@ or failure—without claiming backend progress that the executor cannot report.
 ## Outcomes & Retrospective
 
 Implementation is complete through the production composition seam and real offscreen polling proof.
-The full suite was green at `1435 passed, 20 skipped, 1 warning` for the original progress slice;
-after the durable recovery-journal child, the current full validation is `1519 passed, 20 skipped,
-1 warning`. Focused transaction coverage is green, and Ruff/pip/diff checks are clean. The bounded GUI audit exits with the known
-`SingleInstanceUnavailable` environment limitation (`gui_rc=1`) before frame creation; no matching
-FoliaSeal/PySide6/pytest process remains and the owned temporary root was removed. The commit gate
-remains.
-Durable journaling now records owned staged/final artifacts and supports verified headless restart
-recovery; the GUI recovery surface and explicit Open, Save copy as, Replace, and Discard actions
-remain deferred. Display-backed and privileged acceptance gates remain open.
+The production progress slice is committed as `8208f6666`; the current
+checkout full suite is `1543 passed, 20 skipped, 1 warning`, with focused
+transaction coverage, Ruff, compile, and diff checks clean. Durable journaling
+and the verified GUI recovery surface now record and resolve owned staged
+artifacts through explicit Open, Save copy as, Replace, and Discard actions.
+Display-backed and privileged acceptance gates remain open.
+
+Revision note: 2026-08-16 / Codex: reconciled the stale commit marker and
+updated recovery/full-suite status against the current checkout.
 
 ## Context and Orientation
 
