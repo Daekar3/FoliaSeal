@@ -66,8 +66,9 @@ a new GUI feature or claim Wayland support.
 - A completed child’s “commit is the final handoff gate” wording is not proof of
   an uncommitted worktree. Git history and current tests are the authoritative
   evidence.
-- Wayland remains intentionally deferred for Mint 22.3; X11 is the supported
-  current display evidence. Screen-reader/high-contrast, physical DPI/monitor,
+- V1 Linux acceptance targets Cinnamon/X11; Wayland validation is intentionally
+  deferred to a later compatibility tranche. X11 is the supported current
+  display evidence. Screen-reader/high-contrast, physical DPI/monitor,
   packaged GUI, privileged host installation, and final human release matrix
   remain open and must not be converted into AFK checkboxes.
 
@@ -179,7 +180,10 @@ Acceptance requires:
 - focused tests, full regression, Ruff, compileall, and diff checks pass;
 - parent/release plans still leave human accessibility, physical DPI/monitor,
   packaged GUI, privileged installation, and final release acceptance open;
-- Wayland is explicitly deferred for Mint 22.3;
+- the V1 Cinnamon/X11 target and later Wayland compatibility tranche are stated
+  without making an external Mint maturity claim;
+- the AT-SPI timeout is documented as a controlled session/bridge evidence
+  limitation after normal, forced, Orca-active, and minimal-Qt comparison;
 - no FoliaSeal/Qt/pytest process, dialog, or owned temporary root remains.
 
 ## Idempotence and Recovery

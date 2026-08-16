@@ -165,3 +165,43 @@ def test_children_honors_expired_deadline_without_touching_tree() -> None:
 
     assert children == []
     assert truncated is True
+
+
+def test_children_does_not_call_exact_limit_filled_tree_truncated() -> None:
+    module = _probe_module()
+
+    class _Leaf:
+        name = "one"
+        childCount = 0
+
+        def getRoleName(self) -> str:
+            return "push button"
+
+    class _Root:
+        childCount = 1
+
+        def getChildAtIndex(self, index: int):
+            assert index == 0
+            return _Leaf()
+
+    children, truncated = module._children(  # noqa: SLF001
+        _Root(),
+        SimpleNamespace(),
+        limit=1,
+    )
+
+    assert children[0]["name"] == "one"
+    assert truncated is False
+
+
+def test_probe_rejects_non_positive_timeout_before_bus_access() -> None:
+    module = _probe_module()
+
+    result = module.inspect(42, "FoliaSeal X11 Accessibility Audit", 0)
+
+    assert result == {
+        "status": "unavailable",
+        "reason": "timeout-seconds must be positive",
+        "process_id": 42,
+        "title": "FoliaSeal X11 Accessibility Audit",
+    }

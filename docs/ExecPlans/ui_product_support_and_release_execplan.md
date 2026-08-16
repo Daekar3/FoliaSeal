@@ -275,14 +275,28 @@ Qt surface, focused tests, and observable acceptance.
   registration probe is discoverable by process ID, but the FoliaSeal tree still reaches the
   bounded host timeout at an individual child call; this remains machine evidence only and does
   not close human screen-reader or final release acceptance.
-- [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
+- [x] (2026-08-16) Replaced the provisional AT-SPI interpretation with controlled startup evidence.
+  The audit records the dedicated address and both `org.a11y.Status` properties before Qt startup,
+  supports a forced backend run, preserves child timeout/stderr diagnostics, and restores its
+  environment. Normal, forced, Orca-active, and minimal-Qt X11 runs all retained native F1 and
+  cleanup but timed out at the session AT-SPI bridge; the session had no `org.a11y.Status` service
+  and Orca logged missing AT-SPI socket paths. This is a bridge-wide evidence limitation, not a
+  FoliaSeal-specific failure claim.
+- [x] (2026-08-16) Closed the controlled AT-SPI evidence correction with focused `16`-pass coverage,
+  final normal/forced X11 audits that passed native F1 and cleanup, and full validation of `1597
+  passed, 20 skipped, 1 warning`; the installed-package HITL/release matrix remains the only
+  corresponding release gate.
+- [ ] (remaining release gate) Close one installed-package HITL/release-matrix session. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
-  remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor
-  interpretation, human GUI acceptance, and privileged host package installation. Keep the
-  packaged GUI probe explicitly limited by its isolated `SingleInstanceUnavailable` boundary,
-  retain the Mint 22.3 Wayland deferral, and clean processes and artifacts after each attempt.
+  controlled AT-SPI comparison is complete but remains unavailable at the session bridge. The
+  installed-package session owns screen-reader,
+  high-contrast, physical-DPI/monitor interpretation, human GUI workflow, and package behavior.
+  Keep the packaged GUI probe explicitly limited by its isolated `SingleInstanceUnavailable`
+  boundary, state the V1 Linux acceptance target as Cinnamon/X11 with Wayland intentionally
+  deferred to a later compatibility tranche, and clean processes and artifacts after each
+  attempt.
 - [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
-  corpus after the remaining children close.
+  corpus after the controlled AT-SPI comparison and installed-package session close.
 
 ## Surprises & Discoveries
 

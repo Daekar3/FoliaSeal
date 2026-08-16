@@ -84,8 +84,17 @@ as environment-dependent rather than being falsely claimed by headless tests.
 - [x] (2026-08-16) Corrected the optional host probe to use the AT-SPI2 session-bus launcher and
   dedicated address. Focused probe/audit coverage is `7 passed`; the full suite is `1588 passed,
   20 skipped, 1 warning`. The live run reached the bridge but timed out discovering the owned Qt
-  frame with `GetApplicationBusAddress` warning, so human screen-reader and visual acceptance remain
-  open rather than being inferred from the corrected machine probe.
+  frame with `GetApplicationBusAddress` warning. Because the audit did not yet record accessibility
+  status before `QApplication` or compare forced startup, this result is provisional rather than a
+  Qt/FoliaSeal limitation; human screen-reader and visual acceptance remain open.
+- [x] (2026-08-16) Ran the controlled AT-SPI startup comparison: normal and forced
+  `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` FoliaSeal runs, an Orca-active forced run, and a minimal Qt
+  control all timed out at the host bridge while native F1 and cleanup passed. The session exposed
+  no `org.a11y.Status` service and logged missing AT-SPI socket paths, so no product-specific Qt or
+  FoliaSeal investigation is warranted from this evidence alone.
+- [x] (2026-08-16) Added the controlled-startup test seam and diagnostics coverage. Focused AT-SPI
+  tests pass (`16 passed`); final normal and forced X11 audits pass native F1 and teardown while
+  retaining `atspi.status=unavailable`. Full validation is `1597 passed, 20 skipped, 1 warning`.
 
 ## Surprises & Discoveries
 
@@ -172,8 +181,10 @@ The optional host-Python AT-SPI probe was also exercised against the owned
 window. The corrected helper resolved `org.a11y.Bus` and the dedicated AT-SPI
 address, then returned a bounded `unavailable` classification because the owned
 Qt frame was not discoverable before timeout; native F1 and teardown still
-passed. This is an environment/Qt bridge limitation, not screen-reader speech
-evidence.
+passed. Until accessibility startup is recorded and controlled before
+`QApplication`, the controlled comparison now classifies the failure as a
+session/bridge-wide evidence limitation rather than a FoliaSeal-specific
+failure. It still provides no screen-reader speech evidence.
 
 The same owned X11 frame was rerun at Qt device-pixel ratio 2.0 with two
 monitors present. The report retained the 1100x700 logical frame and native F1;

@@ -61,6 +61,7 @@ def _children(
     result: list[dict[str, Any]] = []
     queue: deque[Any] = deque([accessible])
     truncated = False
+    limit_reached = False
     while queue and len(result) < limit:
         if deadline is not None and time.monotonic() >= deadline:
             truncated = True
@@ -72,6 +73,7 @@ def _children(
             continue
         for index in range(child_count):
             if len(result) >= limit:
+                limit_reached = True
                 break
             try:
                 child = current.getChildAtIndex(index)
@@ -83,10 +85,11 @@ def _children(
                     "extents": _extents(child, pyatspi),
                 }
                 result.append(item)
-                queue.append(child)
+                if len(result) < limit:
+                    queue.append(child)
             except Exception:
                 continue
-    if queue or len(result) >= limit:
+    if queue or limit_reached:
         truncated = True
     return result, truncated
 
@@ -151,6 +154,13 @@ def _atspi_bus_address() -> tuple[str | None, str | None]:
 
 
 def inspect(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]:
+    if timeout_seconds <= 0:
+        return {
+            "status": "unavailable",
+            "reason": "timeout-seconds must be positive",
+            "process_id": pid,
+            "title": title,
+        }
     try:
         bus = subprocess.run(
             ["busctl", "--user", "list"],

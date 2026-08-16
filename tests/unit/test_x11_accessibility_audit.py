@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 
 def _audit_module() -> ModuleType:
@@ -153,3 +153,145 @@ def test_native_f1_retry_rejects_non_positive_attempt_bound() -> None:
         assert str(exc) == "max_attempts must be positive"
     else:
         raise AssertionError("expected max_attempts validation")
+
+
+def test_atspi_startup_preflight_sets_forced_environment_and_parses_status(monkeypatch) -> None:
+    module = _audit_module()
+    calls: list[list[str]] = []
+
+    def _run(args, **_kwargs):
+        calls.append(args)
+        if "call" in args:
+            return SimpleNamespace(
+                returncode=0,
+                stdout='s "unix:path=/run/user/1000/at-spi/bus_0"',
+                stderr="",
+            )
+        property_name = args[-1]
+        value = "true" if property_name == "IsEnabled" else "false"
+        return SimpleNamespace(returncode=0, stdout=f"b {value}", stderr="")
+
+    monkeypatch.delenv("QT_LINUX_ACCESSIBILITY_ALWAYS_ON", raising=False)
+    monkeypatch.delenv("AT_SPI_BUS_ADDRESS", raising=False)
+    monkeypatch.setattr(module.subprocess, "run", _run)
+
+    result = module._atspi_startup_preflight(True)  # noqa: SLF001
+
+    assert result["forced"] is True
+    assert result["address_resolved"] is True
+    assert result["status"]["IsEnabled"]["value"] is True
+    assert result["status"]["ScreenReaderEnabled"]["value"] is False
+    assert module.os.environ["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] == "1"
+    assert calls[0][2] == "call"
+
+
+def test_qt_initialization_runs_atspi_preflight_before_factory_and_restores_environment(
+    monkeypatch,
+) -> None:
+    module = _audit_module()
+    events: list[str] = []
+
+    def _preflight(force: bool):
+        events.append(f"preflight:{force}")
+        module.os.environ["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] = "1"
+        return {"forced": force}
+
+    def _factory():
+        events.append("factory")
+        assert module.os.environ["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] == "1"
+        return object()
+
+    monkeypatch.setenv("QT_LINUX_ACCESSIBILITY_ALWAYS_ON", "original")
+    monkeypatch.setattr(module, "_atspi_startup_preflight", _preflight)
+    app, startup = module._initialize_qt_application(  # noqa: SLF001
+        probe_atspi=True,
+        force_atspi=True,
+        application_factory=_factory,
+    )
+
+    assert app is not None
+    assert startup == {"forced": True}
+    assert events == ["preflight:True", "factory"]
+    module._restore_environment({"QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "original"})  # noqa: SLF001
+    assert module.os.environ["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] == "original"
+
+
+def test_probe_atspi_preserves_exit_and_stderr_diagnostics(monkeypatch) -> None:
+    module = _audit_module()
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=7,
+            stdout="",
+            stderr="bridge failed",
+        ),
+    )
+
+    result = module._probe_atspi(42, "FoliaSeal X11 Accessibility Audit", 1.0)  # noqa: SLF001
+
+    assert result == {
+        "status": "unavailable",
+        "reason": "probe exited with code 7",
+        "returncode": 7,
+        "stderr": "bridge failed",
+    }
+
+
+def test_probe_atspi_classifies_malformed_output_with_stderr(monkeypatch) -> None:
+    module = _audit_module()
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="not-json",
+            stderr="bridge warning",
+        ),
+    )
+
+    result = module._probe_atspi(42, "FoliaSeal X11 Accessibility Audit", 1.0)  # noqa: SLF001
+
+    assert result["status"] == "unavailable"
+    assert result["reason"].startswith("probe output: JSONDecodeError:")
+    assert result["stderr"] == "bridge warning"
+
+
+def test_probe_atspi_classifies_non_object_output_with_diagnostics(monkeypatch) -> None:
+    module = _audit_module()
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="[]",
+            stderr="bridge warning",
+        ),
+    )
+
+    result = module._probe_atspi(42, "FoliaSeal X11 Accessibility Audit", 1.0)  # noqa: SLF001
+
+    assert result == {
+        "status": "unavailable",
+        "reason": "probe output was not a JSON object",
+        "returncode": 0,
+        "stderr": "bridge warning",
+    }
+
+
+def test_probe_atspi_classifies_timeout(monkeypatch) -> None:
+    module = _audit_module()
+
+    def _timeout(*_args, **_kwargs):
+        raise module.subprocess.TimeoutExpired("probe", 3, stderr=b"timed out")
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+
+    result = module._probe_atspi(42, "FoliaSeal X11 Accessibility Audit", 1.0)  # noqa: SLF001
+
+    assert result == {
+        "status": "unavailable",
+        "reason": "probe process: TimeoutExpired: Command 'probe' timed out after 3 seconds",
+        "returncode": None,
+        "stderr": "timed out",
+    }

@@ -171,6 +171,78 @@ def _run_context(command: list[str]) -> str | None:
     return output or None
 
 
+def _run_busctl(command: list[str]) -> tuple[int | None, str, str]:
+    """Run one bounded user-session busctl command and retain diagnostics."""
+
+    try:
+        result = subprocess.run(
+            ["busctl", "--user", *command],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, "", f"{type(exc).__name__}: {exc}"
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+def _atspi_startup_preflight(force: bool) -> dict[str, Any]:
+    """Record AT-SPI state and prepare Qt before QApplication is constructed."""
+
+    if force:
+        os.environ["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] = "1"
+    result: dict[str, Any] = {
+        "forced": force,
+        "address_resolved": False,
+        "status": {},
+    }
+    address_code, address_output, address_error = _run_busctl(
+        [
+            "call",
+            "org.a11y.Bus",
+            "/org/a11y/bus",
+            "org.a11y.Bus",
+            "GetAddress",
+        ]
+    )
+    if address_code == 0 and address_output.startswith('s "') and address_output.endswith('"'):
+        os.environ["AT_SPI_BUS_ADDRESS"] = address_output[3:-1]
+        result["address_resolved"] = True
+    elif address_error:
+        result["address_error"] = address_error[:500]
+    else:
+        result["address_error"] = (
+            f"busctl exited with {address_code}: {address_output or 'no address'}"
+        )
+    for property_name in ("IsEnabled", "ScreenReaderEnabled"):
+        code, output, error = _run_busctl(
+            [
+                "get-property",
+                "org.a11y.Status",
+                "/org/a11y/Status",
+                "org.a11y.Status",
+                property_name,
+            ]
+        )
+        entry: dict[str, Any] = {"raw": output or None}
+        if code == 0 and output.startswith("b "):
+            entry["value"] = output[2:].strip().lower() == "true"
+        else:
+            entry["value"] = None
+            entry["error"] = (error or f"busctl exited with {code}")[:500]
+        result["status"][property_name] = entry
+    return result
+
+
+def _restore_environment(previous: dict[str, str | None]) -> None:
+    for name, value in previous.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+
+
 def _activate_window(window_id: int) -> bool:
     """Ask the local X11 WM to activate only the audit-owned window."""
 
@@ -207,14 +279,47 @@ def _probe_atspi(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]
             text=True,
             timeout=max(1.0, timeout_seconds + 1.0),
         )
+    except subprocess.TimeoutExpired as exc:
+        stderr = exc.stderr
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        return {
+            "status": "unavailable",
+            "reason": f"probe process: {type(exc).__name__}: {exc}",
+            "returncode": None,
+            "stderr": (stderr or "").strip()[:2000] or None,
+        }
     except (OSError, subprocess.SubprocessError) as exc:
-        return {"status": "unavailable", "reason": f"probe process: {type(exc).__name__}: {exc}"}
+        return {
+            "status": "unavailable",
+            "reason": f"probe process: {type(exc).__name__}: {exc}",
+            "returncode": None,
+            "stderr": None,
+        }
+    stderr = (result.stderr or "").strip()[:2000]
+    if result.returncode != 0:
+        return {
+            "status": "unavailable",
+            "reason": f"probe exited with code {result.returncode}",
+            "returncode": result.returncode,
+            "stderr": stderr or None,
+        }
     try:
         payload = json.loads(result.stdout)
     except (TypeError, ValueError) as exc:
-        return {"status": "unavailable", "reason": f"probe output: {type(exc).__name__}: {exc}"}
+        return {
+            "status": "unavailable",
+            "reason": f"probe output: {type(exc).__name__}: {exc}",
+            "returncode": result.returncode,
+            "stderr": stderr or None,
+        }
     if not isinstance(payload, dict):
-        return {"status": "unavailable", "reason": "probe output was not a JSON object"}
+        return {
+            "status": "unavailable",
+            "reason": "probe output was not a JSON object",
+            "returncode": result.returncode,
+            "stderr": stderr or None,
+        }
     return payload
 
 
@@ -388,6 +493,29 @@ def _help_command_id() -> Any:
     return AppFrameCommandId.HELP
 
 
+def _create_qt_application() -> Any:
+    from PySide6.QtWidgets import QApplication
+
+    return QApplication.instance() or QApplication(["foliaseal-x11-accessibility-audit"])
+
+
+def _initialize_qt_application(
+    *,
+    probe_atspi: bool,
+    force_atspi: bool,
+    application_factory: Callable[[], Any] | None = None,
+) -> tuple[Any, dict[str, Any] | None]:
+    """Apply AT-SPI startup policy before invoking the Qt application factory."""
+
+    startup = (
+        _atspi_startup_preflight(force_atspi)
+        if probe_atspi or force_atspi
+        else None
+    )
+    factory = application_factory or _create_qt_application
+    return factory(), startup
+
+
 def _wait_for_help(app: Any, frame: Any, timeout_seconds: float) -> bool:
     """Pump Qt until the modeless Help viewer exists or the bounded wait expires."""
 
@@ -403,6 +531,7 @@ def run_audit(
     timeout_seconds: float,
     capture_screenshot: bool,
     probe_atspi: bool,
+    force_atspi: bool = False,
 ) -> int:
     report: dict[str, Any] = {
         "status": "failed",
@@ -431,6 +560,10 @@ def run_audit(
     exit_code = 1
     temp_root: Path | None = None
     cleanup: dict[str, Any] = {}
+    previous_environment = {
+        name: os.environ.get(name)
+        for name in ("AT_SPI_BUS_ADDRESS", "QT_LINUX_ACCESSIBILITY_ALWAYS_ON")
+    }
     try:
         with _deadline(timeout_seconds):
             with TemporaryDirectory(prefix="foliaseal-x11-accessibility-") as temp_dir:
@@ -438,11 +571,12 @@ def run_audit(
                 try:
                     if not os.environ.get("DISPLAY"):
                         raise RuntimeError("DISPLAY is not set; this audit requires Cinnamon/X11")
-                    from PySide6.QtWidgets import QApplication
-
-                    app = QApplication.instance() or QApplication(
-                        ["foliaseal-x11-accessibility-audit"]
+                    app, atspi_startup = _initialize_qt_application(
+                        probe_atspi=probe_atspi,
+                        force_atspi=force_atspi,
                     )
+                    if atspi_startup is not None:
+                        report["atspi_startup"] = atspi_startup
                     frame, _settings_store, _settings = _build_frame(temp_root)
                     frame.window.setWindowTitle(AUDIT_WINDOW_TITLE)
                     frame.window.resize(1100, 700)
@@ -519,6 +653,8 @@ def run_audit(
         report["status"] = "failed"
         report["error"] = f"{type(exc).__name__}: {exc}"
         exit_code = 1
+    finally:
+        _restore_environment(previous_environment)
     cleanup["owned_temp_root_exists_after_cleanup"] = (
         temp_root.exists() if temp_root is not None else False
     )
@@ -553,12 +689,18 @@ def main() -> int:
         action="store_true",
         help="Inspect the audit-owned window through host Python AT-SPI (read-only, optional).",
     )
+    parser.add_argument(
+        "--force-atspi",
+        action="store_true",
+        help="Set QT_LINUX_ACCESSIBILITY_ALWAYS_ON before Qt startup and record AT-SPI status.",
+    )
     args = parser.parse_args()
     return run_audit(
         args.artifacts_dir,
         args.timeout_seconds,
         args.capture_screenshot,
         args.probe_atspi,
+        args.force_atspi,
     )
 
 
