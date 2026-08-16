@@ -359,20 +359,25 @@ Release tranche:
   gives explicit no-preset guidance in the signing rail and routes `Create or manage presets…`
   through typed workspace composition to the existing modeless Presets-first Library. Opening the
   Library does not mutate the active draft. The nested Preset → Appearance → Preset return path is
-  now complete in the preset transaction child; first-use Presets-first intent, live rail refresh,
-  explicit selection, and per-document input prompts remain open in the first-use/certificate
-  children.
+  now complete in the preset transaction child; at this historical checkpoint, first-use
+  Presets-first intent, live rail refresh, explicit selection, and per-document input prompts
+  remained open in the first-use/certificate children.
 - [x] (2026-08-10) Completed the first-use preset selection follow-up: the rail's Library action
   focuses Presets without persisting `library_last_catalog`, nested Appearance/Preset saves notify
   the active shell so the new row is visible, and no preset is auto-selected. Real offscreen
   first-use integration is green (`4 passed`); full regression is `1367 passed, 20 skipped, 1
-  warning`; optional certificate/placement creation and missing per-document prompts remain in
-  their owning children.
+  warning`; optional certificate/placement creation and missing per-document prompts remained in
+  their owning children at this historical checkpoint; later children close the prompt and blank-
+  page Placement portions.
 - [x] (2026-08-16) Completed the partial-preset missing-input guidance child: typed readiness
   facts and rail copy now identify the selected preset's missing certificate or placement, retain
   blocking certificate precedence, and prove certificate-first progression without mutation.
   Optional Certificate/Placement creation remains separate; display-backed, privileged-host,
   final-release, and deferred Wayland gates remain open.
+- [x] (2026-08-16) Completed the nested blank-page Placement creation child: the suspended Preset
+  editor now opens the existing transactional blank-page editor, attaches the saved stable id on
+  return, and preserves the active signing draft. Certificate creation/import and current-document
+  Placement capture remain separate; external display/package/final-release gates are unchanged.
 - [x] (2026-08-10) Added the bounded certificate-readiness increment: the catalog-backed signing
   rail now projects selected PKCS#12 identity, private-key presence, validity, expiry warnings,
   blocking states, password-promptability, and the exact neutral self-signed caveat through a typed

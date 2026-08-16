@@ -182,10 +182,11 @@ Bounded evidence (2026-08-10):
 - Final bounded lifecycle audit: exit `1` with the expected isolated `SingleInstanceUnavailable`
   endpoint error; no FoliaSeal/PySide6/pytest processes remained and the temporary root was
   removed.
-- Remaining gaps: optional Certificate/Placement creation from the nested first-use flow.
-  The partial-preset child now supplies explicit missing per-document certificate/placement
-  guidance; nested editor suspension/return, Presets-first entry, live rail refresh, and
-  explicit selection behavior are complete in this slice and its dependencies.
+- Remaining gaps: optional Certificate creation/import and current-document Placement capture
+  from the nested first-use flow. The nested blank-page Placement child now supplies creation,
+  return, and attachment; the partial-preset child supplies explicit missing per-document
+  certificate/placement guidance. Nested editor suspension/return, Presets-first entry, live rail
+  refresh, and explicit selection behavior are complete in this slice and its dependencies.
 
 ## Idempotence and Recovery
 
@@ -205,7 +206,8 @@ or workspace ports. The final behavior must be exercised by tests/unit/test_qt_s
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-10 / Codex
-Closed after implementation and compliance review: first-use entry now focuses Presets without
-persisting navigation, successful nested saves refresh the active shell, and the user explicitly
-selects the new preset. Certificate/Placement creation and per-document input prompts remain in
-their owning children.
+Updated after the nested blank-page Placement child: first-use entry focuses Presets without
+persisting navigation, successful nested saves refresh the active shell, the user explicitly
+selects the new preset, and a new Placement can be created and attached before Preset Save.
+Certificate creation/import and current-document Placement capture remain in their owning
+follow-up children.

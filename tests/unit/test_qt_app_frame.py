@@ -7,6 +7,7 @@ from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
     ReusableSigningObjects,
+    SavePlacement,
 )
 from foliaseal.application.signing_executor import LazySigningRequestExecutor
 from foliaseal.domain.models import SignatureRect
@@ -37,6 +38,7 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBundle,
 )
 from foliaseal.presentation.qt.single_instance import OpenRequest
+from tests.support.signing_builders import build_placement_profile
 
 
 def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
@@ -1713,6 +1715,66 @@ def test_first_use_library_is_presets_first_and_refreshes_active_shell_without_s
 
     assert shell.refresh_signature_profiles_calls == 2
     assert frame.current_signing_workflow.selected_signature_preset_id is None
+
+
+def test_nested_placement_creation_preserves_active_signing_draft(tmp_path: Path) -> None:
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    workflow = frame.current_signing_workflow
+    assert workflow is not None
+    workflow.selected_signature_preset_id = "current-preset"
+    workflow.passphrase = "keep-this-secret"
+    workflow.set_signature_rect(
+        SignatureRect(page_index=0, left_pt=20.0, bottom_pt=30.0, width_pt=180.0, height_pt=60.0)
+    )
+    before = (
+        workflow.selected_signature_preset_id,
+        workflow.passphrase,
+        workflow.signature_rect,
+        workflow.output_pdf_path,
+    )
+    created = build_placement_profile(display_name="Nested placement")
+
+    def create_placement():
+        frame._reusable_objects.execute(  # noqa: SLF001
+            SavePlacement(
+                name=created.display_name,
+                rect=created.rect,
+                source_page=created.source_page,
+                page_number=created.page_number,
+                pinned=created.pinned,
+                placement_profile_id=created.placement_profile_id,
+            )
+        )
+        return created
+
+    frame._open_placement_profile_editor = create_placement
+    library = frame.show_first_use_preset_library()
+    library.controls.create_button.click()
+    editor = library.controls.preset_editor
+    assert editor is not None
+    editor.controls.create_placement_button.click()
+
+    after = (
+        workflow.selected_signature_preset_id,
+        workflow.passphrase,
+        workflow.signature_rect,
+        workflow.output_pdf_path,
+    )
+    assert after == before
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:

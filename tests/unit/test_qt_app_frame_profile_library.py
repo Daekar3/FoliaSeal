@@ -18,6 +18,7 @@ from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePr
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
+    build_placement_profile,
     build_signature_appearance,
 )
 from tests.unit.test_qt_signing_shell import _fake_bindings
@@ -478,6 +479,75 @@ def test_nested_preset_editor_creates_appearance_and_returns_stable_reference() 
     assert service.view().preset_names == ("Board approval",)
     resolved = service.resolve(service.view().presets[0].ref)
     assert resolved.preset.appearance_profile_id == service.view().appearances[0].ref.object_id
+
+
+def test_nested_preset_editor_creates_and_attaches_blank_placement() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    created = build_placement_profile(display_name="Blank-page placement")
+
+    def create_placement():
+        service.execute(
+            SavePlacement(
+                name=created.display_name,
+                rect=created.rect,
+                source_page=created.source_page,
+                page_number=created.page_number,
+                pinned=created.pinned,
+                placement_profile_id=created.placement_profile_id,
+            )
+        )
+        return created
+
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        on_create_placement=create_placement,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.name_input.setText("Preset with placement")
+    editor.controls.appearance_selector.setCurrentIndex(0)
+
+    editor.controls.create_placement_button.click()
+
+    assert editor.controls.placement_selector.currentText() == "Blank-page placement"
+    assert editor.dirty is True
+    assert service.view().placement_names == ("Blank-page placement",)
+    editor.controls.save_button.click()
+
+    resolved = service.resolve(service.view().presets[0].ref)
+    assert resolved.preset.placement_profile_id == created.placement_profile_id
+
+
+def test_nested_preset_editor_cancelled_placement_creation_does_not_mutate_catalog() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        on_create_placement=lambda: None,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.appearance_selector.setCurrentIndex(0)
+    editor.controls.create_placement_button.click()
+
+    assert editor.controls.placement_selector.currentText() == "No placement"
+    assert service.view().placement_names == ()
+    assert dialog.controls.preset_editor is editor
 
 
 def test_nested_preset_child_discard_leaves_parent_and_catalog_unchanged() -> None:

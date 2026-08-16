@@ -142,7 +142,7 @@ class ReusableObjectLibraryDialog:
         on_edit_appearance: Callable[[ReusableObjectRef], bool] | None = None,
         on_create: Callable[[], bool] | None = None,
         on_edit: Callable[[ReusableObjectRef], bool] | None = None,
-        on_create_placement: Callable[[], bool] | None = None,
+        on_create_placement: Callable[[], PlacementProfile | None] | None = None,
         on_edit_placement: Callable[[PlacementProfile], bool] | None = None,
         image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
@@ -703,6 +703,7 @@ class ReusableObjectLibraryDialog:
             on_reusable_objects_changed=self._notify_reusable_objects_changed,
             on_cancel_requested=self._preset_editor_cancel_requested,
             on_error=self._show_error,
+            on_create_placement=self._on_create_placement,
             image_store=self._image_store,
         )
         self._preset_editor = editor

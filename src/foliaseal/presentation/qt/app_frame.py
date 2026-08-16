@@ -1851,7 +1851,7 @@ class FoliaSealAppFrame:
         finally:
             self._closing_document_signatures = False
 
-    def _open_placement_profile_editor(self) -> bool:
+    def _open_placement_profile_editor(self) -> PlacementProfile | None:
         """Open a document-independent placement editor from the Library."""
         initial = PlacementEditorState.from_blank_page(
             visible_width_pt=612.0,
@@ -1860,13 +1860,19 @@ class FoliaSealAppFrame:
         return self._run_placement_profile_editor(initial)
 
     def _edit_placement_profile(self, profile: PlacementProfile) -> bool:
-        return self._run_placement_profile_editor(PlacementEditorState.from_profile(profile))
+        return (
+            self._run_placement_profile_editor(PlacementEditorState.from_profile(profile))
+            is not None
+        )
 
-    def _run_placement_profile_editor(self, initial: PlacementEditorState) -> bool:
+    def _run_placement_profile_editor(
+        self,
+        initial: PlacementEditorState,
+    ) -> PlacementProfile | None:
         if self._bindings.q_double_spin_box is None or self._bindings.q_spin_box is None:
             self._emit_error("The placement editor requires the Qt numeric-input bindings.")
-            return False
-        saved = False
+            return None
+        saved: PlacementProfile | None = None
 
         def save(profile: PlacementProfile) -> None:
             nonlocal saved
@@ -1881,7 +1887,7 @@ class FoliaSealAppFrame:
                     overwrite=initial.placement_profile_id is not None,
                 )
             )
-            saved = True
+            saved = profile
             if self._reusable_object_library is not None:
                 self._reusable_object_library.refresh()
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from foliaseal.application.certificate_models import CertificateCatalog
-from foliaseal.application.reusable_signing_models import ResolvedSignaturePreset
+from foliaseal.application.reusable_signing_models import PlacementProfile, ResolvedSignaturePreset
 from foliaseal.application.reusable_signing_objects import (
     ReusableObjectKind,
     ReusableObjectRef,
@@ -33,6 +33,7 @@ class SignaturePresetEditorWidgetControls:
     certificate_selector: Any
     create_appearance_button: Any
     edit_appearance_button: Any
+    create_placement_button: Any
     save_button: Any
     cancel_button: Any
     child_host: Any
@@ -64,6 +65,7 @@ class SignaturePresetEditorWidget:
         on_reusable_objects_changed: Callable[[], None] | None = None,
         on_cancel_requested: Callable[[], bool] | None = None,
         on_error: Callable[[str], None] | None = None,
+        on_create_placement: Callable[[], PlacementProfile | None] | None = None,
         image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._bindings = bindings
@@ -75,6 +77,7 @@ class SignaturePresetEditorWidget:
         self._on_reusable_objects_changed = on_reusable_objects_changed or (lambda: None)
         self._on_cancel_requested = on_cancel_requested or (lambda: True)
         self._on_error = on_error or (lambda _message: None)
+        self._on_create_placement = on_create_placement
         self._image_store = image_store
         self._suspend_updates = True
         self._dirty = False
@@ -245,6 +248,10 @@ class SignaturePresetEditorWidget:
         layout.addWidget(_compose_row(bindings, create_appearance, edit_appearance))
         layout.addWidget(bindings.q_label("Placement"))
         layout.addWidget(placement_selector)
+        create_placement = bindings.q_push_button("Create placement…")
+        if self._on_create_placement is None:
+            create_placement.setEnabled(False)
+        layout.addWidget(create_placement)
         layout.addWidget(bindings.q_label("Certificate"))
         layout.addWidget(certificate_selector)
         helper = bindings.q_label(
@@ -273,6 +280,7 @@ class SignaturePresetEditorWidget:
         certificate_selector.currentIndexChanged.connect(self._mark_dirty)  # type: ignore[attr-defined]
         create_appearance.clicked.connect(self._create_appearance_child)  # type: ignore[attr-defined]
         edit_appearance.clicked.connect(self._edit_appearance_child)  # type: ignore[attr-defined]
+        create_placement.clicked.connect(self._create_placement)  # type: ignore[attr-defined]
         save_button.clicked.connect(self.save)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.request_cancel)  # type: ignore[attr-defined]
         return SignaturePresetEditorWidgetControls(
@@ -284,6 +292,7 @@ class SignaturePresetEditorWidget:
             certificate_selector=certificate_selector,
             create_appearance_button=create_appearance,
             edit_appearance_button=edit_appearance,
+            create_placement_button=create_placement,
             save_button=save_button,
             cancel_button=cancel_button,
             child_host=child_host,
@@ -299,9 +308,7 @@ class SignaturePresetEditorWidget:
         snapshot = self._library.snapshot()
         for item in snapshot.appearances:
             self._add_item(appearance_selector, item.display_name, item.ref.object_id)
-        self._add_item(placement_selector, "No placement", None)
-        for item in snapshot.placements:
-            self._add_item(placement_selector, item.display_name, item.ref.object_id)
+        self._populate_placement_selector(placement_selector)
         self._add_item(certificate_selector, "No certificate", None)
         for item in self._certificate_catalog.certificate_configurations:
             self._add_item(
@@ -325,6 +332,25 @@ class SignaturePresetEditorWidget:
 
     def _create_appearance_child(self) -> bool:
         return self._open_appearance_child(None)
+
+    def _create_placement(self) -> bool:
+        """Create a reusable placement and attach it to this suspended draft."""
+        callback = self._on_create_placement
+        if callback is None:
+            self._on_error("Placement creation is unavailable.")
+            return False
+        self._set_parent_editor_visible(False)
+        try:
+            created = callback()
+        finally:
+            self._set_parent_editor_visible(True)
+        if not isinstance(created, PlacementProfile):
+            return False
+        placement_id = getattr(created, "placement_profile_id", None)
+        self._populate_placement_selector(self.controls.placement_selector, placement_id)
+        self._dirty = True
+        self._on_reusable_objects_changed()
+        return True
 
     def _edit_appearance_child(self) -> bool:
         appearance_id = self._string_data(self.controls.appearance_selector)
@@ -405,10 +431,28 @@ class SignaturePresetEditorWidget:
         clear = getattr(selector, "clear", None)
         if callable(clear):
             clear()
+        if hasattr(selector, "_foliaseal_data"):
+            setattr(selector, "_foliaseal_data", {})
         for item in self._library.view().appearances:
             self._add_item(selector, item.display_name, item.ref.object_id)
         if selected_ref is not None:
             self._set_selector_data(selector, selected_ref.object_id)
+
+    def _populate_placement_selector(
+        self,
+        selector: Any,
+        selected_id: str | None = None,
+    ) -> None:
+        clear = getattr(selector, "clear", None)
+        if callable(clear):
+            clear()
+        if hasattr(selector, "_foliaseal_data"):
+            setattr(selector, "_foliaseal_data", {})
+        self._add_item(selector, "No placement", None)
+        for item in self._library.view().placements:
+            self._add_item(selector, item.display_name, item.ref.object_id)
+        if selected_id is not None:
+            self._set_selector_data(selector, selected_id)
 
     def _mark_dirty(self, *_args: object) -> None:
         if not self._suspend_updates:
