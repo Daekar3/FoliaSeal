@@ -9,10 +9,10 @@ This ExecPlan is a living document and must be maintained in accordance with
 
 The governing UI contract requires that a keyboard-only user can reach the primary signing path,
 that important controls expose names and state without relying on color or pointer position, and
-that the application remains usable at its minimum size. The repository already has most of the
-behavior and focused tests, but the release plan names a missing consolidated acceptance test and
-does not distinguish headless proof from display-backed evidence. This slice supplies that missing
-contract and fixes only concrete accessibility gaps exposed by the test.
+that the application remains usable at its minimum size. This child now supplies the consolidated
+real-Qt/offscreen acceptance contract and the concrete accessible-name, menu-mnemonic, metadata,
+and cleanup corrections exposed by it. Display-backed screen-reader, high-contrast, DPI, and
+monitor observations remain separate human evidence.
 
 After this slice, a checkout can run one real-Qt, offscreen acceptance module that proves the
 no-document frame, typed menus, support dialogs, settings transaction, focus names, minimum size,
@@ -56,13 +56,16 @@ as environment-dependent rather than being falsely claimed by headless tests.
   removed its owned root, and left no matching process. Display-backed screen-reader,
   high-contrast, physical DPI/monitor, installed-package, and final release evidence remain in the
   owning release plan.
-- [ ] Commit the compliance correction and record the display-backed evidence limitation.
+- [x] (2026-08-10) Committed the compliance correction and recorded the display-backed evidence
+  limitation; the acceptance implementation is complete in `4a937ed15`.
 
 ## Surprises & Discoveries
 
-- Observation: the release plan names `tests/integration/test_accessibility_acceptance.py`, but the
-  file is absent while adjacent no-document and Help tests already exercise the production Qt frame.
-  Evidence: `rg --files tests/integration` and `docs/ExecPlans/ui_product_support_and_release_execplan.md`.
+- Observation (historical, resolved): the release plan initially named
+  `tests/integration/test_accessibility_acceptance.py` before this child created it. The consolidated
+  module now exists and is the owning offscreen acceptance contract.
+  Evidence: `tests/integration/test_accessibility_acceptance.py` and the completed progress entries
+  below.
 - Observation: the current no-document frame already provides minimum size, stable primary buttons,
   typed menu actions, and modeless Help/support dialogs; the acceptance gap is consolidated proof,
   not a reason to add placeholder controls.
@@ -113,7 +116,7 @@ as environment-dependent rather than being falsely claimed by headless tests.
 
 ## Outcomes & Retrospective
 
-The bounded slice is implemented. The real-Qt offscreen acceptance verifies 1100x700 minimum
+The slice is implemented. The real-Qt offscreen acceptance verifies 1100x700 minimum
 geometry, no-document Open/Library names, typed File/Edit/View/Signing/Settings/Help action order,
 tooltips, shortcuts, disabled state, and unique mnemonics (including the corrected View entries),
 F1 Help, modeless support dialogs, Settings Restore defaults, and Unicode XDG path display. The
@@ -265,4 +268,9 @@ and package evidence gates.
 Revision note: 2026-08-10 / Codex
 Updated after compliance review to add top-level menu mnemonics, shortcut/disabled-state assertions,
 diagnostic-folder routing coverage, and public-API-only test cleanup; the follow-up focused set is
-`64 passed` and requires a fresh full-suite validation before commit.
+`64 passed`; the compliance correction was committed as `4a937ed15`. Display-backed and privileged
+release gates remain open.
+
+Revision note: 2026-08-16 / Codex
+Reconciled the release status: the acceptance module and correction are complete, while only
+display-backed accessibility, package installation, and final release evidence remain external gates.

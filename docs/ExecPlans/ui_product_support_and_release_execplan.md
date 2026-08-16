@@ -19,37 +19,37 @@ Qt surface, focused tests, and observable acceptance.
   `unshare` install-root smoke gate proves package-manager payload installation and installed-wrapper
   Help/resource/Poppler parity without touching the host package database; privileged host installation
   remains a separate gate.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
-- [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
-- [ ] docs/ExecPlans/ui_window_theme_responsive_execplan.md
-- [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
-- [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
-- [ ] docs/ExecPlans/ui_document_search_selection_execplan.md
-- [ ] docs/ExecPlans/ui_document_signatures_review_execplan.md
-- [ ] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
-- [ ] docs/ExecPlans/ui_signature_library_topology_execplan.md
-- [ ] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
-- [ ] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
-- [ ] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
-- [ ] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
-- [ ] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
-- [ ] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
-- [ ] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md
-- [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
-- [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [x] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
+- [x] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
+- [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [x] docs/ExecPlans/ui_window_theme_responsive_execplan.md
+- [x] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
+- [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
+- [x] docs/ExecPlans/ui_document_search_selection_execplan.md
+- [x] docs/ExecPlans/ui_document_signatures_review_execplan.md
+- [x] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
+- [x] docs/ExecPlans/ui_signature_library_topology_execplan.md
+- [x] docs/ExecPlans/ui_catalog_search_sort_pinning_execplan.md
+- [x] docs/ExecPlans/ui_signature_preset_transactions_execplan.md
+- [x] docs/ExecPlans/ui_appearance_editor_transaction_execplan.md
+- [x] docs/ExecPlans/ui_placement_editor_transaction_execplan.md
+- [x] docs/ExecPlans/ui_first_use_preset_setup_execplan.md
+- [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md
+- [x] docs/ExecPlans/ui_certificate_create_export_password_execplan.md
+- [x] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+- [x] docs/ExecPlans/ui_pointer_signature_placement_execplan.md
+- [x] docs/ExecPlans/ui_keyboard_numeric_placement_execplan.md
+- [x] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
+- [x] docs/ExecPlans/ui_appearance_content_layout_execplan.md
 - [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md — authoritative preview/signing
   parity, glyph and exact-fit readiness guidance, frozen-time refresh stability, and deterministic
   public-panel walkthrough are complete; display-backed accessibility/DPI/monitor, privileged host package installation,
   and legacy acceptance compatibility/nomenclature gates remain open.
-- [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
-- [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
-- [ ] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
-- [ ] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
+- [x] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
+- [x] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
+- [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
+- [x] docs/ExecPlans/ui_verification_recovery_reopen_execplan.md
 - [x] docs/ExecPlans/ui_help_support_execplan.md — completed first Help milestone for canonical
   packaged Markdown, CLI discovery, modeless viewer/F1, and offline resource parity.
 - [x] docs/ExecPlans/ui_support_surfaces_execplan.md — product Help support commands, privacy-safe
@@ -61,7 +61,8 @@ Qt surface, focused tests, and observable acceptance.
 
 ## Progress
 
-- [ ] (2026-08-09) Audit current behavior and add a failing focused test.
+- [x] (2026-08-09) Historical audit identified the need to delegate Help, accessibility, and package
+  work into dedicated children; those children are now complete for their local/offscreen scopes.
 - [x] (2026-08-10) Reconciled the release corpus by delegating the first Help milestone to
   `ui_help_support_execplan.md`; the broader settings/diagnostics/packaging acceptance remains open.
 - [x] (2026-08-10) Help child completed with `72` focused passes and full-suite evidence of
@@ -95,8 +96,13 @@ Qt surface, focused tests, and observable acceptance.
   frozen-time, request-timestamp equality, and cleanup states. This release plan remains open for display-backed
   screen-reader/high-contrast/DPI/monitor, privileged host package installation, diagnostics, and legacy
   acceptance compatibility/nomenclature retirement; no full release-compliance claim is made.
-- [ ] (remaining release gate) Implement any remaining smallest complete model/application/Qt paths
-  owned by the unchecked children above.
+- [x] (2026-08-16) Reconciled completed child markers and accessibility status. Help, privacy-safe
+  diagnostics, offscreen accessibility, and isolated package-manager installation are complete;
+  display-backed accessibility/GUI, privileged host installation, and final release matrix remain
+  open external gates.
+- [x] (2026-08-16) Re-audited the previously unchecked child set and found no remaining
+  dependency-ready model/application/Qt path in this release plan; the remaining gates are
+  environment-dependent acceptance or deliberate compatibility/nomenclature work.
 - [ ] (remaining release gate) Retire migrated compatibility or acceptance product cruft whose
   consumers are gone; this is intentionally separate from the preview behavior closure.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
@@ -131,11 +137,13 @@ Qt surface, focused tests, and observable acceptance.
 
 ## Outcomes & Retrospective
 
-The packaged-release acceptance child is implementation/evidence-complete, but this parent release
-plan remains open for cross-surface diagnostics, display-backed accessibility/GUI evidence, and a
-privileged host package installation. Its fresh package audit passed the structural/offline contract
-and recorded the isolated GUI limitation; it does not claim screen-reader, high-contrast,
-physical-DPI/monitor, or installed-package acceptance.
+The local support/release implementation and evidence are complete for their available environments:
+packaged Help, privacy-safe diagnostics, Restore defaults, real-Qt/offscreen accessibility, package
+payload parity, and private install-root `dpkg --unpack` all have owning children and current evidence.
+This plan remains open only for display-backed screen-reader/high-contrast/physical-DPI/monitor and
+human GUI acceptance, privileged host package installation, final cross-surface release execution,
+and any approved compatibility/nomenclature retirement. The isolated package audit’s GUI result is
+explicitly limited by `SingleInstanceUnavailable`; no full-release claim is made.
 
 ## Context and Orientation
 
@@ -282,3 +290,7 @@ text, Reason, Location, or private keys.
 
 Revision note: 2026-08-09 / Codex
 Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-16 / Codex
+Reconciled completed Help, diagnostics, offscreen accessibility, and isolated package-install child
+markers. No AFK implementation gap remains in this release plan; display-backed, privileged-host,
+and final cross-surface acceptance remain open external gates.
