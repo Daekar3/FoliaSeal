@@ -46,6 +46,7 @@ from foliaseal.domain.models import (
     TimestampTrustPolicy,
 )
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+from foliaseal.infra.config.signing_transaction_journal import FileSigningTransactionJournal
 from foliaseal.infra.render import RenderPageRequest
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
 from foliaseal.infra.tsa import build_dummy_timestamper
@@ -226,6 +227,7 @@ def _build_qt_signing_executor(*, timestamper_factory: Any | None = None) -> Any
     return build_signing_executor(
         timestamper_factory=timestamper_factory,
         render_port=QtPreviewRasterRenderer(QtPdfRenderBackend()),
+        transaction_journal=FileSigningTransactionJournal.default(),
     )
 
 

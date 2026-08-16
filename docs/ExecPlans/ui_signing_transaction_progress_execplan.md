@@ -32,8 +32,8 @@ or failure—without claiming backend progress that the executor cannot report.
 ## Progress
 
 - [x] (2026-08-10) Explorer audit identified synchronous executor invocation as the remaining
-  UI_SPEC WF04/section 11 blocker; no durable transaction artifact boundary exists for crash
-  recovery, so journals/autosave remain out of scope.
+  UI_SPEC WF04/section 11 blocker; the worker/progress portion is complete, while durable artifact
+  recovery was tracked separately and is now implemented by the recovery-journal child.
 - [x] (2026-08-10) Defined typed transaction lifecycle state and a Qt-safe completion delivery seam;
   synchronous submit remains available for deterministic non-Qt tests.
 - [x] (2026-08-10) Runs the executor off the GUI thread in the real Qt composition, preserves
@@ -84,13 +84,15 @@ or failure—without claiming backend progress that the executor cannot report.
 ## Outcomes & Retrospective
 
 Implementation is complete through the production composition seam and real offscreen polling proof.
-The full suite is green at `1435 passed, 20 skipped, 1 warning`; focused transaction coverage is
-green at 145 tests, and Ruff/pip/diff checks are clean. The bounded GUI audit exits with the known
+The full suite was green at `1435 passed, 20 skipped, 1 warning` for the original progress slice;
+after the durable recovery-journal child, the current full validation is `1519 passed, 20 skipped,
+1 warning`. Focused transaction coverage is green, and Ruff/pip/diff checks are clean. The bounded GUI audit exits with the known
 `SingleInstanceUnavailable` environment limitation (`gui_rc=1`) before frame creation; no matching
 FoliaSeal/PySide6/pytest process remains and the owned temporary root was removed. The commit gate
 remains.
-Crash-journal/autosave/restart restoration remain explicitly deferred because the executor still has
-no durable artifact ownership boundary.
+Durable journaling now records owned staged/final artifacts and supports verified headless restart
+recovery; the GUI recovery surface and explicit Open, Save copy as, Replace, and Discard actions
+remain deferred. Display-backed and privileged acceptance gates remain open.
 
 ## Context and Orientation
 
@@ -111,8 +113,9 @@ the one executor call; it does not claim that the backend has reported its inter
 
 Primary change class: behavior change. The slice may add one small Qt-neutral transaction runner,
 typed coordinator/boundary lifecycle methods, shell timer/dispatch ownership, sidebar copy, focused
-tests, one offscreen timing test, architecture/plan updates, and ignored local logs. Do not mix
-crash journals, autosave, backend progress callbacks, cancellation, packaging, or unrelated
+tests, one offscreen timing test, architecture/plan updates, and ignored local logs. The separate
+recovery-journal child owns durable crash journals; do not mix autosave, backend progress callbacks,
+cancellation, packaging, or unrelated
 phase-nomenclature migration.
 
 ## Plan of Work
@@ -206,8 +209,9 @@ destructive timeout appears. A second Sign and save attempt is rejected while ac
 replacing the workspace stops the timer and joins/cleans the owned worker without leaving a process
 or thread behind. Full tests, focused tests, Ruff, pip check, diff check, and cleanup pass.
 
-Crash journals, autosave, and interrupted-session restoration are not acceptance claims; they need a
-separate artifact-ownership plan.
+Durable crash-journal/restart recovery is covered by
+`docs/ExecPlans/signing_transaction_recovery_journal_execplan.md`; this progress child does not
+claim the GUI Open, Save copy as, Replace, or Discard surface.
 
 ## Idempotence and Recovery
 
@@ -234,7 +238,8 @@ The application/coordinator remains Qt-free. The runner’s minimal contract sho
 
 `SigningActionBoundary` owns the typed begin/poll/terminal transition and callbacks. The shell owns
 the Qt timer/dispatcher and cleanup. `SigningWorkspaceSidebar` renders only the resulting state.
-No interface may add cancellation, fake percentages, crash journals, or product-facing phase labels.
+No interface may add cancellation, fake percentages, or product-facing phase labels. Durable journal
+ownership and headless recovery are supplied by the separate recovery-journal child.
 
 Revision note: 2026-08-10 / Codex. Created after the source-change recovery commit and explorer
 audit of the remaining UI_SPEC section 11 transaction-feedback gap.

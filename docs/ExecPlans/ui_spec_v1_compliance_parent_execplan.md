@@ -164,7 +164,12 @@ Placement, preview, and signing tranche:
   environment-limited.
 - [x] docs/ExecPlans/ui_signing_transaction_progress_execplan.md — owned non-blocking worker,
   Qt-thread completion polling, truthful delayed stage/calm copy, and non-cancellable cleanup are
-  implemented; crash journals/autosave remain out of scope.
+  implemented; durable artifact recovery is now supplied by the recovery-journal child, while its
+  GUI Open/Save copy as/Replace/Discard surface remains open.
+- [x] docs/ExecPlans/signing_transaction_recovery_journal_execplan.md — secret-free durable
+  transaction journal, fail-closed write/decode/ownership behavior, verified headless candidate
+  discovery, and post-replace digest recovery are implemented and validated; the explicit GUI
+  Open, Save copy as, Replace, and Discard actions remain open.
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
   are committed; confirmation/source policy is now bounded in its follow-on child, while async
   recovery and package acceptance remain open.
@@ -541,7 +546,14 @@ Release tranche:
   truthful delayed stage/long-running copy without percentages or cancellation, and joins workers
   during disposal. Focused coverage, production-composition fake-Qt timer cleanup, and the real
   offscreen timing test are green; full regression is `1435 passed, 20 skipped, 1 warning`.
-  Durable transaction journals/autosave remain open.
+  Durable transaction journals/autosave were subsequently completed by the recovery-journal child;
+  its GUI recovery actions remain open.
+- [x] (2026-08-16) Added durable signing-transaction recovery: a secret-free atomic JSON journal
+  records begin/stage/preserve/commit transitions, fails closed when journal writes fail, and
+  exposes only verifier-approved owned artifacts through the Qt-free executor API. A crash after
+  final replacement is recovered by matching the recorded digest. Full validation is `1519 passed,
+  20 skipped, 1 warning`; GUI Open, Save copy as, Replace, and Discard actions plus display-backed
+  and privileged acceptance remain open.
 - [x] (2026-08-10) Completed the single-instance open-routing child: secondary invocations forward
   one bounded absolute-path request to the existing frame; active signing keeps the current workspace,
   replaces older pending requests with the newest basename in an AppFrame-owned condition-only status

@@ -41,6 +41,7 @@ from foliaseal.application.signing_draft_contracts import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
 )
+from foliaseal.application.signing_transaction_recovery import SigningRecoveryCandidate
 from foliaseal.application.stamp_background import (
     stamp_background_for_path as _neutral_stamp_background_for_path,
 )
@@ -100,6 +101,7 @@ from foliaseal.domain.models import (
     VerificationSummary,
 )
 from foliaseal.infra.certification import inspect_pdf_certification_reader
+from foliaseal.infra.config.signing_transaction_journal import FileSigningTransactionJournal
 from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validation_context
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
@@ -416,11 +418,15 @@ class SigningExecutor:
     def verify_preserved_artifact(self, artifact_path: str) -> VerificationSummary:
         return self.use_case.verify_preserved_artifact(artifact_path)
 
+    def verified_recovery_candidates(self) -> tuple[SigningRecoveryCandidate, ...]:
+        return self.use_case.verified_recovery_candidates()
+
 
 def build_signing_executor(
     *,
     timestamper_factory: Callable[[str], object] | None = None,
     render_port: PreviewRasterRenderer | None = None,
+    transaction_journal: FileSigningTransactionJournal | None = None,
 ) -> SigningExecutor:
     """Build the concrete signing executor used by the Acceptance shell."""
     use_case = SignPdfUseCase(
@@ -429,6 +435,7 @@ def build_signing_executor(
         signer=PyHankoPdfSigner(timestamper_factory=timestamper_factory),
         verifier=PyHankoSignatureVerifier(),
         preview_render_port=render_port,
+        transaction_journal=transaction_journal,
     )
     return SigningExecutor(use_case=use_case)
 

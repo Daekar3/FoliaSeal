@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Protocol
+from uuid import uuid4
 
 from foliaseal.application.output_path_policy import paths_refer_to_same_file
 from foliaseal.application.pdf_compatibility import (
@@ -14,6 +15,11 @@ from foliaseal.application.pdf_compatibility import (
     PdfCompatibilityProfile,
 )
 from foliaseal.application.preview_render_boundary import PreviewRasterRenderer
+from foliaseal.application.signing_transaction_recovery import (
+    SigningRecoveryCandidate,
+    SigningTransactionJournal,
+    SigningTransactionRecord,
+)
 from foliaseal.domain.errors import (
     CertificateLoadError,
     CertificateWrongPasswordError,
@@ -210,6 +216,7 @@ class SignPdfUseCase:
     )
     compatibility_profile: PdfCompatibilityProfile = PdfCompatibilityProfile()
     preview_render_port: PreviewRasterRenderer | None = None
+    transaction_journal: SigningTransactionJournal | None = None
 
     def verify_preserved_artifact(
         self,
@@ -221,10 +228,43 @@ class SignPdfUseCase:
 
         return self.verifier.verify(artifact_path, trust_policy=trust_policy)
 
+    def verified_recovery_candidates(self) -> tuple[SigningRecoveryCandidate, ...]:
+        """Return only journaled staged artifacts that pass local verification."""
+
+        if self.transaction_journal is None:
+            return ()
+
+        def verify(path: str) -> bool:
+            summary = self.verify_preserved_artifact(path)
+            return (
+                summary.signature_count > 0
+                and summary.signatures_cryptographically_valid is True
+                and not summary.certification_restricted
+            )
+
+        try:
+            return self.transaction_journal.verified_candidates(verify)
+        except OSError:
+            # Recovery is opportunistic when the configured user-data location
+            # is unavailable (for example, a read-only sandbox).  Signing must
+            # retain its normal failure semantics in that environment.
+            return ()
+
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""
         staged_output_path: Path | None = None
+        journal_record: SigningTransactionRecord | None = None
+        journal_state: str | None = None
+        journal = self.transaction_journal
         try:
+            if journal is not None:
+                journal_record = SigningTransactionRecord.new(
+                    transaction_id=str(uuid4()),
+                    input_pdf_path=request.input_pdf_path,
+                    output_pdf_path=request.output_pdf_path,
+                )
+                journal.begin(journal_record)
+                journal_state = "started"
             if self._paths_conflict(request.input_pdf_path, request.output_pdf_path) and not (
                 request.allow_source_overwrite
             ):
@@ -285,6 +325,12 @@ class SignPdfUseCase:
                 request.output_pdf_path,
                 output.output_bytes,
             )
+            if journal is not None and journal_record is not None:
+                journal.mark_staged(
+                    journal_record.transaction_id,
+                    str(staged_output_path),
+                )
+                journal_state = "staged"
             try:
                 verification = self.verifier.verify(
                     str(staged_output_path),
@@ -292,6 +338,8 @@ class SignPdfUseCase:
                 )
             except TimestampTrustMaterialError as exc:
                 preserved_artifact_path = str(staged_output_path)
+                self._mark_journal_preserved(journal, journal_record)
+                journal_state = "preserved"
                 staged_output_path = None
                 return SigningResult(
                     success=False,
@@ -306,6 +354,8 @@ class SignPdfUseCase:
                 )
             except ValueError as exc:
                 preserved_artifact_path = str(staged_output_path)
+                self._mark_journal_preserved(journal, journal_record)
+                journal_state = "preserved"
                 staged_output_path = None
                 return SigningResult(
                     success=False,
@@ -320,6 +370,8 @@ class SignPdfUseCase:
                 )
             except Exception as exc:
                 preserved_artifact_path = str(staged_output_path)
+                self._mark_journal_preserved(journal, journal_record)
+                journal_state = "preserved"
                 staged_output_path = None
                 return SigningResult(
                     success=False,
@@ -334,6 +386,8 @@ class SignPdfUseCase:
                 )
             if request.timestamp_required and not verification.timestamp_present:
                 preserved_artifact_path = str(staged_output_path)
+                self._mark_journal_preserved(journal, journal_record)
+                journal_state = "preserved"
                 staged_output_path = None
                 return SigningResult(
                     success=False,
@@ -353,6 +407,8 @@ class SignPdfUseCase:
                     or verification.tsa_chain_trusted is False
                 ):
                     preserved_artifact_path = str(staged_output_path)
+                    self._mark_journal_preserved(journal, journal_record)
+                    journal_state = "preserved"
                     staged_output_path = None
                     return SigningResult(
                         success=False,
@@ -382,8 +438,14 @@ class SignPdfUseCase:
                 signature_subfilter=output.signature_subfilter,
                 timestamp_present=verification.timestamp_present,
             )
+            if journal is not None and journal_record is not None:
+                journal.mark_committing(journal_record.transaction_id)
+                journal_state = "committing"
             self._replace_staged(staged_output_path, request.output_pdf_path)
             staged_output_path = None
+            if journal is not None and journal_record is not None:
+                journal.complete(journal_record.transaction_id)
+                journal_state = "completed"
             return SigningResult(
                 success=True,
                 failure_code=None,
@@ -476,11 +538,25 @@ class SignPdfUseCase:
                 message=str(exc),
             )
         finally:
+            if (
+                journal is not None
+                and journal_record is not None
+                and journal_state not in ("preserved", "committing", "completed")
+            ):
+                journal.discard(journal_record.transaction_id)
             if staged_output_path is not None and staged_output_path.exists():
                 try:
                     staged_output_path.unlink()
                 except OSError:
                     pass
+
+    def _mark_journal_preserved(
+        self,
+        journal: SigningTransactionJournal | None,
+        record: SigningTransactionRecord | None,
+    ) -> None:
+        if journal is not None and record is not None:
+            journal.mark_preserved(record.transaction_id)
 
     @staticmethod
     def _paths_conflict(input_pdf_path: str, output_pdf_path: str) -> bool:
