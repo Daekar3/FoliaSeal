@@ -151,7 +151,7 @@ Placement, preview, and signing tranche:
 - [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md — authoritative rendered
   preview/signing parity, managed-image alpha policy, bundled-font glyph guidance, exact-fit
   blocking, frozen-time reuse across unchanged preview refreshes, and public readiness walkthrough
-  are implemented and validated; display-backed accessibility/DPI/monitor, package-manager, and
+  are implemented and validated; display-backed accessibility/DPI/monitor, privileged host package installation, and
   legacy acceptance compatibility/nomenclature gates remain open.
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — typed ordered readiness
@@ -175,9 +175,9 @@ Placement, preview, and signing tranche:
 
 Release tranche:
 
-- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — bounded package audit evidence is
-  complete, while broader Settings/diagnostics, display-backed accessibility/GUI, and package-install
-  gates remain open.
+- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — bounded package audit evidence and
+  the isolated package-manager install-root smoke gate are complete, while broader Settings/
+  diagnostics, display-backed accessibility/GUI, and privileged host package-install gates remain open.
 - [x] docs/ExecPlans/ui_help_support_execplan.md — packaged
   canonical Markdown, CLI discovery, modeless searchable viewer, F1 routing, and offline/resource
   parity are implemented and validated; diagnostics and final release acceptance remain with the
@@ -213,13 +213,14 @@ Release tranche:
   `dependency.help_output_present=true`. The GUI probe is explicitly `limited`
   (return code `1`, exact `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal
   instance endpoint:` reason); build warnings and cleanup were recorded in the child plan, and no
-  generated artifact was committed. Display-backed and real package-manager gates remain open.
+  generated artifact was committed. Display-backed and privileged host package-manager gates remain open;
+  the isolated install-root smoke is complete.
 - [x] (2026-08-10) Completed the authoritative preview/readiness closure slice: the focused
   parity/fit/renderer/readiness command is `104 passed`, and the deterministic public-panel
   walkthrough covers placement, unsupported `Common name`/`U+2603` guidance, exact-fit blocking,
   ready state, repeated refresh with frozen signing time, request-timestamp equality, and cleanup.
   The full suite is `1482 passed, 20 skipped, 1 warning`, with Ruff, `pip check`, and
-  `git diff --check` clean. Display-backed screen-reader/high-contrast/DPI/monitor, package-manager
+  `git diff --check` clean. Display-backed screen-reader/high-contrast/DPI/monitor, privileged host package
   installation, and legacy acceptance compatibility/nomenclature retirement remain open; this is not
   full release compliance.
 - [x] (2026-08-09) Added requirement traceability, exact live paths, executable validation commands,

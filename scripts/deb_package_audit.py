@@ -274,6 +274,16 @@ def _assert_inside(path: Path, root: Path, description: str) -> None:
         raise RuntimeError(f"{description} escapes the extracted package") from exc
 
 
+def _assert_dedicated_child(path: Path, root: Path, description: str) -> None:
+    """Require ``path`` to be a strict child of the caller-owned root."""
+
+    resolved_path = path.resolve()
+    resolved_root = root.resolve()
+    if resolved_path == resolved_root:
+        raise RuntimeError(f"{description} must be a dedicated child of its owner")
+    _assert_inside(resolved_path, resolved_root, description)
+
+
 def _expected_help_entries(index_path: Path) -> list[dict[str, Any]]:
     try:
         entries = json.loads(index_path.read_text(encoding="utf-8"))
@@ -389,6 +399,7 @@ def _audit_dependency(fixture: Path, *, cwd: Path, env: dict[str, str]) -> dict[
             f"code={conversion.returncode}, stderr={conversion.stderr}"
         )
     return {
+        "scope": "host-runtime",
         "command": pdftoppm,
         "help_returncode": help_result.returncode,
         "help_output_present": True,
@@ -397,11 +408,183 @@ def _audit_dependency(fixture: Path, *, cwd: Path, env: dict[str, str]) -> dict[
     }
 
 
+def package_manager_install_command(
+    package: Path,
+    install_root: Path,
+    *,
+    fakeroot_path: str | None = None,
+    effective_uid: int | None = None,
+    launcher: str | None = None,
+) -> list[str]:
+    """Build a dpkg command whose database and payload are confined to ``install_root``."""
+
+    root = install_root.resolve()
+    admin_dir = root / "var/lib/dpkg"
+    command: list[str] = []
+    uid = os.geteuid() if effective_uid is None else effective_uid
+    if uid != 0:
+        selected_launcher = launcher
+        if selected_launcher is None:
+            selected_launcher = "unshare" if shutil.which("unshare") is not None else "fakeroot"
+        if selected_launcher == "unshare":
+            unshare = shutil.which("unshare")
+            if unshare is None:
+                raise RuntimeError("requested unshare launcher is unavailable")
+            command.extend([unshare, "--user", "--map-root-user", "--"])
+        elif selected_launcher == "fakeroot":
+            fakeroot = fakeroot_path or shutil.which("fakeroot")
+            if fakeroot is None:
+                raise RuntimeError(
+                    "unprivileged package-manager smoke requires unshare or fakeroot"
+                )
+            command.append(fakeroot)
+        else:
+            raise ValueError(f"unknown package-manager launcher: {selected_launcher}")
+    command.extend(
+        [
+            "dpkg",
+            f"--root={root}",
+            f"--admindir={admin_dir}",
+            f"--instdir={root}",
+            f"--log={root / 'var/log/dpkg.log'}",
+            "--unpack",
+            str(package.resolve()),
+        ]
+    )
+    return command
+
+
+def _initialize_package_manager_root(install_root: Path) -> None:
+    """Create the minimum private dpkg database layout required for ``dpkg --unpack``."""
+
+    admin_dir = install_root / "var/lib/dpkg"
+    (install_root / "var/log").mkdir(parents=True, exist_ok=True)
+    for relative in ("updates", "info"):
+        (admin_dir / relative).mkdir(parents=True, exist_ok=True)
+    status_path = admin_dir / "status"
+    status_path.touch(exist_ok=True)
+
+
+def _prepare_package_manager_root(install_root: Path) -> None:
+    """Reset a dedicated install root and create its private runtime directories."""
+
+    if install_root.exists():
+        for child in install_root.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+    else:
+        install_root.mkdir(parents=True)
+    for directory in ("home", "config", "data", "cache"):
+        (install_root / directory).mkdir()
+    _initialize_package_manager_root(install_root)
+
+
+def _audit_package_manager_install(
+    package: Path,
+    install_root: Path,
+    *,
+    fixture: Path,
+    base_env: dict[str, str],
+    owner_root: Path,
+) -> dict[str, object]:
+    """Install and exercise one package in a disposable, caller-owned root."""
+
+    install_root = install_root.resolve()
+    owner_root = owner_root.resolve()
+    _assert_dedicated_child(install_root, owner_root, "package-manager install root")
+    if install_root.exists() and any(install_root.iterdir()):
+        raise RuntimeError(f"package-manager install root is not empty: {install_root}")
+    env = offline_environment(base_env)
+    env["HOME"] = str(install_root / "home")
+    env["XDG_CONFIG_HOME"] = str(install_root / "config")
+    env["XDG_DATA_HOME"] = str(install_root / "data")
+    env["XDG_CACHE_HOME"] = str(install_root / "cache")
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    try:
+        _prepare_package_manager_root(install_root)
+        command = package_manager_install_command(package, install_root)
+        result = subprocess.run(
+            command,
+            cwd=install_root,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120.0,
+        )
+        output = f"{result.stdout}\n{result.stderr}".strip()
+        if result.returncode != 0:
+            # User namespaces may be present but disabled by policy. Retry once
+            # under fakeroot when the preferred unshare launcher failed at runtime.
+            if command and Path(command[0]).name == "unshare" and shutil.which("fakeroot"):
+                _prepare_package_manager_root(install_root)
+                command = package_manager_install_command(
+                    package,
+                    install_root,
+                    launcher="fakeroot",
+                )
+                result = subprocess.run(
+                    command,
+                    cwd=install_root,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=120.0,
+                )
+                output = f"{result.stdout}\n{result.stderr}".strip()
+            if result.returncode != 0:
+                raise RuntimeError(
+                    "package-manager install failed: "
+                    f"code={result.returncode}, output={output[-2000:]}"
+                )
+        wrapper = install_root / "usr/bin/foliaseal"
+        executable = install_root / "usr/lib/foliaseal/foliaseal"
+        if not wrapper.is_file() or not executable.is_file():
+            raise RuntimeError("package-manager install omitted the wrapper or bundle executable")
+        help_result = _run([str(wrapper), "--help"], cwd=install_root, env=env)
+        if "usage:" not in help_result.stdout.lower():
+            raise RuntimeError("package-manager installed wrapper --help did not emit usage text")
+        bundle_root = install_root / "usr/lib/foliaseal"
+        resource_root = _runtime_resource_root(bundle_root)
+        fonts = sorted(path.name for path in (resource_root / "fonts").glob("*.ttf"))
+        validate_font_files(fonts)
+        help_result_report = _audit_help(
+            wrapper,
+            help_root=resource_root / "help",
+            package_root=install_root,
+            cwd=install_root,
+            env=env,
+        )
+        gui_result = _run_gui(wrapper, fixture, cwd=install_root, env=env)
+        if gui_result["status"] == "failed":
+            raise RuntimeError(str(gui_result.get("reason", "installed GUI startup failed")))
+        dependency_result = _audit_dependency(fixture, cwd=install_root, env=env)
+        return {
+            "status": "passed",
+            "command": command,
+            "dpkg_returncode": result.returncode,
+            "wrapper": "usr/bin/foliaseal",
+            "executable": "usr/lib/foliaseal/foliaseal",
+            "resource_root": str(resource_root.relative_to(install_root)),
+            "help": help_result_report,
+            "fonts": {"count": len(fonts), "files": fonts},
+            "dependency": dependency_result,
+            "gui_startup": gui_result,
+            "temporary_install_root_cleaned": False,
+        }
+    finally:
+        shutil.rmtree(install_root, ignore_errors=True)
+
+
 def audit(
     package: Path,
     artifacts_dir: Path,
     *,
     build_log: Path | None = None,
+    package_manager_root: Path | None = None,
 ) -> dict[str, object]:
     """Extract and validate one Debian artifact, returning a bounded JSON report."""
 
@@ -522,6 +705,17 @@ def audit(
             },
             "temporary_extraction_cleaned": True,
         }
+        if package_manager_root is not None:
+            report["package_manager_install"] = _audit_package_manager_install(
+                package,
+                package_manager_root,
+                fixture=fixture,
+                base_env=base_env,
+                owner_root=artifacts_dir.parent,
+            )
+            report["package_manager_install"]["temporary_install_root_cleaned"] = not Path(
+                package_manager_root
+            ).exists()
     write_report(report, artifacts_dir)
     return report
 
@@ -536,8 +730,24 @@ def main() -> int:
         default=None,
         help="Optional build stderr transcript from which warning lines are recorded.",
     )
+    parser.add_argument(
+        "--package-manager-root",
+        type=Path,
+        default=None,
+        help="Optional disposable root for an isolated dpkg/fakeroot install smoke check.",
+    )
     args = parser.parse_args()
-    print(json.dumps(audit(args.package, args.artifacts_dir, build_log=args.build_log), indent=2))
+    print(
+        json.dumps(
+            audit(
+                args.package,
+                args.artifacts_dir,
+                build_log=args.build_log,
+                package_manager_root=args.package_manager_root,
+            ),
+            indent=2,
+        )
+    )
     return 0
 
 

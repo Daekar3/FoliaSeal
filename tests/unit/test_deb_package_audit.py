@@ -145,3 +145,102 @@ def test_runtime_resource_root_supports_pyinstaller_one_dir_layouts(
     (resource_root / "help/index.json").write_text("[]\n", encoding="utf-8")
 
     assert audit._runtime_resource_root(tmp_path) == resource_root.resolve()
+
+
+def test_package_manager_install_command_is_confined_to_private_root(tmp_path: Path) -> None:
+    audit = _audit_module()
+    package = tmp_path / "foliaseal.deb"
+    install_root = tmp_path / "install-root"
+
+    command = audit.package_manager_install_command(
+        package,
+        install_root,
+        effective_uid=1000,
+    )
+
+    assert command == [
+        "/usr/bin/unshare",
+        "--user",
+        "--map-root-user",
+        "--",
+        "dpkg",
+        f"--root={install_root.resolve()}",
+        f"--admindir={(install_root / 'var/lib/dpkg').resolve()}",
+        f"--instdir={install_root.resolve()}",
+        f"--log={(install_root / 'var/log/dpkg.log').resolve()}",
+        "--unpack",
+        str(package.resolve()),
+    ]
+
+
+def test_package_manager_install_command_does_not_need_fakeroot_as_root(
+    tmp_path: Path,
+) -> None:
+    audit = _audit_module()
+
+    command = audit.package_manager_install_command(
+        tmp_path / "foliaseal.deb",
+        tmp_path / "install-root",
+        effective_uid=0,
+    )
+
+    assert command[0] == "dpkg"
+    assert "/usr/bin/unshare" not in command
+
+
+def test_package_manager_install_command_requires_fakeroot_for_unprivileged_users(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = _audit_module()
+    monkeypatch.setattr(audit.shutil, "which", lambda name, path=None: None)
+
+    with pytest.raises(RuntimeError, match="requires unshare or fakeroot"):
+        audit.package_manager_install_command(
+            tmp_path / "foliaseal.deb",
+            tmp_path / "install-root",
+            effective_uid=1000,
+        )
+
+
+def test_package_manager_install_command_falls_back_to_fakeroot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = _audit_module()
+    monkeypatch.setattr(
+        audit.shutil,
+        "which",
+        lambda name, path=None: "/usr/bin/fakeroot" if name == "fakeroot" else None,
+    )
+
+    command = audit.package_manager_install_command(
+        tmp_path / "foliaseal.deb",
+        tmp_path / "install-root",
+        effective_uid=1000,
+    )
+
+    assert command[0] == "/usr/bin/fakeroot"
+    assert "--unpack" in command
+
+
+def test_package_manager_install_root_must_be_dedicated_child(tmp_path: Path) -> None:
+    audit = _audit_module()
+
+    with pytest.raises(RuntimeError, match="dedicated child"):
+        audit._assert_dedicated_child(tmp_path, tmp_path, "package-manager install root")
+
+    audit._assert_dedicated_child(
+        tmp_path / "install-root", tmp_path, "package-manager install root"
+    )
+
+
+def test_initialize_package_manager_root_creates_private_database(tmp_path: Path) -> None:
+    audit = _audit_module()
+    install_root = tmp_path / "install-root"
+
+    audit._initialize_package_manager_root(install_root)
+
+    assert (install_root / "var/lib/dpkg/status").is_file()
+    assert (install_root / "var/lib/dpkg/updates").is_dir()
+    assert (install_root / "var/lib/dpkg/info").is_dir()

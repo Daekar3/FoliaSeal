@@ -15,6 +15,10 @@ Qt surface, focused tests, and observable acceptance.
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
+- [x] docs/ExecPlans/ui_package_manager_install_smoke_execplan.md — isolated `dpkg --unpack`/
+  `unshare` install-root smoke gate proves package-manager payload installation and installed-wrapper
+  Help/resource/Poppler parity without touching the host package database; privileged host installation
+  remains a separate gate.
 - [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md
@@ -40,7 +44,7 @@ Qt surface, focused tests, and observable acceptance.
 - [ ] docs/ExecPlans/ui_appearance_content_layout_execplan.md
 - [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md — authoritative preview/signing
   parity, glyph and exact-fit readiness guidance, frozen-time refresh stability, and deterministic
-  public-panel walkthrough are complete; display-backed accessibility/DPI/monitor, package-manager,
+  public-panel walkthrough are complete; display-backed accessibility/DPI/monitor, privileged host package installation,
   and legacy acceptance compatibility/nomenclature gates remain open.
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
@@ -65,7 +69,7 @@ Qt surface, focused tests, and observable acceptance.
   installed-package, and final release acceptance.
 - [x] (2026-08-10) Accessibility child completed its focused real-Qt/offscreen contract with `64`
   passes, including explicit no-document accessible names and corrected typed View mnemonics;
-  display-backed accessibility, installed-package, diagnostics, and final release acceptance remain
+  display-backed accessibility, privileged host package installation, diagnostics, and final release acceptance remain
   open under this plan.
 - [x] (2026-08-10) Packaged-release child completed its bounded audit: focused audit helper tests
   passed (`12 passed`), including offline-environment and complete-font-set assertions; the audit
@@ -77,19 +81,25 @@ Qt surface, focused tests, and observable acceptance.
   The GUI probe was classified `limited` with return code `1` and the exact isolated endpoint
   reason `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:`;
   temporary extraction/process cleanup succeeded and no generated artifact was committed. The
-  display-backed accessibility/GUI and real package-manager installation gates remain open.
+  display-backed accessibility/GUI and privileged host package installation gates remain open; the
+  isolated install-root `dpkg --unpack` gate is complete in the child plan below.
+- [x] (2026-08-16) Added and ran the isolated package-manager install-root smoke gate. A fresh `.deb`
+  passed both extraction and `dpkg --unpack` audits; the private install report recorded dpkg code `0`,
+  five offline Help topics, 18 fonts, successful `pdftoppm` conversion, GUI `limited` only for the
+  known isolated endpoint signature, and complete private-root cleanup. This does not claim privileged
+  host package installation or display-backed acceptance.
 - [x] (2026-08-10) Preview/readiness closure evidence is complete: focused parity/fit/renderer/
   readiness validation is `104 passed`; the full suite is `1482 passed, 20 skipped, 1 warning`;
   Ruff, `pip check`, and `git diff --check` are clean. The deterministic walkthrough covers the
   public placement, unsupported `Common name`/`U+2603`, exact-fit blocking, ready, repeated-refresh
   frozen-time, request-timestamp equality, and cleanup states. This release plan remains open for display-backed
-  screen-reader/high-contrast/DPI/monitor, package-manager installation, diagnostics, and legacy
+  screen-reader/high-contrast/DPI/monitor, privileged host package installation, diagnostics, and legacy
   acceptance compatibility/nomenclature retirement; no full release-compliance claim is made.
 - [ ] (remaining release gate) Implement any remaining smallest complete model/application/Qt paths
   owned by the unchecked children above.
 - [ ] (remaining release gate) Retire migrated compatibility or acceptance product cruft whose
   consumers are gone; this is intentionally separate from the preview behavior closure.
-- [ ] (remaining release gate) Run the final focused, regression, display-backed, and package-manager
+- [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
   validation; clean processes and artifacts.
 - [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
   corpus after the remaining children close.
@@ -123,7 +133,7 @@ Qt surface, focused tests, and observable acceptance.
 
 The packaged-release acceptance child is implementation/evidence-complete, but this parent release
 plan remains open for cross-surface diagnostics, display-backed accessibility/GUI evidence, and a
-real package-manager installation. Its fresh package audit passed the structural/offline contract
+privileged host package installation. Its fresh package audit passed the structural/offline contract
 and recorded the isolated GUI limitation; it does not claim screen-reader, high-contrast,
 physical-DPI/monitor, or installed-package acceptance.
 

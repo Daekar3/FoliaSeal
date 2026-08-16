@@ -42,9 +42,9 @@ success when the environment cannot provide it.
 - [x] Add focused tests for audit report parsing and package metadata/resource assertions without
   forcing a full PyInstaller build in ordinary unit runs (`12 passed`), including offline-environment
   and complete-font-set assertions.
-- [x] Build a fresh bundle and `.deb`, run the audit, clean all owned roots/processes, and reconcile
-  release/architecture status. The child implementation/evidence is complete; display-backed GUI,
-  real package-manager installation, and the parent release gates remain open.
+- [x] Build a fresh bundle and `.deb`, run the extraction and isolated install-root audits, clean all
+  owned roots/processes, and reconcile release/architecture status. The child implementation and
+  evidence are complete; display-backed GUI and privileged host package installation remain open.
 
 ## Surprises & Discoveries
 
@@ -73,8 +73,8 @@ success when the environment cannot provide it.
   Rationale: UI_SPEC makes the canonical Markdown Help path the product contract and the old command
   exposes obsolete phase terminology.
   Date/Author: 2026-08-10 / Codex.
-- Decision: use extraction into a `TemporaryDirectory` by default, and reserve real Debian install
-  for a separately documented privileged/manual gate.
+- Decision: use extraction into a `TemporaryDirectory` by default, and reserve privileged host Debian
+  installation for a separately documented manual gate; the isolated install-root smoke is automated.
   Rationale: extraction proves the package payload and wrapper without mutating the host package
   database; the V1 release report must state that distinction.
   Date/Author: 2026-08-10 / Codex.
@@ -105,9 +105,11 @@ isolated/offscreen environment cannot claim or reach the local endpoint. Build w
 missing `pycparser.lextab`/`pycparser.yacctab` hidden imports and optional `libtiff.so.5`; these did
 not invalidate the audited payload, Help, or Poppler checks. Temporary extraction and the child
 process were cleaned. The package and extracted evidence were temporary and no generated artifact
-was committed. Display-backed accessibility/GUI and real package-manager installation remain
+was committed. Display-backed accessibility/GUI and privileged host package installation remain
 external gates; this evidence does not claim screen-reader, high-contrast, physical DPI/monitor, or
-installed-package acceptance.
+privileged host package-manager acceptance. The separate isolated install-root smoke proves private
+`dpkg --unpack` payload installation and installed-wrapper parity, but does not mutate or certify the
+host package database.
 
 ## Context and Orientation
 
