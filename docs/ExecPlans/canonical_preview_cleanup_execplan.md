@@ -58,6 +58,12 @@ the requested artifacts directory remain available.
   common ownership fixture, producing one root per render.
   Evidence: `tests/unit/test_signing_preview_renderer.py` calls the renderer
   dozens of times and the post-suite root count matched those calls.
+- Observation: concurrent full-suite invocations can race when they share the
+  process-wide `/tmp` canonical-preview prefix; an overlapping reviewer run
+  reported renderer-root failures while the isolated authoritative run passed.
+  The current validation workflow runs one suite at a time, so this is recorded
+  as future parallel-test isolation hardening rather than a product leak or
+  release blocker.
 
 ## Decision Log
 
