@@ -724,6 +724,10 @@ Release tranche:
   skipped, 1 warning`). This closes only the audit-harness friction; screen-reader speech,
   high-contrast/physical-DPI/monitor interpretation, privileged installation, and final release
   signoff remain external, and Wayland remains deferred.
+- [x] (2026-08-16) Reconciled the X11 native-input child with its implementation commit
+  `7e63dba38`; the current full suite is `1584 passed, 20 skipped, 1 warning`, and the focused
+  X11 group is `6 passed`. This confirms the audit-only boundary and cleanup evidence without
+  closing human accessibility, physical-DPI, privileged-install, final-release, or Wayland gates.
 - [x] (2026-08-16) Completed the canonical-preview cleanup follow-up: focused preview/evidence/
   parity validation passed (`67 passed`), the full suite passed (`1584 passed, 20 skipped, 1
   warning`), and the final exact-prefix canonical-preview root check was empty. Adapter exception

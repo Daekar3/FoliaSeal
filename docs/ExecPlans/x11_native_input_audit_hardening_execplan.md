@@ -47,15 +47,17 @@ an unexplained assertion.
   attempt observed the focus transition and opened the modeless Help viewer.
   The report recorded `attempt_count=2`, `opened=true`, AT-SPI
   `unavailable` because the registry is absent, and `cleanup.passed=true`.
-- [x] (2026-08-16) Ran the full suite (`1578 passed, 20 skipped, 1 warning`),
+- [x] (2026-08-16) Ran the full suite (`1584 passed, 20 skipped, 1 warning`),
   Ruff, compileall, and diff checks; removed the exact audit root and verified
   no FoliaSeal/PySide6/pytest process or owned window remained.
 - [x] (2026-08-16) Independent review confirmed the slice is audit-only,
   bounded, JSON-safe, cleanup-preserving, and consistent with SPEC/UI_SPEC/
   ARCHITECTURE. The plan wording was tightened to describe reactivation and
   retry rather than claiming an explicit pre-first-attempt settle.
-- [ ] Commit the bounded slice and verify the post-commit checkout and owned
-  resource cleanup.
+- [x] (2026-08-16) Committed the bounded slice as `7e63dba38` (`test: harden
+  X11 native input audit`) and verified the post-commit checkout, focused X11
+  tests (`6 passed`), full-suite evidence (`1584 passed, 20 skipped, 1
+  warning`), and owned-resource cleanup.
 
 ## Surprises & Discoveries
 
@@ -99,10 +101,13 @@ an unexplained assertion.
 
 The audit-tooling improvement is complete with no product source change. The
 report now distinguishes activation from actual X11 focus and a bounded retry
-handled a real first-attempt delivery miss without masking it. Remaining human
-screen-reader, high-contrast, physical-DPI/monitor, privileged-install, and
-final release gates remain external; AT-SPI speech was not claimed because the
-session registry is unavailable.
+handled a real first-attempt delivery miss without masking it. The focused X11
+group passes (`6 passed`), the current full suite passes (`1584 passed, 20
+skipped, 1 warning`), and the committed run leaves no owned resource behind.
+Remaining human screen-reader, high-contrast, physical-DPI/monitor,
+privileged-install, and final release gates remain external; AT-SPI speech was
+not claimed because the session registry is unavailable. Wayland remains
+deferred for Mint 22.3 and is not substituted for this X11 evidence.
 
 ## Context and Orientation
 
@@ -232,4 +237,8 @@ delivery race rather than a product shortcut defect. The slice hardens the
 evidence boundary without changing product behavior or probing Wayland.
 Revision note: 2026-08-16 / Codex: implementation and live evidence completed;
 the first attempt missed Help, the second attempt succeeded, and the full
-suite remained green. Independent review and commit closeout remain.
+suite remained green. Independent review and commit closeout were subsequently
+completed.
+Revision note: 2026-08-16 / Codex: reconciled the stale commit marker with
+`7e63dba38`, refreshed the full-suite evidence to the current `1584 passed, 20
+skipped, 1 warning` run, and recorded post-commit cleanup.

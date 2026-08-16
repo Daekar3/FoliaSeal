@@ -214,7 +214,9 @@ Qt surface, focused tests, and observable acceptance.
   F1 friction. The audit now records X11 focus IDs and retries native F1 at most three times; a
   live run exercised two attempts (first delivery miss, second Help open), recorded
   `opened=true`, and cleaned its owned window/process/temp root. This improves evidence diagnostics
-  only; product shortcut wiring, human AT-SPI speech, and final release gates remain unchanged.
+  only; the bounded slice is committed as `7e63dba38`, its focused X11 group is `6 passed`, and
+  the current full suite remains green (`1584 passed, 20 skipped, 1 warning`). Product shortcut
+  wiring, human AT-SPI speech, and final release gates remain unchanged.
 - [x] (2026-08-16) The full validation run left 104 FoliaSeal-owned
   `foliaseal-canonical-preview-*` temporary image roots from direct preview-render consumers;
   all were verified idle, removed as exact owned cleanup targets, and recorded as cleanup
