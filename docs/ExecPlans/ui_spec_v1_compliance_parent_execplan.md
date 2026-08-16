@@ -248,11 +248,11 @@ Release tranche:
 - [x] (2026-08-09) Reordered the corpus into foundation, document-flow, reusable-object/certificate,
   placement/preview/signing, and release tranches; placement storage and typed settings now precede
   any child that persists reusable objects.
-- [ ] (2026-08-09) Resolve the live contract blockers identified during review: default GUI signing
-  execution, placement-schema alignment, Library/AppSettings restart state, and a real
-  single-instance process boundary. The first three now have bounded implementations and evidence;
-  the remaining acceptance limitation is display-backed single-instance forwarding in this
-  environment, which still reports `SingleInstanceUnavailable` with an isolated endpoint.
+- [x] (2026-08-09) Resolve the implementation blockers identified during review: default GUI
+  signing execution, placement-schema alignment, and Library/AppSettings restart state now have
+  bounded implementations and evidence. The remaining single-instance item is an external
+  display-backed forwarding acceptance gate, not an unresolved implementation blocker; this
+  environment still reports `SingleInstanceUnavailable` with an isolated endpoint.
 - [x] (2026-08-09) Completed the first foundation slice: no-document launch now exposes direct Open
   PDF and Signature Library actions with focused unit/integration evidence and clean teardown.
 - [x] (2026-08-09) Historical File-command foundation slice: a typed registry routed Open, Save,

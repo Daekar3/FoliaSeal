@@ -49,8 +49,11 @@ the old workspace and its actions unchanged.
   were not renamed.
 - [x] (2026-08-06) Focused validation passed (28 tests); full validation passed (1,119 tests).
   `ruff check`, `python -m compileall -q src`, and `git diff --check` also passed.
-- [ ] Run offscreen acceptance evidence, cleanup, process audit, and SPEC diff check.
-- [ ] Commit the complete slice and run a fresh three-explorer post-commit scan.
+- [x] (2026-08-06) Ran offscreen acceptance evidence, cleanup, process audit, and SPEC diff
+  checks; signed acceptance, preview parity, fit rejection, and clean teardown are recorded in
+  the Outcomes section below.
+- [x] (2026-08-06) Committed the complete slice as `905d42703` and completed the fresh
+  three-explorer post-commit scan; this status is reconciled by the archival closure plan.
 
 ## Surprises & Discoveries
 
