@@ -31,8 +31,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   display name. Management Save preserves remembered secrets, explicit disable removes them, and
   enabling validates the supplied password before secure storage. Export validates a supplied or
   remembered password before copying encrypted bytes and leaves managed state unchanged.
-- [x] (2026-08-10) Reviewed changed source and tests for migrated compatibility or phase3 product
-  cruft. No new phase3 nomenclature was introduced; the remaining dialog compatibility snapshot is
+- [x] (2026-08-10) Reviewed changed source and tests for migrated compatibility or acceptance product
+  cruft. No new acceptance nomenclature was introduced; the remaining dialog compatibility snapshot is
   still consumed by app-frame tests and has no safe retirement condition in this slice.
 - [x] (2026-08-10) Ran focused manager/dialog/app-frame validation: Ruff and `git diff --check`
   are clean and the focused manager/dialog command reports 29 passed. Full-suite, bounded GUI,
@@ -96,7 +96,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

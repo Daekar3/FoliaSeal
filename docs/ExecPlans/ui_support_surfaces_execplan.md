@@ -19,7 +19,7 @@ The behavior is visible from a checkout by launching the GUI, opening Help, sele
 entry, and invoking `Open Diagnostic Logs Folder`; focused offscreen tests prove command metadata,
 dialog contents, privacy filtering, path determinism, log rotation, and reset/cancel behavior. This
 slice does not claim the final installed-package matrix, screen-reader certification, or broad
-phase3 evidence nomenclature retirement.
+acceptance evidence nomenclature retirement.
 
 ## Child ExecPlan Dependencies
 
@@ -64,7 +64,7 @@ phase3 evidence nomenclature retirement.
 ## Decision Log
 
 - Decision: keep product diagnostics in a new Qt-free application/infra contract rather than
-  exposing `SigningWorkspaceDiagnosticsPort` or any Phase 3 harness type. Rationale: the product
+  exposing `SigningWorkspaceDiagnosticsPort` or any Acceptance harness type. Rationale: the product
   contract must be privacy-safe, bounded, and usable without an active document; harness state may
   contain richer evidence and has different ownership.
   Date/Author: 2026-08-10 / Codex.
@@ -113,7 +113,7 @@ Primary change class: behavior change plus the minimum architecture/status docum
 describe the new support boundary. Allowed changes are the new support-location/log module, support
 dialogs, command model, AppFrame/Settings wiring, focused tests, and relevant README/architecture/
 ExecPlan updates. Do not mix final Debian/package acceptance, screen-reader certification, broad
-logging of every existing code path, or Phase 3 evidence renaming.
+logging of every existing code path, or Acceptance evidence renaming.
 
 ## Plan of Work
 
@@ -235,7 +235,7 @@ The Qt-free support module should expose deterministic interfaces equivalent to:
 error/status boundary. `SupportDialog` objects own Qt widget construction and expose `show()` and
 `close()`; they must not import application signing workflows. `AppSettingsDialogControls` adds a
 `restore_defaults_button` while preserving the existing Save/Cancel fields. No support module may
-import the Phase 3 harness or read private document/signing values.
+import the Acceptance harness or read private document/signing values.
 
 Revision note: 2026-08-10 / Codex
 Created after a fresh repository audit found the required Help-menu support commands and product-level

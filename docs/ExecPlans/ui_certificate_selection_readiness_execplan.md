@@ -30,7 +30,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   readiness gate. The catalog-backed GUI now evaluates the selected PKCS#12 file, private key,
   validity window, and self-signed caveat without exposing secrets; direct headless callers with
   explicit material retain their existing boundary.
-- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. This slice adds no phase3
+- [x] (2026-08-10) Reviewed compatibility and acceptance product cruft. This slice adds no acceptance
   nomenclature or compatibility wrapper; existing evidence names remain because their external
   CLI/fixture contracts still have consumers. No safe retirement condition was met here.
 - [x] (2026-08-10) Ran focused application/Qt tests, Ruff, the full suite, and a bounded offscreen
@@ -82,7 +82,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.
@@ -190,8 +190,8 @@ name its remaining consumer and retirement condition in this plan.
   no screenshot/SVG was added because this is an existing certificate-group surface, not a new
   topology. The bounded command exited `1` with `SingleInstanceUnavailable` before frame creation;
   its isolated root was removed and no FoliaSeal/PySide6/pytest processes remained after validation.
-- Compatibility proof: no new `phase3` imports or product-facing labels were introduced; existing
-  phase3 evidence modules remain outside this product readiness boundary.
+- Compatibility proof: no new `acceptance` imports or product-facing labels were introduced; existing
+  acceptance evidence modules remain outside this product readiness boundary.
 
 Revision note: 2026-08-10 / Codex
 Implemented the typed catalog-backed readiness projection and Qt helper-state slice.

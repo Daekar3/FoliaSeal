@@ -32,7 +32,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implement the smallest complete model/application/Qt path through the setup
   port, panel adapter, action coordinator, and shell fixtures.
 - [x] (2026-08-10) Retire the migrated readiness callback pair from production callers; no new
-  product-facing phase3 nomenclature or compatibility adapter was introduced.
+  product-facing acceptance nomenclature or compatibility adapter was introduced.
 - [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean owned processes and
   temporary configuration artifacts.
 - [x] (2026-08-10) Update this plan and relevant docs, then commit the child slice.
@@ -101,7 +101,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

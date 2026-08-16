@@ -7,6 +7,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from foliaseal.application.evidence_core import (
+    EvidenceMatrixKind,
+    EvidenceMatrixResult,
+    SignedAcceptanceEvidenceResult,
+    SignedAcceptanceMatrixResult,
+)
+from foliaseal.application.evidence_core import (
+    load_capture_json as core_load_capture_json,
+)
+from foliaseal.application.evidence_core import (
+    matrix_exception_row as core_matrix_exception_row,
+)
+from foliaseal.application.evidence_core import (
+    matrix_summary_row as core_matrix_summary_row,
+)
+from foliaseal.application.evidence_core import (
+    normalize_matrix_result as core_normalize_matrix_result,
+)
+from foliaseal.application.evidence_core import (
+    render_evidence_markdown as core_render_evidence_markdown,
+)
+from foliaseal.application.evidence_core import (
+    validate_signed_acceptance_matrix_summary as core_validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.evidence_ports import (
     AssetGeneratorPort,
     CaptureContractEvaluatorPort,
@@ -16,30 +40,6 @@ from foliaseal.application.evidence_ports import (
     MatrixRunnerPort,
     MatrixRuntimeContextPort,
     TextWriterPort,
-)
-from foliaseal.application.phase3_evidence_core import (
-    Phase3MatrixKind,
-    Phase3MatrixResult,
-    Phase3SignedAcceptanceEvidenceResult,
-    Phase3SignedAcceptanceMatrixResult,
-)
-from foliaseal.application.phase3_evidence_core import (
-    load_capture_json as core_load_capture_json,
-)
-from foliaseal.application.phase3_evidence_core import (
-    matrix_exception_row as core_matrix_exception_row,
-)
-from foliaseal.application.phase3_evidence_core import (
-    matrix_summary_row as core_matrix_summary_row,
-)
-from foliaseal.application.phase3_evidence_core import (
-    normalize_matrix_result as core_normalize_matrix_result,
-)
-from foliaseal.application.phase3_evidence_core import (
-    render_evidence_markdown as core_render_evidence_markdown,
-)
-from foliaseal.application.phase3_evidence_core import (
-    validate_signed_acceptance_matrix_summary as core_validate_signed_acceptance_matrix_summary,
 )
 from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluation
 
@@ -76,7 +76,7 @@ class SignedAcceptanceEvidenceRequest:
     passphrase: str = ""
     suppress_known_runtime_chatter: bool = True
     required_manifests: tuple[str, ...] = ()
-    default_summary_relative_path: str = "artifacts/phase3_signed_acceptance_evidence_summary.md"
+    default_summary_relative_path: str = "artifacts/signed_acceptance_evidence_summary.md"
 
 
 @dataclass(frozen=True)
@@ -114,7 +114,7 @@ class EvidenceService:
         *,
         certificate_path: str,
         passphrase: str,
-        artifacts_dir: str = "artifacts/phase3",
+        artifacts_dir: str = "artifacts/acceptance",
     ) -> EvidenceSession:
         """Return a reusable session bound to one PDF and its credentials."""
 
@@ -130,22 +130,22 @@ class EvidenceService:
     def capture(self, request: EvidenceCaptureRequest) -> CaptureResultPort:
         return self._harness_runner(request)
 
-    def preview_matrix(self, request: EvidenceMatrixRequest) -> Phase3MatrixResult:
+    def preview_matrix(self, request: EvidenceMatrixRequest) -> EvidenceMatrixResult:
         """Run and normalize a preview matrix through the injected runner."""
 
         return core_normalize_matrix_result(
-            kind=Phase3MatrixKind.PREVIEW,
+            kind=EvidenceMatrixKind.PREVIEW,
             summary=self._preview_matrix_runner(request),
         )
 
     def signed_acceptance_matrix(
         self,
         request: EvidenceMatrixRequest,
-    ) -> Phase3MatrixResult:
+    ) -> EvidenceMatrixResult:
         """Return a typed signed-acceptance result over the stable summary contract."""
 
         return core_normalize_matrix_result(
-            kind=Phase3MatrixKind.SIGNED_ACCEPTANCE,
+            kind=EvidenceMatrixKind.SIGNED_ACCEPTANCE,
             summary=self._signed_acceptance_matrix_runner(request),
         )
 
@@ -159,7 +159,7 @@ class EvidenceService:
     def signed_acceptance_evidence(
         self,
         request: SignedAcceptanceEvidenceRequest,
-    ) -> Phase3SignedAcceptanceEvidenceResult:
+    ) -> SignedAcceptanceEvidenceResult:
         root = Path(request.artifacts_root)
         summary_path = (
             Path(request.summary_markdown_path)
@@ -168,7 +168,7 @@ class EvidenceService:
         )
         assets = self._asset_generator(root=root)
 
-        matrix_results: list[Phase3SignedAcceptanceMatrixResult] = []
+        matrix_results: list[SignedAcceptanceMatrixResult] = []
         all_errors: list[str] = []
         for spec in _matrix_specs(root, assets):
             chatter_context = (
@@ -200,7 +200,7 @@ class EvidenceService:
             all_errors.extend(errors)
             matrix_results.append(core_matrix_summary_row(spec["name"], summary, errors))
 
-        evidence = Phase3SignedAcceptanceEvidenceResult(
+        evidence = SignedAcceptanceEvidenceResult(
             passed=not all_errors,
             summary_markdown_path=str(summary_path),
             generated_assets={key: str(value) for key, value in assets.as_dict().items()},

@@ -180,7 +180,7 @@ codec, a new image import/storage module, the shared layout boundary, the nested
 and setup form, their focused tests, and the minimum architecture/ExecPlan documentation needed
 to describe the completed behavior. Generated PNGs and GUI audit output may be written only below
 ignored temporary/artifact directories. Do not mix preview screenshot rebaselines, certificate
-work, packaging, broad renderer refactors, or phase3 nomenclature cleanup into this commit.
+work, packaging, broad renderer refactors, or acceptance nomenclature cleanup into this commit.
 
 ## Plan of Work
 

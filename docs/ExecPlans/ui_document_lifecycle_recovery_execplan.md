@@ -103,7 +103,7 @@ readiness, sign/save, verify, and reopen. This slice must preserve the V1 anti-g
 printing, general PDF editing, cloud workflow, broad trust administration, or multiple pending
 signatures.
 
-The words “compatibility surface” mean an adapter kept only for old callers. “phase3” names identify
+The words “compatibility surface” mean an adapter kept only for old callers. “acceptance” names identify
 legacy evidence/harness infrastructure and must not appear in ordinary product-facing UI or new
 primary contracts; production backend/evidence imports may be renamed only after a neutral migration
 proves the old name is no longer required.

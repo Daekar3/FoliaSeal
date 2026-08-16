@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
 from foliaseal.application.preview_render_boundary import (
     PreviewRasterRequest,
     PreviewRasterResult,
     RenderedInkMeasurementRequest,
     RenderedInkMeasurementResult,
 )
+from foliaseal.application.signing_backend import build_signing_executor
 from foliaseal.application.signing_preview_renderer import (
     _render_preview_style,
 )
@@ -109,5 +109,5 @@ assert not any(
 
 def test_signing_executor_carries_composed_preview_port() -> None:
     fake_port = object()
-    executor = build_phase3_signing_executor(render_port=fake_port)
+    executor = build_signing_executor(render_port=fake_port)
     assert executor.use_case.preview_render_port is fake_port

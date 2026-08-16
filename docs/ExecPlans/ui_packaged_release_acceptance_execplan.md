@@ -10,7 +10,7 @@ This ExecPlan is a living document and must be maintained in accordance with
 SPEC.md says V1 is complete only when a non-expert can use a packaged Linux desktop application to
 review, sign, save, verify, and reopen a PDF offline. The repository already builds a PyInstaller
 one-directory bundle and wraps it in a Debian package, but the existing audit checks only a subset of
-that contract and still invokes a legacy `phase3` command. This slice makes the package audit truthful
+that contract and still invokes a legacy `acceptance` command. This slice makes the package audit truthful
 and repeatable: a fresh package is extracted into a disposable root, the installed wrapper is used to
 discover Help and bundled resources, the desktop entry and Poppler dependency are inspected, and the
 GUI endpoint is reported as either started or the known isolated single-instance limitation.
@@ -34,7 +34,7 @@ success when the environment cannot provide it.
 
 - [x] (2026-08-10) Fresh explorer audit confirmed package builders and structural tests exist, but no
   installed-package integration smoke suite exists and `scripts/deb_package_audit.py` still calls a
-  legacy `phase3-signing-acceptance-evidence` command.
+  legacy `signed-acceptance-evidence` command.
 - [x] (2026-08-10) Created this bounded neutral package-audit plan; generated bundles/packages remain
   temporary and must never be committed.
 - [x] Replace the legacy audit command path with offline Help/resource/desktop/dependency checks and
@@ -49,7 +49,7 @@ success when the environment cannot provide it.
 ## Surprises & Discoveries
 
 - Observation: `scripts/deb_package_audit.py` extracts the package and runs `--help`, but then invokes
-  `phase3-signing-acceptance-evidence` instead of the documented product Help surface. Evidence:
+  `signed-acceptance-evidence` instead of the documented product Help surface. Evidence:
   `scripts/deb_package_audit.py` and `docs/UI_SPEC.md` sections 7 and 14.
 - Observation: package unit tests cover staging metadata but do not build/extract a real artifact or
   verify Help resources, desktop entry, Poppler, or installed wrapper behavior. Evidence:
@@ -130,7 +130,7 @@ Primary change class: evidence/acceptance behavior plus release documentation. A
 `scripts/deb_package_audit.py`, focused audit tests, this plan, architecture/release/parent plan
 updates, and bounded ignored `/tmp` or `artifacts/` evidence. Do not commit `.deb` files, PyInstaller
 directories, PDFs, private keys, logs, or a broad package-manager installation. Do not introduce
-new phase3 labels or use the old phase3 evidence command in the installed product audit.
+new acceptance labels or use the old acceptance evidence command in the installed product audit.
 
 ## Plan of Work
 
@@ -156,7 +156,7 @@ audit manually from a disposable output directory as the acceptance milestone.
 ### Milestone 1: neutral audit contract
 
 Add pure helpers and tests for package metadata, installed Help parity, dependency checks, and exact
-GUI-limitation classification. The result is a script that no longer depends on obsolete phase3
+GUI-limitation classification. The result is a script that no longer depends on obsolete acceptance
 commands and fails loudly on unrelated package/runtime errors.
 
 ### Milestone 2: fresh artifact evidence
@@ -218,4 +218,4 @@ Python checkout imports, credential store, or user state is permitted.
 
 Revision note: 2026-08-10 / Codex
 Created after a fresh release audit found structural package tests but no installed-package smoke
-suite and a stale extracted audit invoking the obsolete phase3 evidence command.
+suite and a stale extracted audit invoking the obsolete acceptance evidence command.

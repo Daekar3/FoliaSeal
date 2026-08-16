@@ -11,9 +11,9 @@ from foliaseal.domain.models import SigningRequest, SigningResult, VerificationS
 def _build_historical_backend() -> object:
     """Load the existing concrete backend only when the first sign is requested."""
 
-    from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
+    from foliaseal.application.signing_backend import build_signing_executor
 
-    return build_phase3_signing_executor()
+    return build_signing_executor()
 
 
 @dataclass

@@ -1,7 +1,7 @@
 """Qt presentation adapters with lazy public exports.
 
 Importing a focused Qt submodule must not construct the complete application
-frame, signing shell, or Phase 3 harness dependency graph. Public names remain
+frame, signing shell, or Acceptance harness dependency graph. Public names remain
 available through module-level lazy attribute resolution for callers that use
 the package facade.
 """
@@ -11,7 +11,7 @@ from typing import Any
 
 __all__ = [
     "HarnessCapture",
-    "Phase3HarnessCapture",
+    "InteractiveHarnessCapture",
     "PdfViewerWidgetAdapter",
     "QtAppFrameAdapter",
     "QtAppFrameBindingsUnavailable",
@@ -23,8 +23,8 @@ __all__ = [
     "launch_qt_app_frame",
     "build_qt_signing_shell",
     "build_phase2_evidence_command",
-    "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH",
-    "DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH",
+    "DEFAULT_ACCEPTANCE_CHECKLIST_RESULTS_PATH",
+    "DEFAULT_ACCEPTANCE_CHECKLIST_TEMPLATE_PATH",
     "run_phase2_viewer_harness",
 ]
 
@@ -36,14 +36,14 @@ _EXPORTS = {
     "QtAppFrameBindingsUnavailable": ("app_frame", "QtAppFrameBindingsUnavailable"),
     "build_qt_app_frame_host": ("app_frame", "build_qt_app_frame_host"),
     "launch_qt_app_frame": ("app_frame", "launch_qt_app_frame"),
-    "Phase3HarnessCapture": ("evidence_interactive_capture", "Phase3HarnessCapture"),
-    "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH": (
-        "phase3_harness",
-        "DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH",
+    "InteractiveHarnessCapture": ("evidence_interactive_capture", "InteractiveHarnessCapture"),
+    "DEFAULT_ACCEPTANCE_CHECKLIST_RESULTS_PATH": (
+        "interactive_harness",
+        "DEFAULT_ACCEPTANCE_CHECKLIST_RESULTS_PATH",
     ),
-    "DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH": (
-        "phase3_harness",
-        "DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH",
+    "DEFAULT_ACCEPTANCE_CHECKLIST_TEMPLATE_PATH": (
+        "interactive_harness",
+        "DEFAULT_ACCEPTANCE_CHECKLIST_TEMPLATE_PATH",
     ),
     "SigningShellAdapter": ("signing_shell", "SigningShellAdapter"),
     "QtSigningBindingsUnavailable": ("signing_shell", "QtSigningBindingsUnavailable"),

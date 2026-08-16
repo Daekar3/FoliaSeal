@@ -40,7 +40,7 @@ def test_signing_builders_produce_consistent_valid_contracts(tmp_path: Path) -> 
     assert request.signature_appearance == appearance
 
 
-def test_phase3_invalid_builder_kwargs_remain_reusable_for_negative_cases() -> None:
+def test_acceptance_invalid_builder_kwargs_remain_reusable_for_negative_cases() -> None:
     with pytest.raises(ValueError, match="Hidden fields cannot be shown"):
         SignatureFieldBinding(**invalid_signature_field_binding_hidden_visible_kwargs())
 

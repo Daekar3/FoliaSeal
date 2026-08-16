@@ -23,19 +23,19 @@ MatrixOperation = Callable[[EvidenceMatrixRequest], Mapping[str, Any]]
 if TYPE_CHECKING:
     from foliaseal.presentation.qt.evidence_interactive_capture import (
         InteractiveCaptureEngine,
-        Phase3HarnessCapture,
+        InteractiveHarnessCapture,
     )
-    from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
-        Phase3PreviewMatrixRunner,
+    from foliaseal.presentation.qt.preview_matrix_runner import (
+        PreviewMatrixRunner,
     )
-    from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
-        Phase3SignedAcceptanceMatrixRunner,
+    from foliaseal.presentation.qt.signed_acceptance_matrix_runner import (
+        SignedAcceptanceMatrixRunner,
     )
 else:
-    Phase3HarnessCapture = Any
+    InteractiveHarnessCapture = Any
     InteractiveCaptureEngine = Any
-    Phase3PreviewMatrixRunner = Any
-    Phase3SignedAcceptanceMatrixRunner = Any
+    PreviewMatrixRunner = Any
+    SignedAcceptanceMatrixRunner = Any
 
 
 def build_interactive_capture_engine(
@@ -47,7 +47,7 @@ def build_interactive_capture_engine(
         InteractiveCaptureEngine,
     )
     if providers is None:
-        from foliaseal.presentation.qt.phase3_harness import (
+        from foliaseal.presentation.qt.interactive_harness import (
             build_evidence_runner_providers,
         )
 
@@ -59,7 +59,7 @@ def build_interactive_capture_engine(
         load_page_count=interactive.load_page_count,
         render_backend_factory=interactive.render_backend_factory,
         profile_store_factory=interactive.profile_store_factory,
-        build_phase3_signing_executor=interactive.build_phase3_signing_executor,
+        build_signing_executor=interactive.build_signing_executor,
         session_runner=interactive.session_runner,
         capture_assembler=interactive.capture_assembler,
         contract_evaluator=interactive.contract_evaluator,
@@ -72,23 +72,23 @@ def build_interactive_capture_engine(
 
 def build_preview_evidence_runner(
     *, providers: EvidenceRunnerProviders | None = None
-) -> Phase3PreviewMatrixRunner:
+) -> PreviewMatrixRunner:
     """Build the headless preview runner lazily."""
 
-    from foliaseal.presentation.qt.phase3_preview_matrix_runner import (
-        Phase3PreviewMatrixRunner,
-        Phase3PreviewMatrixRunnerDeps,
+    from foliaseal.presentation.qt.preview_matrix_runner import (
+        PreviewMatrixRunner,
+        PreviewMatrixRunnerDeps,
     )
     if providers is None:
-        from foliaseal.presentation.qt.phase3_harness import (
+        from foliaseal.presentation.qt.interactive_harness import (
             build_evidence_runner_providers,
         )
 
         providers = build_evidence_runner_providers()
     preview = providers.preview
 
-    return Phase3PreviewMatrixRunner(
-        deps=Phase3PreviewMatrixRunnerDeps(
+    return PreviewMatrixRunner(
+        deps=PreviewMatrixRunnerDeps(
             load_preview_matrix_manifest=preview.load_preview_matrix_manifest,
             execute_headless_preview_matrix_scenario=(
                 preview.execute_headless_preview_matrix_scenario
@@ -103,26 +103,26 @@ def build_preview_evidence_runner(
 
 def build_signed_acceptance_evidence_runner(
     *, providers: EvidenceRunnerProviders | None = None
-) -> Phase3SignedAcceptanceMatrixRunner:
+) -> SignedAcceptanceMatrixRunner:
     """Build the Qt-backed signed matrix runner lazily."""
 
-    from foliaseal.presentation.qt.phase3_signed_acceptance_matrix_runner import (
-        Phase3SignedAcceptanceMatrixRunner,
-        Phase3SignedAcceptanceMatrixRunnerDeps,
+    from foliaseal.presentation.qt.signed_acceptance_matrix_runner import (
+        SignedAcceptanceMatrixRunner,
+        SignedAcceptanceMatrixRunnerDeps,
     )
     if providers is None:
-        from foliaseal.presentation.qt.phase3_harness import (
+        from foliaseal.presentation.qt.interactive_harness import (
             build_evidence_runner_providers,
         )
 
         providers = build_evidence_runner_providers()
     signed = providers.signed
 
-    return Phase3SignedAcceptanceMatrixRunner(
-        deps=Phase3SignedAcceptanceMatrixRunnerDeps(
+    return SignedAcceptanceMatrixRunner(
+        deps=SignedAcceptanceMatrixRunnerDeps(
             load_qt_harness_bindings=signed.load_qt_harness_bindings,
             load_preview_matrix_manifest=signed.load_preview_matrix_manifest,
-            build_phase3_signing_executor=signed.build_phase3_signing_executor,
+            build_signing_executor=signed.build_signing_executor,
             build_dummy_timestamper=signed.build_dummy_timestamper,
             load_page_count=signed.load_page_count,
             build_workspace=signed.build_workspace,
@@ -141,13 +141,13 @@ def build_signed_acceptance_evidence_runner(
 
 
 def build_interactive_capture_operation() -> Callable[
-    [EvidenceCaptureRequest], Phase3HarnessCapture
+    [EvidenceCaptureRequest], InteractiveHarnessCapture
 ]:
     """Return a lazy request callable for interactive capture."""
 
     runner: InteractiveCaptureEngine | None = None
 
-    def run(request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
+    def run(request: EvidenceCaptureRequest) -> InteractiveHarnessCapture:
         nonlocal runner
         if runner is None:
             runner = build_interactive_capture_engine()

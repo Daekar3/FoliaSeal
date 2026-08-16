@@ -41,7 +41,7 @@ Qt surface, focused tests, and observable acceptance.
 - [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md — authoritative preview/signing
   parity, glyph and exact-fit readiness guidance, frozen-time refresh stability, and deterministic
   public-panel walkthrough are complete; display-backed accessibility/DPI/monitor, package-manager,
-  and legacy phase3 compatibility/nomenclature gates remain open.
+  and legacy acceptance compatibility/nomenclature gates remain open.
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [ ] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [ ] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
@@ -84,10 +84,10 @@ Qt surface, focused tests, and observable acceptance.
   public placement, unsupported `Common name`/`U+2603`, exact-fit blocking, ready, repeated-refresh
   frozen-time, request-timestamp equality, and cleanup states. This release plan remains open for display-backed
   screen-reader/high-contrast/DPI/monitor, package-manager installation, diagnostics, and legacy
-  phase3 compatibility/nomenclature retirement; no full release-compliance claim is made.
+  acceptance compatibility/nomenclature retirement; no full release-compliance claim is made.
 - [ ] (remaining release gate) Implement any remaining smallest complete model/application/Qt paths
   owned by the unchecked children above.
-- [ ] (remaining release gate) Retire migrated compatibility or phase3 product cruft whose
+- [ ] (remaining release gate) Retire migrated compatibility or acceptance product cruft whose
   consumers are gone; this is intentionally separate from the preview behavior closure.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and package-manager
   validation; clean processes and artifacts.
@@ -134,7 +134,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.
@@ -153,7 +153,7 @@ storage);
 accessibility and input-independent behavior; local Markdown Help/diagnostics/privacy; then
 PyInstaller/.deb packaging and the complete acceptance matrix. Each milestone owns its tests and
 evidence, while this plan owns only the final cross-milestone wiring and negative anti-goal audit.
-Remove stale product-facing phase3 labels only after the neutral backend/evidence migration has
+Remove stale product-facing acceptance labels only after the neutral backend/evidence migration has
 proved the old label is no longer part of a production import or public command. Use typed
 application contracts and public Qt ports, not private child-widget reach-through.
 Keep persistent objects and secrets within the schemas/storage rules. Retire obsolete compatibility
@@ -223,7 +223,7 @@ package/temp-root and process cleanup explicitly.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: The packaged app starts from its desktop launcher, opens a PDF, completes the primary story offline, exposes help through the documented CLI and in-app viewer, remains usable at minimum sizes and with keyboard/accessibility paths, and leaves no stale phase3 product terminology or unsafe logs. Focused tests and the full suite must pass; the
+Acceptance is behavioral: The packaged app starts from its desktop launcher, opens a PDF, completes the primary story offline, exposes help through the documented CLI and in-app viewer, remains usable at minimum sizes and with keyboard/accessibility paths, and leaves no stale acceptance product terminology or unsafe logs. Focused tests and the full suite must pass; the
 final acceptance record must distinguish headless evidence from real Qt interaction and must include
 cleanup evidence.
 

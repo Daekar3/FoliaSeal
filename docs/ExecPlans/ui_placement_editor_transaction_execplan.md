@@ -117,7 +117,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

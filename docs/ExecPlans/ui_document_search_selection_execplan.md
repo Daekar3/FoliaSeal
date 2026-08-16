@@ -20,7 +20,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] (2026-08-09) Audit current behavior and add a failing focused test.
 - [x] (2026-08-10) Implement the smallest complete model/application/Qt path: search-match geometry and strong/quiet overlays, typed View → Find focus, and Enter/Shift+Enter navigation.
-- [x] (2026-08-10) Audit compatibility and phase3 product cruft; no migrated compatibility path remained in this search boundary, and the Shift+Enter shortcut now uses injected Qt bindings.
+- [x] (2026-08-10) Audit compatibility and acceptance product cruft; no migrated compatibility path remained in this search boundary, and the Shift+Enter shortcut now uses injected Qt bindings.
 - [x] (2026-08-10) Run focused/offscreen/full validation and clean owned processes/artifacts: the
   document/search/viewer/shell/sidebar/app-frame focused set passes `223 passed`, and five real
   offscreen Qt cases cover initial fit, View shortcut dispatch, Ctrl+F focus/select-all, and
@@ -83,7 +83,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.
@@ -168,7 +168,7 @@ search/text slice: UI_SPEC §8 is normative and the existing main-workspace SVGs
 search result overlay treatment. Empty-text and Qt load-error classification tests cover image-only,
 no-extractable-text, password/protection, invalid-format, and unknown parser paths. The full suite
 passes `1209 passed, 20 skipped, 1 warning`; the warning is the existing Pillow deprecation in the
-legacy Phase 3 harness test. Process inspection after both focused and full runs found no FoliaSeal,
+legacy Acceptance harness test. Process inspection after both focused and full runs found no FoliaSeal,
 PySide6, or pytest processes, and no temporary audit root or generated artifact was left behind.
 
 ## Idempotence and Recovery

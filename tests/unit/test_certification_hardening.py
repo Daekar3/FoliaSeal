@@ -6,7 +6,7 @@ import pytest
 from pyhanko.pdf_utils.reader import PdfFileReader
 from pyhanko.sign.validation.pdf_embedded import MDPPerm
 
-from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
+from foliaseal.application.signing_backend import build_signing_executor
 from foliaseal.domain.errors import FailureCode
 from foliaseal.domain.models import SigningRequest
 from foliaseal.infra.certification import (
@@ -132,7 +132,7 @@ def test_certification_policy_matrix_blocks_only_no_changes(
         raise AssertionError(f"Unknown input state: {input_state}")
 
     request = _build_request(input_pdf, tmp_path / f"output_{version}_{input_state}.pdf")
-    executor = build_phase3_signing_executor()
+    executor = build_signing_executor()
 
     result = executor.execute(request)
 

@@ -144,7 +144,7 @@ headless test can certify a screen reader or physical monitor setup.
 Primary change class: acceptance behavior/tests plus the minimum source correction needed for a
 failing concrete accessibility assertion. Allowed files are the new integration test, a focused Qt
 source module if required, this child plan, the parent/release/architecture status docs, and no
-generated package or private fixture. Do not add V2 features, broad menu redesign, or phase3 naming
+generated package or private fixture. Do not add V2 features, broad menu redesign, or acceptance naming
 cleanup unrelated to the acceptance findings.
 
 ## Plan of Work

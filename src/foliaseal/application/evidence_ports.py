@@ -1,4 +1,4 @@
-"""Effect boundaries used by the Phase 3 evidence application service."""
+"""Effect boundaries used by the Acceptance evidence application service."""
 
 from __future__ import annotations
 

@@ -26,7 +26,7 @@ increments because they require additional geometry and focus seams.
 - [x] (2026-08-10) Implemented typed application placement creation/movement and routed keyboard
   callbacks through the runtime/composition boundary; Enter and exact movement are consumed only in
   Place mode and do not alter Pan/Text behavior.
-- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft; no migrated consumer retirement
+- [x] (2026-08-10) Reviewed compatibility and acceptance product cruft; no migrated consumer retirement
   condition was proven in this viewer/application seam.
 - [x] (2026-08-10) Focused viewer/session/shell/composition/offscreen validation passed (`165 passed`)
   and the full suite passed (`1304 passed, 20 skipped, 1 warning`); bounded GUI launch cleanup is
@@ -100,7 +100,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

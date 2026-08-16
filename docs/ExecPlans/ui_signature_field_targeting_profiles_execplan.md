@@ -26,7 +26,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   new signature, the draft carries the field name, and pyHanko fills the existing field only.
 - [x] (2026-08-10) Locked targeted page/geometry controls and rejected mismatched placement-profile
   dimensions with an explicit Use/adjust/place-manually explanation; no compatibility path was
-  added and no obsolete product-facing phase3 label was introduced.
+  added and no obsolete product-facing acceptance label was introduced.
 - [x] (2026-08-10) Ran focused tests, full suite (1318 passed, 20 skipped, 1 warning), Ruff, diff
   check, and bounded offscreen GUI lifecycle validation; the isolated single-instance socket
   limitation remained, with no FoliaSeal/python processes or temporary audit root left behind.
@@ -66,7 +66,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.
@@ -133,7 +133,7 @@ Also record the exact focused test node and expected result (`N passed`); when t
 contract, record that the test was red before implementation and green afterward.
 
 Evidence: UI_SPEC WF02, section 10, SUR06, acceptance scenario 4. Focused workflow/use-case/review
-tests and `tests/unit/test_phase3_signing_backend.py::test_pyhanko_signer_fills_existing_visible_signature_field`
+tests and `tests/unit/test_signing_backend.py::test_pyhanko_signer_fills_existing_visible_signature_field`
 are green; the full command `.venv/bin/pytest -q` reports 1318 passed, 20 skipped, 1 warning.
 The backend fixture used field `Approval` at page 0, `(24,36)-(584,216)` and filled that existing
 field without creating another one. The mismatch test used a 220x80 profile against a 180x54

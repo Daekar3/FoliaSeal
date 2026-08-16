@@ -65,12 +65,12 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   `ui_document_source_change_recovery_execplan.md`: changed sources expose Reload/Ignore, missing
   sources expose Locate/Close, candidate replacement is atomic, and authored state/secrets survive
   transfer. Focused/offscreen coverage, full regression, bounded launch cleanup, and the recovery
-  child evidence record are complete; the remaining open item in this parent is compatibility/phase3
+  child evidence record are complete; the remaining open item in this parent is compatibility/acceptance
   cleanup, not source-recovery behavior.
 
 - [x] (2026-08-09) Audit current behavior and add a failing focused test.
 - [x] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
+- [ ] (2026-08-09) Retire migrated compatibility or acceptance product cruft whose consumers are gone.
 - [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean processes and artifacts.
 - [x] (2026-08-10) Update this plan and relevant docs; the complete source-recovery slice is committed
   in `0d5116084`.
@@ -97,7 +97,7 @@ classification, cancel-default external confirmation/launch, and draft-preservin
 recovery. The source-recovery child records `89` focused passes and the current full-suite result of
 `1465 passed, 20 skipped, 1 warning`, with a bounded GUI launch limited by the isolated
 `SingleInstanceUnavailable` endpoint and clean process/temp teardown. This parent remains open only
-for its explicit migrated compatibility/phase3 cleanup requirement and final parent-level release
+for its explicit migrated compatibility/acceptance cleanup requirement and final parent-level release
 reconciliation; no source-recovery behavior is deferred.
 
 ## Context and Orientation
@@ -107,7 +107,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

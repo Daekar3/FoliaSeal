@@ -97,7 +97,7 @@ def test_projection_import_is_free_of_gui_and_render_dependencies() -> None:
     script = """
 import sys
 import foliaseal.presentation.qt.evidence_snapshot_projection
-blocked = ('PyQt', 'PySide6', 'PIL', 'pyhanko', 'foliaseal.presentation.qt.phase3_harness')
+blocked = ('PyQt', 'PySide6', 'PIL', 'pyhanko', 'foliaseal.presentation.qt.interactive_harness')
 loaded = sorted(
     name for name in sys.modules
     if any(name == prefix or name.startswith(prefix + '.') for prefix in blocked)

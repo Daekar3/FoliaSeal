@@ -25,7 +25,7 @@ Qt surface, focused tests, and observable acceptance.
   `SignPdfUseCase` writes the destination before verification. Added red acceptance coverage for
   lazy default-executor construction and verification-before-replacement.
 - [x] (2026-08-10) Implemented the default production executor and staged output transaction.
-- [x] (2026-08-10) Reviewed compatibility/phase3 cruft; retained the historical backend only behind the
+- [x] (2026-08-10) Reviewed compatibility/acceptance cruft; retained the historical backend only behind the
   neutral lazy executor until its separate migration consumers are gone.
 - [x] (2026-08-10) Ran focused, regression, and GUI lifecycle validation; cleaned processes and
   temporary roots. Focused command reports `72 passed`; full suite reports `1272 passed, 20 skipped,
@@ -79,7 +79,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

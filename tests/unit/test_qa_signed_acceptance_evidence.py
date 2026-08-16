@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.evidence_core import (
+    validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.evidence_service import (
     EvidenceMatrixRequest,
     SignedAcceptanceEvidenceRequest,
-)
-from foliaseal.application.phase3_evidence_core import (
-    validate_signed_acceptance_matrix_summary,
 )
 from foliaseal.application.qa_signed_acceptance_assets import (
     SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
@@ -117,7 +117,7 @@ def test_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_wri
     ]
     assert evidence["passed"] is True
     summary_path = Path(evidence["summary_markdown_path"])
-    assert summary_path == tmp_path / "artifacts/phase3_signed_acceptance_evidence_summary.md"
+    assert summary_path == tmp_path / "artifacts/signed_acceptance_evidence_summary.md"
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "Overall result: PASS" in summary_text
     assert "signed_acceptance_matrix" in summary_text
@@ -152,7 +152,7 @@ def test_signed_acceptance_evidence_writes_failure_summary_and_raises(
             matrix_runner=fake_matrix_runner,
         )
 
-    summary_path = tmp_path / "artifacts/phase3_signed_acceptance_evidence_summary.md"
+    summary_path = tmp_path / "artifacts/signed_acceptance_evidence_summary.md"
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "Overall result: FAIL" in summary_text
     assert "expected preview_output_comparison_failure_count=0, observed 1" in summary_text
@@ -182,7 +182,7 @@ def test_signed_acceptance_evidence_writes_failure_summary_when_matrix_raises(
             matrix_runner=fake_matrix_runner,
         )
 
-    summary_path = tmp_path / "artifacts/phase3_signed_acceptance_evidence_summary.md"
+    summary_path = tmp_path / "artifacts/signed_acceptance_evidence_summary.md"
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "Overall result: FAIL" in summary_text
     assert (

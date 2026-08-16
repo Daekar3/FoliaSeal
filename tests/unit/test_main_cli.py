@@ -342,7 +342,7 @@ def test_main_gui_uses_process_argv_when_called_without_explicit_argv(
     }
 
 
-def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
+def test_main_acceptance_signing_preview_matrix_dispatches_to_runner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = {}
@@ -368,7 +368,7 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
 
     __main__.main(
         [
-            "phase3-signing-preview-matrix",
+            "preview-matrix",
             "--pdf-path",
             "/tmp/sample.pdf",
             "--certificate-path",
@@ -391,7 +391,7 @@ def test_main_phase3_signing_preview_matrix_dispatches_to_runner(
     }
 
 
-def test_main_phase3_preview_matrix_uses_the_application_orchestrator(
+def test_main_preview_matrix_uses_the_application_orchestrator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = {}
@@ -407,7 +407,7 @@ def test_main_phase3_preview_matrix_uses_the_application_orchestrator(
             )
 
     def fail_if_service_builder_called():
-        raise AssertionError("CLI should compose the orchestrator as its Phase 3 boundary")
+        raise AssertionError("CLI should compose the orchestrator as its Acceptance boundary")
 
     monkeypatch.setattr(
         "foliaseal.__main__._build_evidence_program",
@@ -420,7 +420,7 @@ def test_main_phase3_preview_matrix_uses_the_application_orchestrator(
 
     __main__.main(
         [
-            "phase3-signing-preview-matrix",
+            "preview-matrix",
             "--pdf-path",
             "/tmp/sample.pdf",
             "--certificate-path",
@@ -437,7 +437,7 @@ def test_main_phase3_preview_matrix_uses_the_application_orchestrator(
     assert captured["payload"].pdf_path == "/tmp/sample.pdf"
 
 
-def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
+def test_main_acceptance_signing_acceptance_matrix_dispatches_to_runner(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -464,7 +464,7 @@ def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
 
     __main__.main(
         [
-            "phase3-signing-acceptance-matrix",
+            "signed-acceptance",
             "--pdf-path",
             "/tmp/sample.pdf",
             "--certificate-path",
@@ -486,12 +486,12 @@ def test_main_phase3_signing_acceptance_matrix_dispatches_to_runner(
         "artifacts_dir": "/tmp/artifacts",
     }
     output = capsys.readouterr().out
-    assert "Phase 3 signed acceptance matrix" in output
+    assert "Signed acceptance matrix" in output
     assert "- scenarios executed: 3" in output
     assert "- successful signings: 2" in output
 
 
-def test_main_phase3_signing_harness_dispatches_through_service(
+def test_main_acceptance_signing_harness_dispatches_through_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = {}
@@ -514,7 +514,7 @@ def test_main_phase3_signing_harness_dispatches_through_service(
 
     __main__.main(
         [
-            "phase3-signing-harness",
+            "interactive-harness",
             "--pdf-path",
             "/tmp/sample.pdf",
             "--certificate-path",
@@ -575,7 +575,7 @@ def test_main_signed_acceptance_evidence_dispatches_to_service(
 
     __main__.main(
         [
-            "phase3-signing-acceptance-evidence",
+            "signed-acceptance-evidence",
             "--artifacts-root",
             "/tmp/foliaseal-evidence",
             "--summary-markdown-path",
@@ -589,11 +589,11 @@ def test_main_signed_acceptance_evidence_dispatches_to_service(
         "passphrase": "secret",
     }
     output = capsys.readouterr().out
-    assert "Phase 3 signed acceptance evidence" in output
+    assert "Signed acceptance evidence" in output
     assert "signed_acceptance_matrix: PASS (10 scenarios, 7 successful signings)" in output
 
 
-def test_main_phase3_signing_harness_validate_dispatches_to_service(
+def test_main_acceptance_signing_harness_validate_dispatches_to_service(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -607,7 +607,7 @@ def test_main_phase3_signing_harness_validate_dispatches_to_service(
                 acceptance_tier="full",
                 gate_verdict="pass",
                 passed=True,
-                contract_version="phase3.v1",
+                contract_version="evidence.v1",
                 errors=(),
                 warnings=(),
             )
@@ -619,7 +619,7 @@ def test_main_phase3_signing_harness_validate_dispatches_to_service(
 
     __main__.main(
         [
-            "phase3-signing-harness-validate",
+            "acceptance-harness-validate",
             "--summary-json-path",
             str(tmp_path / "summary.json"),
         ]
@@ -627,11 +627,11 @@ def test_main_phase3_signing_harness_validate_dispatches_to_service(
 
     output = capsys.readouterr().out
     assert captured == {"summary_json_path": str(tmp_path / "summary.json")}
-    assert "Phase 3 evidence contract" in output
+    assert "Acceptance evidence contract" in output
     assert "- validation passed: yes" in output
 
 
-def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
+def test_main_acceptance_signing_harness_validate_raises_on_failed_contract(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -642,7 +642,7 @@ def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
                 acceptance_tier="partial",
                 gate_verdict="fail",
                 passed=False,
-                contract_version="phase3.v1",
+                contract_version="evidence.v1",
                 errors=("missing required field",),
                 warnings=(),
             )
@@ -655,7 +655,7 @@ def test_main_phase3_signing_harness_validate_raises_on_failed_contract(
     with pytest.raises(ValueError, match="failed evidence contract validation"):
         __main__.main(
             [
-                "phase3-signing-harness-validate",
+                "acceptance-harness-validate",
                 "--summary-json-path",
                 str(tmp_path / "summary.json"),
             ]

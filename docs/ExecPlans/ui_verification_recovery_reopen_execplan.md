@@ -35,8 +35,8 @@ Qt surface, focused tests, and observable acceptance.
   non-signable until Verify again proves every signature and the summary reports no certification
   restriction (or an allowed `fill_forms`/`annotate` DocMDP permission). Known restrictions and
   uncertain/unknown trust remain blocked with the recovery warning.
-- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No safe retirement condition
-  was met; historical evidence names remain external contracts and no new product-facing phase3
+- [x] (2026-08-10) Reviewed compatibility and acceptance product cruft. No safe retirement condition
+  was met; historical evidence names remain external contracts and no new product-facing acceptance
   nomenclature was introduced.
 - [x] (2026-08-10) Ran focused, regression, and GUI validation; clean processes and artifacts
   (historical closeout at that revision): the recovery/app-frame/sidebar/document-review command
@@ -117,7 +117,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

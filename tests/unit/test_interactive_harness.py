@@ -1,0 +1,2997 @@
+import importlib
+import json
+from dataclasses import fields
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.oid import NameOID
+from PIL import Image
+from pyhanko.pdf_utils import generic
+from pyhanko.pdf_utils.reader import PdfFileReader
+from pyhanko.pdf_utils.writer import PageObject, PdfFileWriter
+
+import foliaseal.presentation.qt.interactive_harness as interactive_harness_module
+from foliaseal.application import SigningDraftWorkflow
+from foliaseal.application.evidence_service import (
+    EvidenceCaptureRequest,
+)
+from foliaseal.application.qa_evidence_contract import (
+    ENGINEERING_RUN,
+    EVIDENCE_CONTRACT_VERSION,
+    GATE_CANDIDATE,
+    NON_GATING,
+    evaluate_acceptance_evidence_contract,
+)
+from foliaseal.application.qa_preview_stress_fixtures import (
+    STRESS_VISIBLE_APPEARANCE_PROFILE,
+)
+from foliaseal.application.qa_signed_acceptance_assets import (
+    SIGNED_ACCEPTANCE_FIXTURE_PDF,
+    SIGNED_ACCEPTANCE_IDENTITY_P12,
+    SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
+    SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
+    SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
+)
+from foliaseal.application.signing_backend import (
+    build_signing_executor,
+)
+from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignatureBoxStyle,
+    SignatureFieldSource,
+    SignatureLayoutTemplate,
+    SignatureRect,
+    SignatureStampPosition,
+    SignatureTextStyle,
+    SignatureTimezoneDisplayMode,
+)
+from foliaseal.presentation.qt.acceptance_harness_workspace import (
+    AcceptanceHarnessWorkspaceSnapshot,
+)
+from foliaseal.presentation.qt.evidence_harness_projection import (
+    evaluate_signed_matrix_acceptance_expectations,
+    preview_matrix_diagnostic_summary,
+    preview_matrix_error_result,
+    signed_matrix_diagnostic_summary,
+)
+from foliaseal.presentation.qt.evidence_interactive_capture import (
+    InteractiveCaptureEngine,
+    InteractiveEvidenceArtifactPolicy,
+    InteractiveHarnessCapture,
+    build_capture_from_payload,
+    default_harness_artifacts_dir,
+    default_harness_output_pdf_path,
+    write_optional_text,
+)
+from foliaseal.presentation.qt.evidence_runner_factories import (
+    build_interactive_capture_operation,
+)
+from foliaseal.presentation.qt.interactive_harness import (
+    _capture_headless_preview_render,
+    _interactive_capture_label,
+    _load_preview_matrix_manifest,
+    _preview_padding_for_capture,
+    _preview_padding_for_capture_from_snapshot,
+    _render_signed_annotation_appearance_direct,
+    _snapshot_preview,
+    _widget_application,
+    _widget_is_visible,
+    _write_stamp_debug_overlay,
+    _write_text_debug_overlay,
+)
+from foliaseal.presentation.qt.interactive_harness_session_runner import (
+    InteractiveHarnessSessionResult,
+)
+from foliaseal.presentation.qt.pdf_signature_snapshotter import (
+    AcceptancePdfSignatureSnapshotter,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    analyze_capture_state_transitions as _analyze_capture_state_transitions,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    analyze_stamp_source_image as _analyze_stamp_source_image,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    font_diagnostics as _text_font_diagnostics,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    preview_edge_distances as _preview_edge_distances,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    stamp_edge_diagnostics as _stamp_edge_diagnostics,
+)
+from foliaseal.presentation.qt.preview_analysis import (
+    text_edge_diagnostics as _text_edge_diagnostics,
+)
+from tests.support.signing_builders import (
+    build_signature_appearance,
+    build_signature_field_binding,
+    build_signature_rect,
+    build_signing_request,
+)
+
+LOCAL_PREVIEW_SWEEP_ASSETS_DIR = Path("artifacts/preview_sweep_assets")
+LOCAL_PREVIEW_STRESS_MANIFESTS = (
+    LOCAL_PREVIEW_SWEEP_ASSETS_DIR / "single_line_full_matrix_stress.json",
+    LOCAL_PREVIEW_SWEEP_ASSETS_DIR / "multi_line_full_matrix_stress.json",
+    LOCAL_PREVIEW_SWEEP_ASSETS_DIR / "wrapped_block_full_matrix_stress.json",
+)
+
+
+def _require_local_artifact_paths(*paths: Path) -> None:
+    missing = [str(path) for path in paths if not path.exists()]
+    if missing:
+        pytest.skip(
+            "local QA artifact fixtures are absent because artifacts/ is ignored: "
+            + ", ".join(missing)
+        )
+
+
+def _write_test_pdf(path: Path) -> None:
+    writer = PdfFileWriter()
+    empty_stream = writer.add_object(generic.StreamObject(stream_data=b""))
+    writer.insert_page(PageObject(contents=empty_stream, media_box=(0, 0, 612, 792)))
+    with path.open("wb") as handle:
+        writer.write(handle)
+
+
+def _write_test_pkcs12(
+    path: Path,
+    *,
+    passphrase: str,
+    common_name: str = "Test User",
+) -> x509.Certificate:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "FoliaSeal"),
+            x509.NameAttribute(NameOID.TITLE, "Board Secretary"),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, "QA"),
+            x509.NameAttribute(NameOID.EMAIL_ADDRESS, "test@example.com"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "Wytheville"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Virginia"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(UTC) + timedelta(days=365))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    pfx = pkcs12.serialize_key_and_certificates(
+        name=common_name.encode("utf-8"),
+        key=key,
+        cert=cert,
+        cas=None,
+        encryption_algorithm=serialization.BestAvailableEncryption(passphrase.encode("utf-8")),
+    )
+    path.write_bytes(pfx)
+    return cert
+
+
+def _write_test_stamp_image(path: Path) -> None:
+    image = Image.new("RGB", (96, 48), color=(215, 235, 255))
+    image.save(path, format="PNG")
+
+
+def _write_transparent_test_stamp_image(path: Path) -> None:
+    image = Image.new("RGBA", (100, 50), color=(0, 0, 0, 0))
+    for x in range(12, 84):
+        for y in range(8, 38):
+            image.putpixel((x, y), (32, 48, 96, 255))
+    image.save(path, format="PNG")
+
+
+def _write_fully_transparent_stamp_image(path: Path) -> None:
+    Image.new("RGBA", (40, 20), color=(0, 0, 0, 0)).save(path, format="PNG")
+
+
+def _write_signed_test_pdf(
+    tmp_path: Path,
+    *,
+    signature_appearance: SignatureAppearance | None = None,
+    signature_rect: SignatureRect | None = None,
+) -> Path:
+    input_pdf = tmp_path / "input.pdf"
+    output_pdf = tmp_path / "output.pdf"
+    cert_path = tmp_path / "cert.p12"
+    stamp_path = tmp_path / "stamp.png"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    _write_test_stamp_image(stamp_path)
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+        signature_rect=signature_rect
+        or build_signature_rect(page_index=0, width_pt=540.0, height_pt=120.0),
+        signature_appearance=signature_appearance
+        or build_signature_appearance(
+            image_stamp_path=str(stamp_path),
+            signer_label_prefix="Digitally signed by",
+            show_field_names=False,
+            layout_template=SignatureLayoutTemplate.SINGLE_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            text_style=SignatureTextStyle(
+                font_family="Serif",
+                font_size_pt=8.0,
+                bold=False,
+                italic=False,
+                text_color_hex="#000000",
+            ),
+        ),
+    )
+    build_signing_executor().execute(request)
+    return output_pdf
+
+
+def _capture_metadata_defaults(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "summary_json_path": "artifacts/interactive_harness_capture.json",
+        "summary_json_written": True,
+        "checklist_results_path": "artifacts/acceptance_fr3b_acceptance_results.md",
+        "checklist_results_written": True,
+        "evidence_contract_version": EVIDENCE_CONTRACT_VERSION,
+        "acceptance_tier": GATE_CANDIDATE,
+        "gate_verdict": GATE_CANDIDATE,
+        "evidence_validation_passed": True,
+        "evidence_validation_errors": (),
+        "evidence_validation_warnings": (),
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.parametrize("stamp_position", list(SignatureStampPosition))
+def test_preview_capture_padding_matches_snapshot_projection(
+    stamp_position: SignatureStampPosition,
+) -> None:
+    box_style = {
+        "show_border": True,
+        "border_color_hex": "#000000",
+        "border_width_pt": 1.0,
+        "background_color_hex": "#FFFFFF",
+    }
+    preview = type(
+        "Preview",
+        (),
+        {
+            "signature_rect": SignatureRect(
+                page_index=0,
+                left_pt=20.0,
+                bottom_pt=40.0,
+                width_pt=260.0,
+                height_pt=72.0,
+            ),
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": stamp_position,
+            "box_style": SignatureBoxStyle(**box_style),
+        },
+    )()
+    snapshot = {
+        "signature_rect": {"height_pt": 72.0},
+        "layout_template": SignatureLayoutTemplate.SINGLE_LINE.value,
+        "stamp_position": stamp_position.value,
+        "box_style": box_style,
+    }
+
+    assert _preview_padding_for_capture(preview) == _preview_padding_for_capture_from_snapshot(
+        snapshot
+    )
+
+
+def test_evidence_contract_rejects_success_without_output_file() -> None:
+    evaluation = evaluate_acceptance_evidence_contract(
+        {
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 1,
+            "last_signing_result_success": True,
+            "last_signature_has_visible_appearance": True,
+            "output_file_exists": False,
+            "output_signature_count": None,
+            "output_visible_appearance_snapshot": None,
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+            },
+            "sign_request_snapshot": {
+                "signature_appearance": {
+                    "layout_template": "single_line",
+                    "stamp_position": "top",
+                    "show_field_names": False,
+                    "datetime_format": "%Y-%m-%d",
+                    "signer_label_prefix": "",
+                    "timezone_display_mode": "utc",
+                    "image_stamp_path": None,
+                }
+            },
+            "backend_reservation_snapshot": {"layout_template": "single_line"},
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is False
+    assert evaluation.acceptance_tier == ENGINEERING_RUN
+    assert evaluation.gate_verdict == NON_GATING
+    assert any("output_file_exists is false" in item for item in evaluation.errors)
+    assert any("output_signature_count is missing" in item for item in evaluation.errors)
+    assert any(
+        "output_visible_appearance_snapshot is missing" in item for item in evaluation.errors
+    )
+
+
+def test_evidence_contract_accepts_consistent_success_state() -> None:
+    evaluation = evaluate_acceptance_evidence_contract(
+        {
+            "summary_json_path": "artifacts/interactive_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 1,
+            "last_signing_result_success": True,
+            "last_signature_has_visible_appearance": True,
+            "output_file_exists": True,
+            "output_signature_count": 1,
+            "output_verification_snapshot": {
+                "cryptographic_validation_passed": True,
+                "signature_count": 1,
+                "error": None,
+            },
+            "output_visible_appearance_snapshot": {"field_name": "Signature1"},
+            "signed_output_render_snapshot": {
+                "page_render_path": "artifacts/final_signed_output_page.png",
+                "signature_crop_path": "artifacts/final_signed_output_crop.png",
+                "page_render_error": None,
+                "signature_crop_error": None,
+            },
+            "signed_output_preview_comparison": {
+                "signature_crop_path": "artifacts/final_signed_output_crop.png",
+                "comparison_path": "artifacts/final_signed_output_compare.png",
+                "preview_vs_signed_output_passed": True,
+                "preview_vs_signed_output_error": None,
+            },
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": (
+                        "artifacts/interactive_harness_capture_artifacts/"
+                        "current.png"
+                    ),
+                    "preview_image_error": None,
+                    "text_debug_image_path": (
+                        "artifacts/interactive_harness_capture_artifacts/current_text_debug.png"
+                    ),
+                    "stamp_debug_image_path": (
+                        "artifacts/interactive_harness_capture_artifacts/current_stamp_debug.png"
+                    ),
+                    "text_rendered_content_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "text_content_clipped_in_preview": False,
+                    "stamp_content_within_warning_distance": False,
+                },
+            },
+            "sign_request_snapshot": {
+                "signature_appearance": {
+                    "layout_template": "single_line",
+                    "stamp_position": "top",
+                    "show_field_names": False,
+                    "datetime_format": "%Y-%m-%d",
+                    "signer_label_prefix": "",
+                    "timezone_display_mode": "utc",
+                    "image_stamp_path": None,
+                }
+            },
+            "backend_reservation_snapshot": {"layout_template": "single_line"},
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+            "captured_states": [
+                {
+                    "preview_snapshot": {
+                        "render_capture": {
+                            "preview_image_path": (
+                                "artifacts/interactive_harness_capture_artifacts/manual.png"
+                            ),
+                            "preview_image_error": None,
+                            "text_debug_image_path": (
+                                "artifacts/interactive_harness_capture_artifacts/manual_text_debug.png"
+                            ),
+                            "stamp_debug_image_path": (
+                                "artifacts/interactive_harness_capture_artifacts/manual_stamp_debug.png"
+                            ),
+                            "text_rendered_content_bounds_px": {
+                                "x": 1,
+                                "y": 2,
+                                "width": 3,
+                                "height": 4,
+                            },
+                            "text_content_clipped_in_preview": False,
+                            "stamp_content_within_warning_distance": False,
+                        }
+                    }
+                }
+            ],
+        }
+    )
+
+    assert evaluation.passed is True
+    assert evaluation.acceptance_tier == GATE_CANDIDATE
+    assert evaluation.gate_verdict == GATE_CANDIDATE
+    assert evaluation.errors == ()
+
+
+def test_evidence_contract_rejects_saved_capture_without_preview_artifacts() -> None:
+    evaluation = evaluate_acceptance_evidence_contract(
+        {
+            "summary_json_path": "artifacts/interactive_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 0,
+            "last_signing_result_success": False,
+            "last_signature_has_visible_appearance": False,
+            "output_file_exists": False,
+            "output_signature_count": None,
+            "output_visible_appearance_snapshot": None,
+            "preview_snapshot": {
+                "can_submit": False,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": None,
+                    "preview_image_error": None,
+                },
+            },
+            "sign_request_snapshot": None,
+            "backend_reservation_snapshot": None,
+            "backend_reservation_error": None,
+            "validation_text": "Will fail to sign.",
+            "preview_available": True,
+            "captured_states": [
+                {
+                    "preview_snapshot": {
+                        "render_capture": {
+                            "preview_image_path": None,
+                            "preview_image_error": None,
+                        }
+                    }
+                }
+            ],
+        }
+    )
+
+    assert evaluation.passed is False
+    assert any(
+        "current preview snapshot is missing preview_image_path" in item
+        for item in evaluation.errors
+    )
+    assert any(
+        "captured_states[1] is missing preview_image_path" in item for item in evaluation.errors
+    )
+
+
+def test_evidence_contract_rejects_signable_render_clipping() -> None:
+    evaluation = evaluate_acceptance_evidence_contract(
+        {
+            "summary_json_path": "artifacts/interactive_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 0,
+            "last_signing_result_success": False,
+            "last_signature_has_visible_appearance": False,
+            "output_file_exists": False,
+            "output_signature_count": None,
+            "output_visible_appearance_snapshot": None,
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "multi_line",
+                "stamp_position": "bottom",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": (
+                        "artifacts/interactive_harness_capture_artifacts/"
+                        "current.png"
+                    ),
+                    "preview_image_error": None,
+                    "text_debug_image_path": "artifacts/current_text_debug.png",
+                    "stamp_debug_image_path": "artifacts/current_stamp_debug.png",
+                    "text_rendered_content_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "text_content_clipped_in_preview": True,
+                    "text_content_overlaps_stamp_band": False,
+                    "text_content_overlaps_stamp_content": False,
+                    "stamp_content_touches_band_edge": False,
+                    "stamp_content_within_warning_distance": False,
+                },
+            },
+            "sign_request_snapshot": None,
+            "backend_reservation_snapshot": None,
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is False
+    assert any("user-visible fit failure" in item for item in evaluation.errors)
+
+
+def test_evidence_contract_requires_signed_output_evidence_for_success() -> None:
+    evaluation = evaluate_acceptance_evidence_contract(
+        {
+            "summary_json_path": "artifacts/interactive_harness_capture.json",
+            "summary_json_written": True,
+            "checklist_results_written": True,
+            "sign_request_count": 1,
+            "last_signing_result_success": True,
+            "last_signature_has_visible_appearance": True,
+            "output_file_exists": True,
+            "output_signature_count": 1,
+            "output_visible_appearance_snapshot": {"field_name": "Signature1"},
+            "preview_snapshot": {
+                "can_submit": True,
+                "layout_template": "single_line",
+                "stamp_position": "top",
+                "show_field_names": False,
+                "datetime_format": "%Y-%m-%d",
+                "signer_label_prefix": "",
+                "timezone_display_mode": "utc",
+                "image_stamp_path": None,
+                "render_capture": {
+                    "preview_image_path": "artifacts/current.png",
+                    "preview_image_error": None,
+                    "text_debug_image_path": "artifacts/current_text_debug.png",
+                    "stamp_debug_image_path": "artifacts/current_stamp_debug.png",
+                    "text_rendered_content_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+                    "text_content_clipped_in_preview": False,
+                    "text_content_overlaps_stamp_band": False,
+                    "text_content_overlaps_stamp_content": False,
+                    "stamp_content_touches_band_edge": False,
+                    "stamp_content_within_warning_distance": False,
+                },
+            },
+            "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
+            "backend_reservation_snapshot": {"layout_template": "single_line"},
+            "backend_reservation_error": None,
+            "validation_text": "Ready to sign.",
+            "preview_available": True,
+        }
+    )
+
+    assert evaluation.passed is False
+    assert any("output_verification_snapshot is missing" in item for item in evaluation.errors)
+    assert any("signed_output_preview_comparison is missing" in item for item in evaluation.errors)
+
+
+def test_interactive_harness_capture_to_json_handles_nested_non_json_objects(
+    tmp_path: Path,
+) -> None:
+    opaque_path = tmp_path / "opaque.bin"
+    opaque_path.write_bytes(b"opaque")
+
+    with opaque_path.open("rb") as opaque_handle:
+        capture = InteractiveHarnessCapture(
+            pdf_path="/tmp/sample.pdf",
+            **_capture_metadata_defaults(
+                acceptance_tier=ENGINEERING_RUN,
+                gate_verdict=NON_GATING,
+            ),
+            first_render_ms=None,
+            selection_count=0,
+            sign_request_count=0,
+            last_signature_page_index=None,
+            last_signature_page_number=None,
+            last_signature_has_visible_appearance=False,
+            last_signature_output_path=None,
+            last_signing_result_message=None,
+            last_signing_result_success=None,
+            preview_snapshot={"opaque": opaque_handle},
+            sign_request_snapshot=None,
+            backend_reservation_snapshot=None,
+            backend_reservation_error=None,
+            output_file_exists=False,
+            output_file_size_bytes=None,
+            output_signature_count=None,
+            output_signature_snapshot=None,
+            output_visible_appearance_snapshot=None,
+            preview_available=False,
+            preview_text="",
+            validation_text="",
+            interaction_counts={},
+            errors=(),
+        )
+
+        payload = json.loads(capture.to_json())
+
+    assert payload["preview_snapshot"]["opaque"].startswith("<_io.BufferedReader")
+
+
+def test_build_capture_from_payload_preserves_every_stable_capture_field() -> None:
+    metadata_fields = {
+        "summary_json_path",
+        "summary_json_written",
+        "checklist_results_path",
+        "checklist_results_written",
+        "evidence_contract_version",
+        "acceptance_tier",
+        "gate_verdict",
+        "evidence_validation_passed",
+        "evidence_validation_errors",
+        "evidence_validation_warnings",
+    }
+    payload: dict[str, object] = {}
+    for index, field in enumerate(fields(InteractiveHarnessCapture)):
+        if field.name in metadata_fields:
+            continue
+        if field.name in {
+            "evidence_validation_errors",
+            "evidence_validation_warnings",
+            "errors",
+            "signed_runs",
+            "captured_states",
+            "captured_state_transition_diagnostics",
+        }:
+            value: object = (f"{field.name}-{index}",)
+        elif field.name == "interaction_counts":
+            value = {field.name: index}
+        elif field.name.endswith("_snapshot") or field.name == "preview_snapshot":
+            value = {field.name: index}
+        else:
+            value = f"{field.name}-{index}"
+        payload[field.name] = value
+
+    contract = SimpleNamespace(
+        contract_version="evidence-contract-test",
+        acceptance_tier="gate_candidate",
+        gate_verdict="gate_candidate",
+        passed=True,
+        errors=(),
+        warnings=(),
+    )
+    capture = build_capture_from_payload(
+        capture_payload=payload,
+        contract=contract,
+        summary_json_path="artifacts/summary.json",
+        checklist_results_path="artifacts/checklist.md",
+        checklist_results_written=True,
+    )
+
+    for field in fields(InteractiveHarnessCapture):
+        if field.name in metadata_fields:
+            continue
+        assert getattr(capture, field.name) == payload[field.name]
+    assert capture.evidence_contract_version == contract.contract_version
+    assert capture.acceptance_tier == contract.acceptance_tier
+    assert capture.gate_verdict == contract.gate_verdict
+    assert capture.evidence_validation_passed is contract.passed
+    assert capture.evidence_validation_errors == contract.errors
+    assert capture.evidence_validation_warnings == contract.warnings
+    assert capture.summary_json_written is True
+    assert capture.checklist_results_written is True
+    serialized = capture.to_json()
+    assert serialized == json.dumps(json.loads(serialized), indent=2, sort_keys=True)
+
+
+def test_interactive_harness_capture_to_json_serializes_captured_states() -> None:
+    capture = InteractiveHarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
+        first_render_ms=12.5,
+        selection_count=1,
+        sign_request_count=0,
+        last_signature_page_index=None,
+        last_signature_page_number=None,
+        last_signature_has_visible_appearance=False,
+        last_signature_output_path=None,
+        last_signing_result_message=None,
+        last_signing_result_success=None,
+        preview_snapshot={"title": "Current"},
+        sign_request_snapshot=None,
+        backend_reservation_snapshot=None,
+        backend_reservation_error=None,
+        output_file_exists=False,
+        output_file_size_bytes=None,
+        output_signature_count=None,
+        output_signature_snapshot=None,
+        output_visible_appearance_snapshot=None,
+        preview_available=True,
+        preview_text="Current",
+        validation_text="Ready to sign.",
+        interaction_counts={},
+        errors=(),
+        captured_states=(
+            {
+                "capture_index": 1,
+                "capture_kind": "manual",
+                "capture_label": "manual_01_single_line_top",
+                "preview_snapshot": {"title": "Manual"},
+                "preview_text": "Manual",
+                "validation_text": "Ready to sign.",
+                "sign_request_snapshot": None,
+                "backend_reservation_snapshot": None,
+                "backend_reservation_error": None,
+            },
+            {
+                "capture_index": 2,
+                "capture_kind": "final",
+                "capture_label": "final_02_single_line_top",
+                "preview_snapshot": {"title": "Final"},
+                "preview_text": "Final",
+                "validation_text": "Ready to sign.",
+                "sign_request_snapshot": None,
+                "backend_reservation_snapshot": None,
+                "backend_reservation_error": None,
+            },
+        ),
+    )
+
+    payload = json.loads(capture.to_json())
+
+    assert len(payload["captured_states"]) == 2
+    assert payload["captured_states"][0]["capture_kind"] == "manual"
+    assert payload["captured_states"][1]["capture_kind"] == "final"
+
+
+def test_interactive_harness_capture_to_json_serializes_signed_runs() -> None:
+    capture = InteractiveHarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
+        first_render_ms=12.5,
+        selection_count=1,
+        sign_request_count=1,
+        last_signature_page_index=0,
+        last_signature_page_number=1,
+        last_signature_has_visible_appearance=True,
+        last_signature_output_path="/tmp/sample-signed.pdf",
+        last_signing_result_message="Signing completed successfully.",
+        last_signing_result_success=True,
+        preview_snapshot={"title": "Current"},
+        sign_request_snapshot=None,
+        backend_reservation_snapshot=None,
+        backend_reservation_error=None,
+        output_file_exists=True,
+        output_file_size_bytes=1024,
+        output_signature_count=1,
+        output_signature_snapshot={"field_name": "Signature1"},
+        output_visible_appearance_snapshot={"field_name": "Signature1"},
+        preview_available=True,
+        preview_text="Current",
+        validation_text="Ready to sign.",
+        interaction_counts={},
+        errors=(),
+        signed_runs=(
+            {
+                "run_index": 1,
+                "capture_label": "signed_run_01_single_line_top",
+                "preview_snapshot": {"title": "At sign time"},
+                "signing_result": {"success": True, "message": "ok"},
+                "output_pdf_path": "/tmp/sample-signed.pdf",
+            },
+        ),
+    )
+
+    payload = json.loads(capture.to_json())
+
+    assert len(payload["signed_runs"]) == 1
+    assert payload["signed_runs"][0]["run_index"] == 1
+    assert payload["signed_runs"][0]["preview_snapshot"]["title"] == "At sign time"
+
+
+def test_interactive_harness_capture_can_preserve_signed_runs_after_later_preview_changes() -> None:
+    capture = InteractiveHarnessCapture(
+        pdf_path="/tmp/sample.pdf",
+        **_capture_metadata_defaults(),
+        first_render_ms=12.5,
+        selection_count=3,
+        sign_request_count=2,
+        last_signature_page_index=0,
+        last_signature_page_number=1,
+        last_signature_has_visible_appearance=True,
+        last_signature_output_path="/tmp/sample-signed-1.pdf",
+        last_signing_result_message="Visible signature content does not fit.",
+        last_signing_result_success=False,
+        preview_snapshot={"title": "Later rejected draft"},
+        sign_request_snapshot=None,
+        backend_reservation_snapshot=None,
+        backend_reservation_error="Visible signature content does not fit.",
+        output_file_exists=True,
+        output_file_size_bytes=1024,
+        output_signature_count=1,
+        output_signature_snapshot={"field_name": "Signature1"},
+        output_visible_appearance_snapshot={"field_name": "Signature1"},
+        preview_available=True,
+        preview_text="Later rejected draft",
+        validation_text="Visible signature content does not fit.",
+        interaction_counts={"sign_success": 1, "sign_failure": 1},
+        errors=(),
+        signed_runs=(
+            {
+                "run_index": 1,
+                "preview_snapshot": {"title": "Successful sign-time preview"},
+                "signing_result": {"success": True, "message": "Signing completed successfully."},
+                "output_pdf_path": "/tmp/sample-signed-1.pdf",
+            },
+        ),
+    )
+
+    payload = json.loads(capture.to_json())
+
+    assert payload["preview_snapshot"]["title"] == "Later rejected draft"
+    assert payload["signed_runs"][0]["preview_snapshot"]["title"] == "Successful sign-time preview"
+    assert payload["signed_runs"][0]["signing_result"]["success"] is True
+
+
+def test_pdf_snapshotter_reports_cryptographic_details(tmp_path: Path) -> None:
+    output_pdf = _write_signed_test_pdf(tmp_path)
+
+    snapshot = AcceptancePdfSignatureSnapshotter().snapshot_output_verification(output_pdf)
+
+    assert snapshot is not None
+    assert snapshot["cryptographic_validation_passed"] is True
+    assert snapshot["signature_count"] == 1
+    assert snapshot["byte_range_present"] is True
+    assert snapshot["subfilter"] is not None
+    assert snapshot["signer_subject"]
+
+
+def test_signed_matrix_diagnostic_summary_counts_failures() -> None:
+    summary = signed_matrix_diagnostic_summary(
+        [
+            {
+                "name": "expected_success_but_failed",
+                "signing_result": {"success": True},
+                "expected_outcome": "success",
+                "output_verification_snapshot": {"cryptographic_validation_passed": False},
+                "signed_output_preview_comparison": {
+                    "preview_vs_signed_output_passed": False,
+                    "annotation_rect_matches_request": False,
+                },
+            },
+            {
+                "name": "expected_rejection_and_rejected",
+                "signing_result": {
+                    "success": False,
+                    "message": (
+                        "Visible signature content does not fit inside the selected rectangle."
+                    ),
+                },
+                "expected_outcome": "validation_rejection",
+                "expected_failure_message_contains": "does not fit inside the selected rectangle",
+                "output_verification_snapshot": {"cryptographic_validation_passed": True},
+                "signed_output_preview_comparison": {
+                    "preview_vs_signed_output_passed": True,
+                    "annotation_rect_matches_request": True,
+                },
+            },
+            {
+                "name": "expected_success_and_succeeded",
+                "signing_result": {"success": True},
+                "expected_outcome": "success",
+                "output_verification_snapshot": {"cryptographic_validation_passed": True},
+                "signed_output_preview_comparison": {
+                    "preview_vs_signed_output_passed": True,
+                    "annotation_rect_matches_request": True,
+                },
+            },
+        ]
+    )
+
+    assert summary["successful_signing_run_count"] == 2
+    assert summary["cryptographic_validation_failure_count"] == 1
+    assert summary["preview_output_comparison_failure_count"] == 1
+
+
+def test_evaluate_signed_matrix_acceptance_expectations_flags_contract_failures() -> None:
+    passed, errors = evaluate_signed_matrix_acceptance_expectations(
+        summary={
+            "scenario_count": 10,
+            "successful_signing_run_count": 6,
+            "cryptographic_validation_failure_count": 1,
+            "preview_output_comparison_failure_count": 0,
+            "annotation_rect_mismatch_count": 0,
+            "matched_expected_intentional_rejection_count": 3,
+            "expected_outcome_mismatch_count": 1,
+        },
+        manifest_expectations={
+            "scenario_count": 10,
+            "minimum_successful_signing_run_count": 7,
+            "expected_intentional_rejection_count": 3,
+            "require_zero_cryptographic_validation_failures": True,
+            "require_zero_preview_output_comparison_failures": True,
+            "require_zero_annotation_rect_mismatches": True,
+        },
+    )
+
+    assert passed is False
+    assert any("at least 7 successful signings" in item for item in errors)
+    assert any("zero cryptographic validation failures" in item for item in errors)
+    assert any("zero per-scenario expectation mismatches" in item for item in errors)
+
+
+def test_default_harness_artifacts_dir_prefers_explicit_override() -> None:
+    assert (
+        default_harness_artifacts_dir(
+            summary_json_path="artifacts/interactive_harness_capture.json",
+            artifacts_dir="artifacts/manual_override",
+        )
+        == "artifacts/manual_override"
+    )
+
+
+def test_default_harness_artifacts_dir_derives_from_summary_json_path() -> None:
+    assert (
+        default_harness_artifacts_dir(
+            summary_json_path="artifacts/interactive_harness_capture.json",
+            artifacts_dir=None,
+        )
+        == "artifacts/interactive_harness_capture_artifacts"
+    )
+
+
+def test_default_harness_output_pdf_path_uses_artifacts_dir_and_numbering() -> None:
+    output_path = default_harness_output_pdf_path(
+        pdf_path="/tmp/input.pdf",
+        artifacts_dir="artifacts/interactive_harness_capture_artifacts",
+        sign_attempt_index=3,
+    )
+
+    assert (
+        output_path
+        == "artifacts/interactive_harness_capture_artifacts/input_harness_signed_003.pdf"
+    )
+
+
+def test_default_harness_output_pdf_path_falls_back_to_source_directory() -> None:
+    output_path = default_harness_output_pdf_path(
+        pdf_path="/tmp/input.pdf",
+        artifacts_dir=None,
+        sign_attempt_index=2,
+    )
+
+    assert output_path == "/tmp/input-signed.pdf"
+
+
+def test_build_live_evidence_workspace_wires_shared_qt_adapter_dependencies() -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        pass
+
+    def _fake_adapter(**kwargs):
+        captured.update(kwargs)
+        return _FakeWorkspace()
+
+    original_adapter = interactive_harness_module.QtAcceptanceHarnessWorkspaceAdapter
+    interactive_harness_module.QtAcceptanceHarnessWorkspaceAdapter = _fake_adapter
+    try:
+        shell = type("_Shell", (), {"testing_adapter": object()})()
+        profile_store = object()
+        bundle = SimpleNamespace(view=SimpleNamespace(mount_target=lambda: shell))
+        workspace = interactive_harness_module._build_live_evidence_workspace(
+            workspace=bundle,
+            profile_store=profile_store,
+        )
+    finally:
+        interactive_harness_module.QtAcceptanceHarnessWorkspaceAdapter = original_adapter
+
+    assert isinstance(workspace, _FakeWorkspace)
+    assert captured["workspace"].view.mount_target() is shell
+    assert captured["profile_store"] is profile_store
+    deps = captured["deps"]
+    assert callable(deps.capture_preview_render.capture)
+    assert deps.snapshot_preview is interactive_harness_module._snapshot_preview
+    assert deps.snapshot_signing_request is interactive_harness_module._snapshot_signing_request
+    assert (
+        deps.build_backend_reservation_evidence
+        is interactive_harness_module.build_backend_reservation_evidence
+    )
+    assert (
+        deps.snapshot_sign_time_fit_diagnostics
+        is interactive_harness_module._snapshot_sign_time_fit_diagnostics
+    )
+    assert deps.interactive_capture_label is interactive_harness_module._interactive_capture_label
+
+
+def test_qt_acceptance_harness_workspace_wrappers_delegate_to_shared_live_builder() -> None:
+    calls: list[dict[str, object]] = []
+
+    def _fake_builder(*, workspace, profile_store):
+        calls.append({"workspace": workspace, "profile_store": profile_store})
+        return object()
+
+    original_builder = interactive_harness_module._build_live_evidence_workspace
+    interactive_harness_module._build_live_evidence_workspace = _fake_builder
+    try:
+        harness_workspace = object()
+        preview_workspace = object()
+        preview_store = object()
+        interactive_harness_module._build_qt_evidence_workspace(harness_workspace)
+        interactive_harness_module._build_preview_matrix_qt_workspace(
+            workspace=preview_workspace,
+            profile_store=preview_store,
+        )
+    finally:
+        interactive_harness_module._build_live_evidence_workspace = original_builder
+
+    assert len(calls) == 2
+    assert calls[0]["workspace"] is harness_workspace
+    assert calls[0]["profile_store"] is not preview_store
+    assert calls[1] == {"workspace": preview_workspace, "profile_store": preview_store}
+
+
+def test_apply_preview_matrix_scenario_uses_preview_matrix_workspace_builder() -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        def apply_scenario(self, command) -> None:
+            captured["command"] = command
+
+    def _fake_builder(*, workspace, profile_store):
+        captured["workspace"] = workspace
+        captured["profile_store"] = profile_store
+        return _FakeWorkspace()
+
+    original_builder = interactive_harness_module._build_preview_matrix_qt_workspace
+    interactive_harness_module._build_preview_matrix_qt_workspace = _fake_builder
+    try:
+        scenario = {
+            "name": "Scenario A",
+            "profile_name": "Saved Profile",
+            "timestamp_required": False,
+        }
+        workspace = object()
+        profile_store = object()
+        interactive_harness_module._apply_preview_matrix_scenario(
+            workspace=workspace,
+            scenario=scenario,
+            profile_store=profile_store,
+        )
+    finally:
+        interactive_harness_module._build_preview_matrix_qt_workspace = original_builder
+
+    assert captured["workspace"] is workspace
+    assert captured["profile_store"] is profile_store
+    assert captured["command"] == interactive_harness_module.InteractiveHarnessScenarioCommand(
+        profile_name="Saved Profile",
+        appearance_overrides=None,
+        timestamp_required=False,
+        signature_rect=None,
+    )
+
+
+def test_execute_preview_matrix_scenario_uses_workspace_snapshot_capture(
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        def apply_scenario(self, command) -> None:
+            captured["command"] = command
+
+        def capture_snapshot(self, command):
+            captured["capture_command"] = command
+            return AcceptanceHarnessWorkspaceSnapshot(
+                current_request=None,
+                last_signing_result=None,
+                capture_index=command.capture_index,
+                capture_kind=command.capture_kind,
+                capture_label=None,
+                preview_snapshot={"title": "Live preview"},
+                preview_text="Preview text",
+                validation_text="Ready to sign.",
+                sign_request_snapshot={"signature_appearance": {"layout_template": "single_line"}},
+                backend_reservation_snapshot={"layout_template": "single_line"},
+                backend_reservation_error=None,
+            )
+
+    original_builder = interactive_harness_module._build_preview_matrix_qt_workspace
+    interactive_harness_module._build_preview_matrix_qt_workspace = lambda **_kwargs: (
+        _FakeWorkspace()
+    )
+    try:
+        result = interactive_harness_module._execute_preview_matrix_scenario(
+            workspace=object(),
+            scenario={"name": "Scenario A", "profile_name": "Saved Profile"},
+            profile_store=object(),
+            artifacts_dir=tmp_path,
+        )
+    finally:
+        interactive_harness_module._build_preview_matrix_qt_workspace = original_builder
+
+    assert result == {
+        "name": "Scenario A",
+        "profile_name": "Saved Profile",
+        "preview_snapshot": {"title": "Live preview"},
+        "preview_text": "Preview text",
+        "validation_text": "Ready to sign.",
+        "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
+        "backend_reservation_snapshot": {"layout_template": "single_line"},
+    }
+    assert captured[
+        "capture_command"
+    ] == interactive_harness_module.InteractiveHarnessCaptureCommand(
+        request=None,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="scenario_a",
+        capture_index=1,
+        capture_kind="preview_matrix",
+    )
+
+
+def test_execute_headless_preview_matrix_scenario_uses_workspace_snapshot_capture(
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeWorkspace:
+        def apply_scenario(self, command) -> None:
+            captured["command"] = command
+
+        def capture_snapshot(self, command):
+            captured["capture_command"] = command
+            return AcceptanceHarnessWorkspaceSnapshot(
+                current_request=None,
+                last_signing_result=None,
+                capture_index=command.capture_index,
+                capture_kind=command.capture_kind,
+                capture_label=None,
+                preview_snapshot={"title": "Headless preview"},
+                preview_text="Preview text",
+                validation_text="Ready to sign.",
+                sign_request_snapshot={"signature_appearance": {"layout_template": "single_line"}},
+                backend_reservation_snapshot={"layout_template": "single_line"},
+                backend_reservation_error=None,
+            )
+
+    original_workflow_builder = interactive_harness_module._build_headless_preview_matrix_workflow
+    original_workspace_builder = interactive_harness_module._build_preview_matrix_headless_workspace
+    interactive_harness_module._build_headless_preview_matrix_workflow = lambda **_kwargs: object()
+    interactive_harness_module._build_preview_matrix_headless_workspace = lambda **_kwargs: (
+        _FakeWorkspace()
+    )
+    try:
+        result = interactive_harness_module._execute_headless_preview_matrix_scenario(
+            source_path=tmp_path / "fixture.pdf",
+            certificate_path=str(tmp_path / "cert.p12"),
+            passphrase="secret",
+            scenario={"name": "Scenario B", "profile_name": "Headless"},
+            profile_store=object(),
+            artifacts_dir=tmp_path,
+        )
+    finally:
+        interactive_harness_module._build_headless_preview_matrix_workflow = (
+            original_workflow_builder
+        )
+        interactive_harness_module._build_preview_matrix_headless_workspace = (
+            original_workspace_builder
+        )
+
+    assert result == {
+        "name": "Scenario B",
+        "profile_name": "Headless",
+        "preview_snapshot": {"title": "Headless preview"},
+        "preview_text": "Preview text",
+        "validation_text": "Ready to sign.",
+        "sign_request_snapshot": {"signature_appearance": {"layout_template": "single_line"}},
+        "backend_reservation_snapshot": {"layout_template": "single_line"},
+    }
+    assert captured[
+        "capture_command"
+    ] == interactive_harness_module.InteractiveHarnessCaptureCommand(
+        request=None,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="scenario_b",
+        capture_index=1,
+        capture_kind="preview_matrix",
+    )
+
+
+def test_run_acceptance_signing_harness_orchestrates_session_and_reporting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    request = build_signing_request(
+        tmp_path,
+        input_name="input.pdf",
+        output_name="output.pdf",
+        certificate_name="cert.p12",
+        passphrase="secret",
+        timestamp_required=False,
+    )
+    captured = {}
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_load_qt_harness_bindings",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_load_page_count",
+        lambda **_kwargs: 1,
+    )
+
+    class _FakeBackend:
+        def diagnostics(self):
+            return type("_Diag", (), {"available": True, "message": "ok"})()
+
+    monkeypatch.setattr(interactive_harness_module, "QtPdfRenderBackend", _FakeBackend)
+    monkeypatch.setattr(
+        interactive_harness_module.SignaturePresetCatalogStore,
+        "default",
+        staticmethod(lambda: object()),
+    )
+
+    def fake_finalize(request_obj, **_kwargs):
+        captured["payload"] = request_obj.capture_payload
+        return SimpleNamespace(
+            capture=SimpleNamespace(
+                acceptance_tier="gate_candidate",
+                gate_verdict="gate_candidate",
+                validation_text="Ready to sign.",
+                captured_states=(
+                    {"capture_kind": "manual"},
+                    {"capture_kind": "final"},
+                ),
+            )
+        )
+
+    runner = InteractiveCaptureEngine(
+        load_qt_harness_bindings=interactive_harness_module._load_qt_harness_bindings,
+        load_page_count=interactive_harness_module._load_page_count,
+        render_backend_factory=interactive_harness_module.QtPdfRenderBackend,
+        profile_store_factory=interactive_harness_module.SignaturePresetCatalogStore.default,
+        build_signing_executor=lambda: object(),
+        session_runner=SimpleNamespace(
+            run=lambda **_kwargs: InteractiveHarnessSessionResult(
+                first_render_ms=12.5,
+                sign_requests=(request,),
+                signed_runs=(),
+                errors=(),
+                interaction_counts={"selection_success": 1},
+                captured_states=({"capture_kind": "manual"},),
+                final_state={
+                    "capture_kind": "final",
+                    "preview_snapshot": {"title": "Final preview"},
+                    "sign_request_snapshot": {
+                        "signature_appearance": {"layout_template": "single_line"}
+                    },
+                    "backend_reservation_snapshot": {"layout_template": "single_line"},
+                    "backend_reservation_error": None,
+                    "preview_text": "Final preview",
+                    "validation_text": "Ready to sign.",
+                },
+                capture_request=request,
+                last_signing_result=None,
+            )
+        ),
+        capture_assembler=interactive_harness_module.build_capture_assembler(),
+        contract_evaluator=evaluate_acceptance_evidence_contract,
+        capture_factory=build_capture_from_payload,
+        checklist_renderer=lambda *_args, **_kwargs: "",
+        report_finalizer=fake_finalize,
+        artifact_policy=InteractiveEvidenceArtifactPolicy(
+            default_artifacts_dir=default_harness_artifacts_dir,
+            output_pdf_path=default_harness_output_pdf_path,
+            write_text=write_optional_text,
+        ),
+    )
+    capture = runner.run(
+        EvidenceCaptureRequest(
+            pdf_path=str(input_pdf),
+            certificate_path=str(cert_path),
+            passphrase="secret",
+            summary_json_path=str(tmp_path / "summary.json"),
+            checklist_results_path=str(tmp_path / "results.md"),
+            checklist_template_path=str(tmp_path / "template.md"),
+            artifacts_dir=None,
+        )
+    )
+
+    assert capture.acceptance_tier == "gate_candidate"
+    assert captured["payload"]["sign_request_count"] == 1
+    assert captured["payload"]["selection_count"] == 1
+    assert captured["payload"]["captured_states"][-1]["capture_kind"] == "final"
+    assert captured["payload"]["preview_snapshot"]["title"] == "Final preview"
+
+
+def test_interactive_harness_capture_orchestrates_session_and_reporting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "input.pdf"
+    cert_path = tmp_path / "cert.p12"
+    _write_test_pdf(input_pdf)
+    _write_test_pkcs12(cert_path, passphrase="secret")
+    captured = {}
+
+    class _FakeInteractivePort:
+        def run(self, request_obj):
+            captured["request"] = request_obj
+            return SimpleNamespace(
+                acceptance_tier="gate_candidate",
+                gate_verdict="gate_candidate",
+                validation_text="Ready to sign.",
+                captured_states=(
+                    {"capture_kind": "manual"},
+                    {"capture_kind": "final"},
+                ),
+            )
+
+    monkeypatch.setattr(
+        "foliaseal.presentation.qt.evidence_runner_factories.build_interactive_capture_engine",
+        lambda: _FakeInteractivePort(),
+    )
+    capture = build_interactive_capture_operation()(
+        EvidenceCaptureRequest(
+            pdf_path=str(input_pdf),
+            certificate_path=str(cert_path),
+            passphrase="secret",
+            summary_json_path=str(tmp_path / "summary.json"),
+            checklist_results_path=str(tmp_path / "results.md"),
+            checklist_template_path=str(tmp_path / "template.md"),
+            artifacts_dir=None,
+        )
+    )
+
+    assert capture.acceptance_tier == "gate_candidate"
+    assert captured["request"].pdf_path == str(input_pdf)
+    assert captured["request"].certificate_path == str(cert_path)
+    assert captured["request"].passphrase == "secret"
+
+
+def test_interactive_capture_label_uses_layout_and_stamp_names() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.BOTTOM,
+        },
+    )()
+
+    label = _interactive_capture_label(
+        preview=preview,
+        capture_index=3,
+        capture_kind="manual",
+    )
+
+    assert label == "manual_03_single_line_bottom"
+
+
+def test_widget_rect_snapshot_relative_to_skips_mapto_for_non_ancestor_root() -> None:
+    calls: list[tuple[object, object]] = []
+
+    class _Root:
+        def isAncestorOf(self, widget) -> bool:
+            return False
+
+    class _Widget:
+        def mapTo(self, root, point):
+            calls.append((root, point))
+            raise AssertionError("mapTo should not be called when root is not an ancestor")
+
+    root = _Root()
+    widget = _Widget()
+    original = interactive_harness_module._widget_rect_snapshot
+    try:
+        interactive_harness_module._widget_rect_snapshot = lambda target: {
+            "x": 7,
+            "y": 9,
+            "width": 11,
+            "height": 13,
+        }
+        assert interactive_harness_module._widget_rect_snapshot_relative_to(root, widget) == {
+            "x": 7,
+            "y": 9,
+            "width": 11,
+            "height": 13,
+        }
+        assert calls == []
+    finally:
+        interactive_harness_module._widget_rect_snapshot = original
+
+
+def test_analyze_capture_state_transitions_flags_negligible_font_size_change(
+    tmp_path: Path,
+) -> None:
+    image_a = tmp_path / "a.png"
+    image_b = tmp_path / "b.png"
+    base = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    variant = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    for x in range(5, 25):
+        for y in range(5, 12):
+            base.putpixel((x, y), (0, 0, 0, 255))
+            variant.putpixel((x, y), (0, 0, 0, 255))
+    variant.putpixel((26, 12), (0, 0, 0, 255))
+    base.save(image_a, format="PNG")
+    variant.save(image_b, format="PNG")
+
+    diagnostics = _analyze_capture_state_transitions(
+        (
+            {
+                "capture_label": "manual_01_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:05",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.5},
+                    "render_capture": {
+                        "preview_image_path": str(image_a),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+            {
+                "capture_label": "manual_02_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:05",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.0},
+                    "render_capture": {
+                        "preview_image_path": str(image_b),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+        )
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["issue_code"] == "font_size_change_had_negligible_visual_effect"
+    assert diagnostics[0]["previous_font_size_pt"] == 8.5
+    assert diagnostics[0]["current_font_size_pt"] == 8.0
+    assert diagnostics[0]["changed_pixel_ratio"] == pytest.approx(1 / 1200, rel=0.01)
+
+
+def test_analyze_capture_state_transitions_ignores_signing_time_differences(
+    tmp_path: Path,
+) -> None:
+    image_a = tmp_path / "a.png"
+    image_b = tmp_path / "b.png"
+    base = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    variant = Image.new("RGBA", (60, 20), color=(255, 255, 255, 255))
+    for x in range(5, 25):
+        for y in range(5, 12):
+            base.putpixel((x, y), (0, 0, 0, 255))
+            variant.putpixel((x, y), (0, 0, 0, 255))
+    variant.putpixel((26, 12), (0, 0, 0, 255))
+    base.save(image_a, format="PNG")
+    variant.save(image_b, format="PNG")
+
+    diagnostics = _analyze_capture_state_transitions(
+        (
+            {
+                "capture_label": "manual_01_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:05",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.5},
+                    "render_capture": {
+                        "preview_image_path": str(image_a),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+            {
+                "capture_label": "manual_02_multi_line_top",
+                "preview_text": "Adam Smith\n2026-04-11 17:06",
+                "preview_snapshot": {
+                    "layout_template": "multi_line",
+                    "stamp_position": "top",
+                    "signature_rect": {"width_pt": 200.0, "height_pt": 40.0},
+                    "text_style": {"font_family": "Serif", "font_size_pt": 8.0},
+                    "render_capture": {
+                        "preview_image_path": str(image_b),
+                        "text_widget_bounds_px": {"x": 0, "y": 0, "width": 60, "height": 20},
+                        "text_rendered_content_bounds_px": {
+                            "x": 5,
+                            "y": 5,
+                            "width": 20,
+                            "height": 7,
+                        },
+                        "effective_text_font_category": "serif",
+                    },
+                },
+            },
+        )
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["issue_code"] == "font_size_change_had_negligible_visual_effect"
+
+
+def test_snapshot_preview_includes_render_capture_payload() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "title": "",
+            "signer_label_prefix": "",
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "timezone_display_mode": SignatureTimezoneDisplayMode.UTC,
+            "show_field_names": False,
+            "datetime_format": "%Y-%m-%d",
+            "image_stamp_path": None,
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=30.0),
+            "text_style": None,
+            "box_style": None,
+            "fields": (),
+            "issues": (),
+            "can_submit": True,
+        },
+    )()
+
+    snapshot = _snapshot_preview(
+        preview,
+        render_capture={"preview_image_path": "artifacts/preview.png"},
+    )
+
+    assert snapshot["render_capture"] == {"preview_image_path": "artifacts/preview.png"}
+
+
+def test_analyze_stamp_source_image_reports_alpha_bounds(tmp_path: Path) -> None:
+    image_path = tmp_path / "transparent_stamp.png"
+    image = Image.new("RGBA", (20, 10), color=(0, 0, 0, 0))
+    for x in range(4, 16):
+        for y in range(2, 8):
+            image.putpixel((x, y), (10, 40, 90, 255))
+    image.save(image_path, format="PNG")
+
+    analysis = _analyze_stamp_source_image(str(image_path))
+
+    assert analysis["stamp_source_image_size_px"] == {"width": 20, "height": 10}
+    assert analysis["stamp_source_content_bounds_px"] == {
+        "x": 4,
+        "y": 2,
+        "width": 12,
+        "height": 6,
+    }
+    assert analysis["stamp_source_content_error"] is None
+
+
+def test_stamp_edge_diagnostics_flags_touching_but_not_one_pixel_clearance() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 0, "y": 0, "width": 100, "height": 40},
+        stamp_pixmap_bounds={"x": 0, "y": 5, "width": 80, "height": 20},
+        stamp_content_bounds={"x": 1, "y": 6, "width": 70, "height": 18},
+    )
+
+    assert diagnostics["stamp_pixmap_touches_band_edge"] is True
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+    assert diagnostics["stamp_content_warning_threshold_px"] == 0
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 1
+
+
+def test_write_stamp_debug_overlay_writes_debug_crop(tmp_path: Path) -> None:
+    preview_image_path = tmp_path / "preview.png"
+    output_path = tmp_path / "stamp_debug.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_image_path)
+
+    error = _write_stamp_debug_overlay(
+        preview_image_path=str(preview_image_path),
+        output_path=str(output_path),
+        stamp_band_bounds={"x": 10, "y": 8, "width": 70, "height": 24},
+        stamp_pixmap_bounds={"x": 14, "y": 10, "width": 52, "height": 18},
+        stamp_content_bounds={"x": 18, "y": 12, "width": 40, "height": 12},
+        crop_padding=6,
+    )
+
+    assert error is None
+    assert output_path.exists()
+
+
+def test_text_edge_diagnostics_flags_stamp_facing_touch_and_overlap() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.BOTTOM},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 30},
+        text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
+        reference_text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
+        stamp_band_bounds={"x": 10, "y": 40, "width": 80, "height": 20},
+        stamp_content_bounds={"x": 15, "y": 42, "width": 40, "height": 12},
+    )
+
+    assert diagnostics["text_content_stamp_facing_distance_px"] == 0
+    assert diagnostics["text_content_touches_stamp_facing_edge"] is True
+    assert diagnostics["text_content_overlaps_stamp_band"] is False
+    assert diagnostics["text_content_clipped_in_preview"] is False
+
+
+def test_text_edge_diagnostics_flags_reference_content_loss_as_clipping() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.BOTTOM},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 30},
+        text_content_bounds={"x": 10, "y": 10, "width": 56, "height": 24},
+        reference_text_content_bounds={"x": 12, "y": 12, "width": 60, "height": 28},
+        stamp_band_bounds={"x": 10, "y": 40, "width": 80, "height": 20},
+        stamp_content_bounds={"x": 15, "y": 42, "width": 40, "height": 12},
+    )
+
+    assert diagnostics["text_content_reference_width_loss_px"] == 4
+    assert diagnostics["text_content_reference_height_loss_px"] == 4
+    assert diagnostics["text_content_clipped_in_preview"] is True
+
+
+def test_text_edge_diagnostics_flags_horizontal_border_edge_reference_loss() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.LEFT},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 300, "height": 80},
+        text_widget_bounds={"x": 40, "y": 10, "width": 240, "height": 30},
+        text_content_bounds={"x": 58, "y": 12, "width": 222, "height": 18},
+        reference_text_content_bounds={"x": 40, "y": 12, "width": 240, "height": 18},
+        stamp_band_bounds={"x": 5, "y": 10, "width": 30, "height": 30},
+        stamp_content_bounds={"x": 8, "y": 20, "width": 24, "height": 6},
+    )
+
+    assert diagnostics["text_content_reference_width_loss_px"] == 18
+    assert diagnostics["text_content_touches_widget_edge"] is True
+    assert diagnostics["text_content_touches_border_facing_edge"] is True
+    assert diagnostics["text_content_clipped_in_preview"] is True
+
+
+def test_text_edge_diagnostics_ignores_reference_loss_without_edge_contact() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.TOP},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 200, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 140, "height": 40},
+        text_content_bounds={"x": 14, "y": 18, "width": 120, "height": 18},
+        reference_text_content_bounds={"x": 0, "y": 0, "width": 120, "height": 24},
+        stamp_band_bounds={"x": 10, "y": 52, "width": 140, "height": 14},
+        stamp_content_bounds={"x": 15, "y": 54, "width": 70, "height": 8},
+    )
+
+    assert diagnostics["text_content_reference_height_loss_px"] == 6
+    assert diagnostics["text_content_touches_widget_edge"] is False
+    assert diagnostics["text_content_clipped_in_preview"] is False
+
+
+def test_text_edge_diagnostics_flags_small_height_loss_at_edge() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {"stamp_position": SignatureStampPosition.TOP},
+    )()
+
+    diagnostics = _text_edge_diagnostics(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 120, "height": 80},
+        text_widget_bounds={"x": 10, "y": 10, "width": 80, "height": 20},
+        text_content_bounds={"x": 12, "y": 10, "width": 60, "height": 18},
+        reference_text_content_bounds={"x": 12, "y": 10, "width": 60, "height": 20},
+        stamp_band_bounds={"x": 10, "y": 0, "width": 80, "height": 8},
+        stamp_content_bounds={"x": 15, "y": 1, "width": 40, "height": 6},
+    )
+
+    assert diagnostics["text_content_reference_height_loss_px"] == 2
+    assert diagnostics["text_content_clipped_in_preview"] is True
+
+
+def test_text_font_diagnostics_reports_cursive_as_direct_preview_family() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "text_style": type(
+                "_TextStyle",
+                (),
+                {"font_family": "Cursive", "font_size_pt": 8.5},
+            )(),
+        },
+    )()
+
+    class _Font:
+        def family(self) -> str:
+            return "Liberation Sans"
+
+        def pointSizeF(self) -> float:
+            return 8.5
+
+    class _Label:
+        def font(self):
+            return _Font()
+
+        def fontInfo(self):
+            return _Font()
+
+    diagnostics = _text_font_diagnostics(preview=preview, active_label=_Label())
+
+    assert diagnostics["requested_text_font_category"] == "cursive"
+    assert diagnostics["effective_text_font_category"] == "sans_serif"
+    assert diagnostics["font_family_direct_preview_mapping_supported"] is False
+    assert diagnostics["font_family_category_mismatch"] is True
+
+
+def test_text_font_diagnostics_classifies_sans_serif_and_bracketed_qt_family() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "text_style": type(
+                "_TextStyle",
+                (),
+                {"font_family": "Sans Serif", "font_size_pt": 10.0},
+            )(),
+        },
+    )()
+
+    class _Font:
+        def family(self) -> str:
+            return "Arial [Mono]"
+
+        def pointSizeF(self) -> float:
+            return 10.0
+
+    class _Label:
+        def font(self):
+            return _Font()
+
+        def fontInfo(self):
+            return _Font()
+
+    diagnostics = _text_font_diagnostics(preview=preview, active_label=_Label())
+
+    assert diagnostics["requested_text_font_category"] == "sans_serif"
+    assert diagnostics["effective_text_font_category"] == "sans_serif"
+    assert diagnostics["font_family_category_mismatch"] is False
+
+
+def test_write_text_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
+    preview_path = tmp_path / "preview.png"
+    output_path = tmp_path / "text_debug.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
+
+    error = _write_text_debug_overlay(
+        preview_image_path=str(preview_path),
+        output_path=str(output_path),
+        text_widget_bounds={"x": 10, "y": 12, "width": 50, "height": 18},
+        text_content_bounds={"x": 14, "y": 16, "width": 30, "height": 8},
+        stamp_band_bounds={"x": 10, "y": 34, "width": 50, "height": 12},
+        crop_padding=6,
+    )
+
+    assert error is None
+    assert output_path.exists() is True
+
+
+def test_preview_edge_distances_report_top_and_bottom_clearance() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "signature_rect": build_signature_rect(page_index=0, width_pt=220.0, height_pt=28.0),
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.BOTTOM,
+            "box_style": None,
+        },
+    )()
+
+    distances = _preview_edge_distances(
+        preview=preview,
+        card_bounds={"x": 0, "y": 0, "width": 200, "height": 80},
+        body_bounds={"x": 6, "y": 6, "width": 188, "height": 68},
+        detail_bounds={"x": 0, "y": 0, "width": 188, "height": 28},
+        stamp_bounds={"x": 0, "y": 40, "width": 188, "height": 20},
+    )
+
+    assert distances["text_top_to_border_px"] == 6
+    assert distances["stamp_bottom_to_border_px"] == 14
+    assert distances["content_top_to_border_px"] == 6
+    assert distances["content_bottom_to_border_px"] == 14
+
+
+def test_analyze_stamp_source_image_reports_alpha_content_bounds(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "transparent_stamp.png"
+    _write_transparent_test_stamp_image(stamp_path)
+
+    analysis = _analyze_stamp_source_image(str(stamp_path))
+
+    assert analysis["stamp_source_image_size_px"] == {"width": 100, "height": 50}
+    assert analysis["stamp_source_content_bounds_px"] == {
+        "x": 12,
+        "y": 8,
+        "width": 72,
+        "height": 30,
+    }
+    assert analysis["stamp_source_content_error"] is None
+
+
+def test_analyze_stamp_source_image_reports_empty_alpha_as_error(tmp_path: Path) -> None:
+    stamp_path = tmp_path / "empty_stamp.png"
+    _write_fully_transparent_stamp_image(stamp_path)
+
+    analysis = _analyze_stamp_source_image(str(stamp_path))
+
+    assert analysis["stamp_source_image_size_px"] == {"width": 40, "height": 20}
+    assert analysis["stamp_source_content_bounds_px"] is None
+    assert analysis["stamp_source_content_error"] == (
+        "Stamp source image contains no non-transparent pixels."
+    )
+
+
+def test_stamp_edge_diagnostics_flags_touching_without_one_pixel_warning() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 10, "y": 10, "width": 60, "height": 20},
+        stamp_pixmap_bounds={"x": 10, "y": 12, "width": 58, "height": 18},
+        stamp_content_bounds={"x": 11, "y": 12, "width": 56, "height": 17},
+    )
+
+    assert diagnostics["stamp_pixmap_touches_band_edge"] is True
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_warning_threshold_px"] == 0
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 1
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
+def test_stamp_edge_diagnostics_ignores_left_anchor_for_top_and_bottom() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "stamp_position": SignatureStampPosition.TOP,
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 10, "y": 10, "width": 60, "height": 20},
+        stamp_pixmap_bounds={"x": 10, "y": 12, "width": 30, "height": 16},
+        stamp_content_bounds={"x": 10, "y": 13, "width": 20, "height": 14},
+    )
+
+    assert diagnostics["stamp_content_edge_distances_px"] == {
+        "top": 3,
+        "right": 40,
+        "bottom": 3,
+        "left": 0,
+    }
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 3
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
+def test_stamp_edge_diagnostics_uses_uniform_touch_only_threshold() -> None:
+    for layout_template in (
+        SignatureLayoutTemplate.SINGLE_LINE,
+        SignatureLayoutTemplate.MULTI_LINE,
+        SignatureLayoutTemplate.WRAPPED_BLOCK,
+    ):
+        preview = type(
+            "_Preview",
+            (),
+            {
+                "layout_template": layout_template,
+                "stamp_position": SignatureStampPosition.RIGHT,
+                "box_style": type(
+                    "_BoxStyle",
+                    (),
+                    {"show_border": True, "border_width_pt": 3.5},
+                )(),
+            },
+        )()
+
+        diagnostics = _stamp_edge_diagnostics(
+            preview=preview,
+            stamp_band_bounds={"x": 10, "y": 10, "width": 40, "height": 40},
+            stamp_pixmap_bounds={"x": 14, "y": 14, "width": 24, "height": 24},
+            stamp_content_bounds={"x": 12, "y": 12, "width": 26, "height": 26},
+        )
+
+        assert diagnostics["stamp_content_warning_threshold_px"] == 0
+        assert diagnostics["stamp_content_min_edge_distance_px"] == 12
+        assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
+def test_stamp_edge_diagnostics_ignores_text_facing_edge_for_multi_line_top() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "layout_template": SignatureLayoutTemplate.MULTI_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 1.0},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 7, "y": 24, "width": 234, "height": 59},
+        stamp_pixmap_bounds={"x": 7, "y": 28, "width": 230, "height": 55},
+        stamp_content_bounds={"x": 8, "y": 30, "width": 228, "height": 53},
+    )
+
+    assert diagnostics["stamp_content_edge_distances_px"] == {
+        "left": 1,
+        "top": 6,
+        "right": 5,
+        "bottom": 0,
+    }
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 6
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
+def test_stamp_edge_diagnostics_ignores_text_facing_edge_for_single_line_top() -> None:
+    preview = type(
+        "_Preview",
+        (),
+        {
+            "layout_template": SignatureLayoutTemplate.SINGLE_LINE,
+            "stamp_position": SignatureStampPosition.TOP,
+            "box_style": type(
+                "_BoxStyle",
+                (),
+                {"show_border": True, "border_width_pt": 3.5},
+            )(),
+        },
+    )()
+
+    diagnostics = _stamp_edge_diagnostics(
+        preview=preview,
+        stamp_band_bounds={"x": 9, "y": 9, "width": 341, "height": 11},
+        stamp_pixmap_bounds={"x": 10, "y": 12, "width": 8, "height": 8},
+        stamp_content_bounds={"x": 10, "y": 13, "width": 7, "height": 7},
+    )
+
+    assert diagnostics["stamp_content_edge_distances_px"] == {
+        "bottom": 0,
+        "left": 1,
+        "right": 333,
+        "top": 4,
+    }
+    assert diagnostics["stamp_content_min_edge_distance_px"] == 4
+    assert diagnostics["stamp_content_touches_band_edge"] is False
+    assert diagnostics["stamp_content_within_warning_distance"] is False
+
+
+def test_write_stamp_debug_overlay_writes_expected_file(tmp_path: Path) -> None:
+    preview_path = tmp_path / "preview.png"
+    output_path = tmp_path / "stamp_debug.png"
+    Image.new("RGBA", (120, 60), color=(255, 255, 255, 255)).save(preview_path)
+
+    error = _write_stamp_debug_overlay(
+        preview_image_path=str(preview_path),
+        output_path=str(output_path),
+        stamp_band_bounds={"x": 10, "y": 12, "width": 50, "height": 18},
+        stamp_pixmap_bounds={"x": 14, "y": 14, "width": 32, "height": 12},
+        stamp_content_bounds={"x": 18, "y": 16, "width": 20, "height": 8},
+        crop_padding=6,
+    )
+
+    assert error is None
+    assert output_path.exists() is True
+
+
+def test_widget_is_visible_supports_real_and_fake_widget_shapes() -> None:
+    fake_widget = type("_FakeWidget", (), {"visible": False})()
+    qt_like_widget = type(
+        "_QtLikeWidget",
+        (),
+        {"isVisible": lambda self: True},
+    )()
+
+    assert _widget_is_visible(fake_widget) is False
+    assert _widget_is_visible(qt_like_widget) is True
+    assert _widget_is_visible(object()) is True
+
+
+def test_preview_matrix_error_result_records_scenario_name_and_error_type() -> None:
+    result = preview_matrix_error_result(
+        scenario={"name": "Broken Scenario", "profile_name": "Saved Profile"},
+        error=ValueError("bad border width"),
+    )
+
+    assert result == {
+        "name": "Broken Scenario",
+        "profile_name": "Saved Profile",
+        "error": "bad border width",
+        "error_type": "ValueError",
+    }
+
+
+def test_preview_matrix_diagnostic_summary_counts_text_risks() -> None:
+    summary = preview_matrix_diagnostic_summary(
+        [
+            {
+                "preview_snapshot": {
+                    "can_submit": True,
+                    "render_capture": {
+                        "text_content_clipped_in_preview": True,
+                        "text_content_overlaps_stamp_band": False,
+                        "text_content_overlaps_stamp_content": False,
+                        "stamp_content_within_warning_distance": True,
+                        "stamp_content_touches_band_edge": False,
+                    },
+                }
+            },
+            {
+                "preview_snapshot": {
+                    "can_submit": False,
+                    "render_capture": {
+                        "text_content_clipped_in_preview": False,
+                        "text_content_overlaps_stamp_band": True,
+                        "text_content_overlaps_stamp_content": False,
+                        "stamp_content_within_warning_distance": False,
+                        "stamp_content_touches_band_edge": True,
+                    },
+                }
+            },
+            {"error": "boom"},
+        ]
+    )
+
+    assert summary == {
+        "text_clipping_risk_scenario_count": 1,
+        "signable_text_clipping_risk_scenario_count": 1,
+        "rejected_text_clipping_risk_scenario_count": 0,
+        "text_stamp_overlap_risk_scenario_count": 1,
+        "signable_text_stamp_overlap_risk_scenario_count": 0,
+        "rejected_text_stamp_overlap_risk_scenario_count": 1,
+        "stamp_warning_scenario_count": 1,
+        "signable_stamp_warning_scenario_count": 1,
+        "rejected_stamp_warning_scenario_count": 0,
+        "stamp_edge_touch_scenario_count": 1,
+        "signable_stamp_edge_touch_scenario_count": 0,
+        "rejected_stamp_edge_touch_scenario_count": 1,
+    }
+
+
+def test_widget_application_returns_none_when_pyside_is_unavailable(
+    monkeypatch,
+) -> None:
+    real_import_module = importlib.import_module
+
+    def _fake_import_module(name: str, package: str | None = None):
+        if name == "PySide6.QtWidgets":
+            raise ModuleNotFoundError(name)
+        return real_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", _fake_import_module)
+
+    assert _widget_application(object()) is None
+
+
+def test_load_preview_matrix_manifest_accepts_object_or_array(tmp_path: Path) -> None:
+    object_manifest = tmp_path / "object.json"
+    array_manifest = tmp_path / "array.json"
+    object_manifest.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "name": "Compact Top",
+                        "signature_rect": {
+                            "page_index": 0,
+                            "left_pt": 1,
+                            "bottom_pt": 2,
+                            "width_pt": 3,
+                            "height_pt": 4,
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    array_manifest.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "Compact Bottom",
+                    "signature_rect": {
+                        "page_index": 0,
+                        "left_pt": 1,
+                        "bottom_pt": 2,
+                        "width_pt": 3,
+                        "height_pt": 4,
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        _load_preview_matrix_manifest(str(object_manifest))["scenarios"][0]["name"] == "Compact Top"
+    )
+    assert (
+        _load_preview_matrix_manifest(str(array_manifest))["scenarios"][0]["name"]
+        == "Compact Bottom"
+    )
+
+
+def test_stress_preview_manifests_exist_and_parse() -> None:
+    _require_local_artifact_paths(*LOCAL_PREVIEW_STRESS_MANIFESTS)
+    for path in LOCAL_PREVIEW_STRESS_MANIFESTS:
+        manifest = _load_preview_matrix_manifest(str(path))
+        assert manifest["scenarios"]
+
+
+def test_execute_signed_acceptance_scenario_delegates_to_scenario_executor(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeExecutor:
+        def run_result(self, **kwargs):
+            captured.update(kwargs)
+            return {"name": "Scenario A", "signing_result": {"success": True}}
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_build_signed_acceptance_scenario_executor",
+        lambda: FakeExecutor(),
+    )
+
+    summary = interactive_harness_module._execute_signed_acceptance_scenario(
+        workspace="workspace",
+        scenario={"name": "Scenario A"},
+        profile_store="profiles",
+        artifacts_dir=tmp_path,
+        base_input_path=tmp_path / "fixture.pdf",
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        sign_executor="executor",
+    )
+
+    assert summary == {"name": "Scenario A", "signing_result": {"success": True}}
+    assert captured == {
+        "workspace": "workspace",
+        "scenario": {"name": "Scenario A"},
+        "profile_store": "profiles",
+        "artifacts_dir": tmp_path,
+        "base_input_path": tmp_path / "fixture.pdf",
+        "certificate_path": str(tmp_path / "cert.p12"),
+        "passphrase": "secret",
+        "sign_executor": "executor",
+    }
+
+
+def test_private_composition_surface_uses_neutral_evidence_names() -> None:
+    legacy_prefix = "phase" + "3"
+    for legacy_name in (
+        f"_build_live_{legacy_prefix}_harness_workspace",
+        f"_build_qt_{legacy_prefix}_harness_workspace",
+        f"_build_{legacy_prefix}_signed_acceptance_scenario_executor",
+        f"_build_{legacy_prefix}_signed_output_snapshotter",
+        f"_build_{legacy_prefix}_signed_output_render_snapshotter",
+        f"_build_{legacy_prefix}_appearance_snapshotter",
+        f"_build_{legacy_prefix}_sign_time_diagnostics_snapshotter",
+        f"_derive_{legacy_prefix}_auto_checked_items",
+    ):
+        assert not hasattr(interactive_harness_module, legacy_name)
+
+    assert hasattr(interactive_harness_module, "_build_live_evidence_workspace")
+    assert hasattr(interactive_harness_module, "_build_signed_acceptance_scenario_executor")
+    assert hasattr(interactive_harness_module, "_build_signed_output_snapshotter")
+
+
+def test_snapshot_successful_signed_output_delegates_to_shared_snapshotter(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+    output_file = tmp_path / "signed.pdf"
+    output_file.write_bytes(b"%PDF-1.7\n")
+
+    class FakeSnapshotter:
+        def snapshot_successful_signed_output(self, **kwargs):
+            captured.update(kwargs)
+            return {"output_file_exists": True, "output_signature_count": 1}
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_build_signed_output_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = interactive_harness_module._snapshot_successful_signed_output(
+        output_file=output_file,
+        page_index=2,
+        preview_snapshot={"preview": True},
+        preview_text="Preview text",
+        trust_policy=None,
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_case",
+    )
+
+    assert summary == {"output_file_exists": True, "output_signature_count": 1}
+    assert captured == {
+        "output_file": output_file,
+        "page_index": 2,
+        "preview_snapshot": {"preview": True},
+        "preview_text": "Preview text",
+        "trust_policy": None,
+        "artifacts_dir": str(tmp_path),
+        "artifact_basename": "signed_case",
+    }
+
+
+def test_snapshot_signed_output_render_delegates_to_render_snapshotter(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeSnapshotter:
+        def run(self, **kwargs):
+            captured.update(kwargs)
+            return {"page_number": 1, "comparison_path": "cmp.png"}
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_build_signed_output_render_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = interactive_harness_module._snapshot_signed_output_render(
+        output_pdf_path=str(tmp_path / "signed.pdf"),
+        page_index=0,
+        preview_snapshot={"preview": True},
+        preview_text="Preview text",
+        output_visible_appearance_snapshot={"annotation_rect": [1, 2, 3, 4]},
+        artifacts_dir=str(tmp_path),
+        artifact_basename="signed_case",
+    )
+
+    assert summary == {"page_number": 1, "comparison_path": "cmp.png"}
+    assert captured == {
+        "output_pdf_path": str(tmp_path / "signed.pdf"),
+        "page_index": 0,
+        "preview_snapshot": {"preview": True},
+        "preview_text": "Preview text",
+        "output_visible_appearance_snapshot": {"annotation_rect": [1, 2, 3, 4]},
+        "artifacts_dir": str(tmp_path),
+        "artifact_basename": "signed_case",
+    }
+
+
+def test_preview_appearance_snapshot_from_capture_delegates_to_snapshotter(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeSnapshotter:
+        def preview_appearance_snapshot_from_capture(self, **kwargs):
+            captured.update(kwargs)
+            return "preview-snapshot"
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_build_appearance_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = interactive_harness_module._preview_appearance_snapshot_from_capture(
+        preview_snapshot={"preview": True}
+    )
+
+    assert summary == "preview-snapshot"
+    assert captured == {"preview_snapshot": {"preview": True}}
+
+
+def test_signed_output_appearance_snapshot_delegates_to_snapshotter(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeSnapshotter:
+        def signed_output_appearance_snapshot(self, **kwargs):
+            captured.update(kwargs)
+            return "signed-snapshot"
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_build_appearance_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = interactive_harness_module._signed_output_appearance_snapshot(
+        normalized_image_path="signed.png",
+        normalized_image_size={"width": 320, "height": 42},
+        text_bounds_px={"x": 1, "y": 2, "width": 3, "height": 4},
+        line_bounds_px=(),
+        visible_appearance_snapshot={"annotation_rect": [1, 2, 3, 4]},
+        preview_snapshot={"preview": True},
+    )
+
+    assert summary == "signed-snapshot"
+    assert captured == {
+        "normalized_image_path": "signed.png",
+        "normalized_image_size": {"width": 320, "height": 42},
+        "text_bounds_px": {"x": 1, "y": 2, "width": 3, "height": 4},
+        "line_bounds_px": (),
+        "visible_appearance_snapshot": {"annotation_rect": [1, 2, 3, 4]},
+        "preview_snapshot": {"preview": True},
+    }
+
+
+def test_snapshot_sign_time_fit_diagnostics_delegates_to_snapshotter(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeSnapshotter:
+        def snapshot(self, **kwargs):
+            captured.update(kwargs)
+            return "sign-time-diagnostics"
+
+    monkeypatch.setattr(
+        interactive_harness_module,
+        "_build_sign_time_diagnostics_snapshotter",
+        lambda: FakeSnapshotter(),
+    )
+
+    summary = interactive_harness_module._snapshot_sign_time_fit_diagnostics(
+        preview_render_capture={"preview": True},
+        backend_reservation_snapshot={"backend": True},
+    )
+
+    assert summary == "sign-time-diagnostics"
+    assert captured == {
+        "preview_render_capture": {"preview": True},
+        "backend_reservation_snapshot": {"backend": True},
+    }
+
+
+def test_capture_headless_preview_render_clears_top_stamp_edge_warning_for_sparse_multi_line(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        certificate_alias="signing-cert",
+    )
+    stamp_path = tmp_path / "tall_stamp.png"
+    Image.new("RGBA", (12, 32), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.MULTI_LINE,
+            stamp_position=SignatureStampPosition.TOP,
+            show_field_names=False,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="2026-04-17 02:15:53 UTC",
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=260.0, height_pt=46.0))
+
+    render_capture = _capture_headless_preview_render(
+        preview=workflow.preview(),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="top_stamp_sparse",
+    )
+
+    assert render_capture["stamp_content_touches_band_edge"] is False
+    assert render_capture["stamp_content_within_warning_distance"] is False
+    assert render_capture["stamp_content_min_edge_distance_px"] is not None
+    assert render_capture["stamp_content_min_edge_distance_px"] > 0
+
+
+def test_capture_headless_preview_render_clears_bottom_stamp_edge_warning_for_sparse_wrapped_block(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        certificate_alias="signing-cert",
+    )
+    stamp_path = tmp_path / "bottom_tall_stamp.png"
+    Image.new("RGBA", (12, 40), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.BOTTOM,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=260.0, height_pt=54.0))
+
+    render_capture = _capture_headless_preview_render(
+        preview=workflow.preview(),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="bottom_stamp_sparse",
+    )
+
+    assert render_capture["stamp_content_touches_band_edge"] is False
+    assert render_capture["stamp_content_within_warning_distance"] is False
+    assert render_capture["stamp_content_min_edge_distance_px"] is not None
+    assert render_capture["stamp_content_min_edge_distance_px"] > 0
+
+
+def test_capture_headless_preview_render_clears_right_stamp_edge_warning_for_sparse_wrapped_block(
+    tmp_path: Path,
+) -> None:
+    workflow = SigningDraftWorkflow(
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "output.pdf"),
+        certificate_path=str(tmp_path / "cert.p12"),
+        passphrase="secret",
+        tsa_url="https://tsa.example.invalid",
+        timestamp_required=False,
+        certificate_alias="signing-cert",
+    )
+    stamp_path = tmp_path / "right_script_stamp.png"
+    Image.new("RGBA", (40, 12), color=(0, 0, 0, 255)).save(stamp_path)
+    workflow.set_signature_appearance(
+        build_signature_appearance(
+            signer_label_prefix="Digitally signed by",
+            layout_template=SignatureLayoutTemplate.WRAPPED_BLOCK,
+            stamp_position=SignatureStampPosition.RIGHT,
+            show_field_names=True,
+            image_stamp_path=str(stamp_path),
+            distinguished_name=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            common_name=build_signature_field_binding(
+                source=SignatureFieldSource.OVERRIDE,
+                show_in_visible_appearance=True,
+                override_text="Preview Sweep User",
+            ),
+            email=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            title=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            company=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            signing_time=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            reason=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+            location=build_signature_field_binding(
+                source=SignatureFieldSource.HIDDEN,
+                show_in_visible_appearance=False,
+            ),
+        )
+    )
+    workflow.set_signature_rect(build_signature_rect(page_index=0, width_pt=220.0, height_pt=62.0))
+
+    render_capture = _capture_headless_preview_render(
+        preview=workflow.preview(),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="right_stamp_sparse",
+    )
+
+    assert render_capture["stamp_content_touches_band_edge"] is False
+    assert render_capture["stamp_content_within_warning_distance"] is False
+    assert render_capture["stamp_content_min_edge_distance_px"] is not None
+    assert render_capture["stamp_content_min_edge_distance_px"] > 0
+
+
+def test_signed_acceptance_manifest_exists_and_parses() -> None:
+    _require_local_artifact_paths(Path(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST))
+    manifest = _load_preview_matrix_manifest(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST)
+
+    assert len(manifest["scenarios"]) >= 9
+    assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+    assert manifest["fixture_role"] == "signed_acceptance"
+    assert manifest["timestamping_mode"] == "dummy"
+    assert manifest["acceptance_expectations"]["minimum_successful_signing_run_count"] >= 6
+    assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] >= 3
+    assert any("single_line" in scenario["name"] for scenario in manifest["scenarios"])
+    assert any("multi_line" in scenario["name"] for scenario in manifest["scenarios"])
+    assert any("wrapped_block" in scenario["name"] for scenario in manifest["scenarios"])
+    assert all(
+        scenario.get("expected_outcome") in {"success", "validation_rejection"}
+        for scenario in manifest["scenarios"]
+    )
+    assert any(scenario.get("timestamp_required") is True for scenario in manifest["scenarios"])
+
+
+def test_signed_acceptance_fixture_assets_exist_and_are_parseable() -> None:
+    _require_local_artifact_paths(
+        Path(SIGNED_ACCEPTANCE_FIXTURE_PDF),
+        Path(SIGNED_ACCEPTANCE_IDENTITY_P12),
+    )
+    fixture_pdf = Path(SIGNED_ACCEPTANCE_FIXTURE_PDF)
+    fixture_identity = Path(SIGNED_ACCEPTANCE_IDENTITY_P12)
+
+    assert fixture_pdf.exists()
+    assert fixture_identity.exists()
+
+    with fixture_pdf.open("rb") as handle:
+        reader = PdfFileReader(handle)
+        assert len(list(reader.root["/Pages"]["/Kids"])) >= 1
+
+
+def test_stress_preview_manifests_reference_stress_fixture_profile() -> None:
+    _require_local_artifact_paths(*LOCAL_PREVIEW_STRESS_MANIFESTS)
+    for path in LOCAL_PREVIEW_STRESS_MANIFESTS:
+        payload = json.loads(path.read_text())
+        assert payload["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+        assert all(
+            scenario["appearance_overrides"].get(
+                "fixture_profile",
+                STRESS_VISIBLE_APPEARANCE_PROFILE,
+            )
+            == STRESS_VISIBLE_APPEARANCE_PROFILE
+            for scenario in payload["scenarios"]
+        )
+
+
+def test_single_line_stress_manifest_includes_required_dense_field_sets() -> None:
+    manifest_path = LOCAL_PREVIEW_SWEEP_ASSETS_DIR / "single_line_full_matrix_stress.json"
+    _require_local_artifact_paths(manifest_path)
+    payload = json.loads(manifest_path.read_text())
+    field_sets = {
+        tuple(scenario["appearance_overrides"]["visible_fields"])
+        for scenario in payload["scenarios"]
+    }
+    assert ("common_name", "email", "signing_time") in field_sets
+    assert ("common_name", "title", "company", "signing_time") in field_sets
+    assert (
+        "common_name",
+        "email",
+        "title",
+        "company",
+        "signing_time",
+        "location",
+        "reason",
+    ) in field_sets
+
+
+def test_signed_acceptance_manifest_includes_required_positive_and_negative_families() -> None:
+    _require_local_artifact_paths(Path(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST))
+    payload = json.loads(Path(SIGNED_ACCEPTANCE_SCENARIO_MANIFEST).read_text())
+    names = [scenario["name"] for scenario in payload["scenarios"]]
+    expected_outcomes = {
+        scenario["name"]: scenario["expected_outcome"] for scenario in payload["scenarios"]
+    }
+
+    assert "single_line_top_label_success" in names
+    assert "single_line_bottom_label_success" in names
+    assert "single_line_left_label_reject" in names
+    assert "multi_line_top_medium_success" in names
+    assert "multi_line_bottom_medium_success" in names
+    assert "multi_line_right_medium_reject" in names
+    assert "wrapped_block_left_plain_success" in names
+    assert "wrapped_block_right_plain_reject" in names
+    assert "wrapped_block_top_plain_success" in names
+    assert expected_outcomes["single_line_left_label_reject"] == "validation_rejection"
+    assert expected_outcomes["multi_line_right_medium_reject"] == "validation_rejection"
+    assert expected_outcomes["wrapped_block_right_plain_reject"] == "validation_rejection"
+
+
+def test_signed_preview_parity_manifest_exists_and_parses() -> None:
+    _require_local_artifact_paths(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST))
+    manifest = _load_preview_matrix_manifest(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST)
+
+    assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+    assert manifest["fixture_role"] == "signed_preview_parity"
+    assert manifest["timestamping_mode"] == "dummy"
+    assert manifest["acceptance_expectations"]["scenario_count"] >= 17
+    assert (
+        manifest["acceptance_expectations"]["minimum_successful_signing_run_count"]
+        == manifest["acceptance_expectations"]["scenario_count"]
+    )
+    assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] == 0
+    assert all(scenario.get("expected_outcome") == "success" for scenario in manifest["scenarios"])
+
+
+def test_signed_preview_parity_manifest_covers_layout_families_and_positions() -> None:
+    _require_local_artifact_paths(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST))
+    payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
+    names = {scenario["name"] for scenario in payload["scenarios"]}
+    positions = {
+        scenario["appearance_overrides"]["stamp_position"] for scenario in payload["scenarios"]
+    }
+    families = {
+        scenario["appearance_overrides"]["layout_template"] for scenario in payload["scenarios"]
+    }
+
+    assert families == {"single_line", "multi_line", "wrapped_block"}
+    assert {"top", "bottom", "left", "right"} <= positions
+    assert "single_line_top_no_stamp_sparse_large" in names
+    assert "single_line_bottom_no_stamp_sparse_relaxed" in names
+    assert "single_line_left_stamp_sparse_relaxed" in names
+    assert "single_line_right_no_stamp_sparse_relaxed" in names
+    assert "multi_line_bottom_sparse_large" in names
+    assert "multi_line_top_medium_relaxed" in names
+    assert "multi_line_bottom_medium_relaxed" in names
+    assert "wrapped_block_left_sparse_large" in names
+    assert "multi_line_right_medium_large" in names
+    assert "wrapped_block_top_sparse_relaxed" in names
+    assert "wrapped_block_right_medium_relaxed" in names
+    assert "single_line_left_stamp_sparse_large" not in names
+    assert "single_line_right_stamp_sparse_large" not in names
+    assert "wrapped_block_top_dense_large" not in names
+
+
+def test_signed_preview_parity_manifest_excludes_stale_horizontal_replay_ladder() -> None:
+    _require_local_artifact_paths(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST))
+    payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
+    names = {scenario["name"] for scenario in payload["scenarios"]}
+    stale_success_names = {
+        "single_line_left_stamp_manual_replay_06_minimum_success",
+        "single_line_left_stamp_manual_replay_07_success",
+        "single_line_left_stamp_manual_replay_08_roomy_success",
+        "single_line_right_stamp_manual_replay_07_short_height_success",
+        "single_line_left_stamp_manual_replay_08_short_height_success",
+    }
+
+    assert payload["acceptance_expectations"]["scenario_count"] == len(payload["scenarios"])
+    assert names.isdisjoint(stale_success_names)
+
+
+def test_signed_fit_rejection_manifest_exists_and_parses() -> None:
+    _require_local_artifact_paths(Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST))
+    manifest = _load_preview_matrix_manifest(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST)
+
+    assert manifest["fixture_profile"] == STRESS_VISIBLE_APPEARANCE_PROFILE
+    assert manifest["fixture_role"] == "signed_fit_rejection"
+    assert manifest["timestamping_mode"] == "dummy"
+    assert manifest["acceptance_expectations"]["scenario_count"] >= 3
+    assert manifest["acceptance_expectations"]["expected_intentional_rejection_count"] == len(
+        manifest["scenarios"]
+    )
+    assert manifest["acceptance_expectations"].get("minimum_successful_signing_run_count", 0) == 0
+    assert all(
+        scenario.get("expected_outcome") == "validation_rejection"
+        for scenario in manifest["scenarios"]
+    )
+
+
+def test_signed_fit_rejection_manifest_covers_known_boundary_failures() -> None:
+    _require_local_artifact_paths(Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST))
+    payload = json.loads(Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST).read_text())
+    names = {scenario["name"] for scenario in payload["scenarios"]}
+
+    assert names == {
+        "single_line_left_stamp_sparse_large",
+        "single_line_right_stamp_sparse_large",
+        "wrapped_block_top_dense_large",
+    }
+
+
+def test_signed_parity_and_rejection_manifests_are_disjoint() -> None:
+    _require_local_artifact_paths(
+        Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST),
+        Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST),
+    )
+    parity_payload = json.loads(Path(SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST).read_text())
+    rejection_payload = json.loads(Path(SIGNED_FIT_REJECTION_SCENARIO_MANIFEST).read_text())
+
+    parity_names = {scenario["name"] for scenario in parity_payload["scenarios"]}
+    rejection_names = {scenario["name"] for scenario in rejection_payload["scenarios"]}
+
+    assert parity_names.isdisjoint(rejection_names)
+
+
+def test_stress_preview_manifests_preserve_expected_family_variants() -> None:
+    _require_local_artifact_paths(*LOCAL_PREVIEW_STRESS_MANIFESTS)
+    expectations = {
+        "multi_line_full_matrix_stress.json": {
+            "field_sets": {
+                ("common_name", "email", "signing_time"),
+                ("common_name", "title", "company", "signing_time"),
+                (
+                    "common_name",
+                    "email",
+                    "title",
+                    "company",
+                    "signing_time",
+                    "location",
+                    "reason",
+                ),
+            },
+            "label_tokens": {"_label_", "_nolabel_"},
+        },
+        "wrapped_block_full_matrix_stress.json": {
+            "field_sets": {
+                ("common_name", "email", "signing_time"),
+                ("common_name", "title", "company", "signing_time"),
+                (
+                    "common_name",
+                    "email",
+                    "title",
+                    "company",
+                    "signing_time",
+                    "location",
+                    "reason",
+                ),
+            },
+            "label_tokens": {"_label_", "_nolabel_"},
+            "name_tokens": {"_named", "_plain"},
+        },
+    }
+    for manifest_name, expectation in expectations.items():
+        payload = json.loads((LOCAL_PREVIEW_SWEEP_ASSETS_DIR / manifest_name).read_text())
+        names = [scenario["name"] for scenario in payload["scenarios"]]
+        field_sets = {
+            tuple(scenario["appearance_overrides"]["visible_fields"])
+            for scenario in payload["scenarios"]
+        }
+        assert expectation["field_sets"].issubset(field_sets)
+        for token in expectation["label_tokens"]:
+            assert any(token in name for name in names)
+        for token in expectation.get("name_tokens", set()):
+            assert any(token in name for name in names)
+
+
+def test_pdf_snapshotter_extracts_visible_appearance_facts(
+    tmp_path: Path,
+) -> None:
+    output_pdf = _write_signed_test_pdf(tmp_path)
+
+    snapshot = AcceptancePdfSignatureSnapshotter().snapshot_visible_signature_appearance(output_pdf)
+
+    assert snapshot is not None
+    assert snapshot["field_name"] == "Signature1"
+    assert snapshot["annotation_rect"] == [24.0, 18.0, 564.0, 138.0]
+    assert snapshot["appearance_stream_length"] > 0
+    assert snapshot["appearance_has_visible_text"] is True
+    assert snapshot["visible_text_present"] is True
+    fragments = snapshot["appearance_text_fragments"]
+    assert snapshot["text_fragments"] == fragments
+    assert any("Digitally signed by" in fragment for fragment in fragments)
+    assert any("Test User" in fragment for fragment in fragments)
+    assert snapshot["appearance_image_xobject_count"] >= 1
+    assert snapshot["appearance_xobjects"]
+    assert snapshot["image_xobjects"] == snapshot["appearance_xobjects"]
+    assert snapshot["annotation_rect_size"] == {"width": 540.0, "height": 120.0}
+    assert snapshot["text_fragment_count"] == len(fragments)
+    assert snapshot["image_xobject_count"] == snapshot["appearance_image_xobject_count"]
+
+
+def test_render_signed_annotation_appearance_direct_writes_nonblank_image(
+    tmp_path: Path,
+) -> None:
+    output_pdf = _write_signed_test_pdf(tmp_path)
+
+    render = _render_signed_annotation_appearance_direct(
+        output_pdf_path=str(output_pdf),
+        artifacts_dir=str(tmp_path),
+        artifact_basename="direct_appearance",
+    )
+
+    assert render["error"] is None
+    assert render["image_path"] is not None
+    image = Image.open(render["image_path"]).convert("RGBA")
+    white = Image.new("RGBA", image.size, (255, 255, 255, 255))
+    flattened = Image.alpha_composite(white, image)
+    assert any(pixel[:3] != (255, 255, 255) for pixel in flattened.getdata())

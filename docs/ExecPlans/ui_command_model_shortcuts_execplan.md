@@ -24,7 +24,7 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
 
 - [x] (2026-08-09) Audit the current implementation and write failing focused tests for the File command foundation.
 - [x] (2026-08-09) Implement the typed File command registry and lifecycle application/Qt path.
-- [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the command-model seams was met, so no unrelated removal was mixed into this slice.
+- [x] (2026-08-09) Review migrated compatibility and acceptance product cruft; no retirement condition in the command-model seams was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and real-Qt validation; record evidence and clean up.
 - [x] (2026-08-09) Historical broad completion gate superseded by dependency-ordered command slices;
   each completed increment now reconciles its owning architecture/status records and commit evidence.
@@ -292,7 +292,7 @@ readiness, sign/save, verify, and reopen. This slice must preserve the V1 anti-g
 printing, general PDF editing, cloud workflow, broad trust administration, or multiple pending
 signatures.
 
-The words “compatibility surface” mean an adapter kept only for old callers. “phase3” names identify
+The words “compatibility surface” mean an adapter kept only for old callers. “acceptance” names identify
 legacy evidence/harness infrastructure and must not appear in ordinary product-facing UI or new
 primary contracts; production backend/evidence imports may be renamed only after a neutral migration
 proves the old name is no longer required.

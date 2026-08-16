@@ -16,7 +16,7 @@ def test_adapter_import_does_not_load_backend_or_heavy_runtime() -> None:
     script = """
 import sys
 import foliaseal.application.visible_signature_fit_validator
-blocked = ('foliaseal.application.phase3_signing_backend', 'pyhanko', 'PIL', 'PyQt', 'PySide6')
+blocked = ('foliaseal.application.signing_backend', 'pyhanko', 'PIL', 'PyQt', 'PySide6')
 loaded = sorted(
     name for name in sys.modules
     if any(name == prefix or name.startswith(prefix + '.') for prefix in blocked)
@@ -48,5 +48,5 @@ def test_missing_certificate_preserves_no_fit_issue_behavior(tmp_path: Path) -> 
 
 def test_workflow_uses_typed_validator_without_backend_import() -> None:
     source = inspect.getsource(signing_draft_workflow)
-    assert "phase3_signing_backend" not in source
+    assert "signing_backend" not in source
     assert "BackendVisibleSignatureFitValidator" in source

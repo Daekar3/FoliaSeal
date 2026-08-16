@@ -117,7 +117,7 @@ headless tests never open a browser. “Active signing” means the signing acti
 non-cancellable transaction state; inspect the existing signing action/state boundary rather than
 inventing a second flag.
 
-The ordinary product vocabulary is used in this slice. Do not add `phase3` names to product-facing
+The ordinary product vocabulary is used in this slice. Do not add `acceptance` names to product-facing
 code, new public contracts, or UI text; existing evidence/harness names are outside this slice.
 
 ## Change Slice

@@ -6,7 +6,7 @@ implement the frozen product contract in docs/SPEC.md and docs/UI_SPEC.md.
 
 In this document, AFK means “agent can implement and validate without a pending human product
 decision.” A Qt port is a small typed interface between application behavior and Qt widgets. A
-compatibility surface is an adapter retained only for old callers. “phase3” is legacy evidence or
+compatibility surface is an adapter retained only for old callers. “acceptance” is legacy evidence or
 harness nomenclature, not a product feature name. A vertical slice is one complete path from stored
 data through application logic and the GUI to a user-observable result. A red test is a focused test
 that fails before the behavior exists; green means it passes after implementation. CRUD means create,
@@ -26,11 +26,11 @@ is merely a horizontal refactor.
 
 The governing documents are already written and frozen. This plan implements their requirements; it
 does not silently revise them. The persistent model remains governed by docs/SCHEMAS.md. Existing
-compatibility paths, manual-assembly paths, and product-facing phase3 labels may be removed when a
+compatibility paths, manual-assembly paths, and product-facing acceptance labels may be removed when a
 child migrates their consumers, provided the child records the retirement evidence.
 
 This parent and its 31 `ui_*` children are the active UI implementation corpus. Older `gui_*`,
-`phase3_*`, and completed migration plans elsewhere in `docs/ExecPlans/` are historical records or
+`acceptance_*`, and completed migration plans elsewhere in `docs/ExecPlans/` are historical records or
 superseded slices unless this parent names them as a prerequisite. Their retrospective dependency
 notes are not additional execution edges; do not select one as active work without first marking its
 status and reconciling it with this parent.
@@ -152,7 +152,7 @@ Placement, preview, and signing tranche:
   preview/signing parity, managed-image alpha policy, bundled-font glyph guidance, exact-fit
   blocking, frozen-time reuse across unchanged preview refreshes, and public readiness walkthrough
   are implemented and validated; display-backed accessibility/DPI/monitor, package-manager, and
-  legacy phase3 compatibility/nomenclature gates remain open.
+  legacy acceptance compatibility/nomenclature gates remain open.
 - [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — typed ordered readiness
   projection and action vocabulary landed in the current slice; document-safety source gating is
@@ -220,7 +220,7 @@ Release tranche:
   ready state, repeated refresh with frozen signing time, request-timestamp equality, and cleanup.
   The full suite is `1482 passed, 20 skipped, 1 warning`, with Ruff, `pip check`, and
   `git diff --check` clean. Display-backed screen-reader/high-contrast/DPI/monitor, package-manager
-  installation, and legacy phase3 compatibility/nomenclature retirement remain open; this is not
+  installation, and legacy acceptance compatibility/nomenclature retirement remain open; this is not
   full release compliance.
 - [x] (2026-08-09) Added requirement traceability, exact live paths, executable validation commands,
   schema/SVG ownership, and milestone/evidence requirements before implementation.
@@ -552,7 +552,7 @@ Release tranche:
 - [x] (2026-08-10) Closed the viewer keyboard-contract correction: fake and real offscreen Qt
   evidence proves bare Home/End are not consumed or rendered as page jumps, while Ctrl+Home/End
   perform exactly one first/last-page transition. The combined viewer/navigation validation is
-  `47 passed`; unrelated display-backed, package-install, and phase3 nomenclature gates remain open.
+  `47 passed`; unrelated display-backed, package-install, and acceptance nomenclature gates remain open.
 - [x] (2026-08-15) Completed the typed View → Pan increment: `AppFrameCommandId.PAN` is registered
   without a shortcut, disabled until a workspace is open, and routed exactly once through the
   public session port. Focused tests prove Pan exits text mode without mutating placement; a real
@@ -571,9 +571,9 @@ Release tranche:
   Evidence: current files include app_frame.py, viewer_widget.py, reusable_signing_models.py,
   certificate-management dialogs, and signing-workspace modules, while UI_SPEC.md still requires
   a modeless three-column Library, fixed signing rail, and keyboard-equivalent workflows.
-- Observation: existing phase3-named modules are primarily evidence/harness infrastructure rather
+- Observation: existing acceptance-named modules are primarily evidence/harness infrastructure rather
   than the user-facing product path.
-  Evidence: phase3-prefixed files occur under application evidence and Qt acceptance tooling.
+  Evidence: acceptance-prefixed files occur under application evidence and Qt acceptance tooling.
   Their product-facing labels must not leak into the V1 UI; migrations must preserve evidence meaning
   while removing obsolete nomenclature where safe.
 - Observation: the first live implementation loop completed with real-Qt offscreen evidence, while
@@ -627,11 +627,11 @@ Release tranche:
   delete unrelated files; the current slice now protects in-memory drafts and secrets without
   overstating restart recovery.
   Date/Author: 2026-08-09 / Codex
-- Decision: remove legacy compatibility and product-facing phase3 cruft only after each migration
+- Decision: remove legacy compatibility and product-facing acceptance cruft only after each migration
   proves its concrete callers are gone; retain or rename production evidence/backend imports in a
   separate neutral migration first.
   Rationale: SPEC.md prioritizes V1 clarity, but current fit validation and acceptance tooling still
-  import phase3-named modules, so a broad rename would break production behavior and evidence.
+  import acceptance-named modules, so a broad rename would break production behavior and evidence.
   Date/Author: 2026-08-09 / Codex
 - Decision: treat the current implementation mismatches recorded in child plans as explicit
   prerequisites, not assumptions hidden inside later GUI work.
@@ -783,10 +783,10 @@ Record exact observations in the child plan, update docs/ARCHITECTURE.md or READ
 their current statements become inaccurate, clean processes/dialogs/temp artifacts, and commit the
 narrow change. Check the corresponding child box here only after its acceptance criteria are met.
 
-The product-support/release child owns a separate neutralization audit for the phase3 backend and
+The product-support/release child owns a separate neutralization audit for the acceptance backend and
 evidence import graph. It must inventory every production and test consumer, add neutral names with
 temporary adapters, run import-isolation and acceptance tests, and record the deletion proof before
-any UI child removes a phase3-named module or command. UI children may remove only product-facing
+any UI child removes a acceptance-named module or command. UI children may remove only product-facing
 labels after that audit; they may not rename the backend opportunistically.
 
 ## Milestones
@@ -814,7 +814,7 @@ or system Qt.
     git status --short
     sed -n '1,360p' docs/SPEC.md
     sed -n '1,530p' docs/UI_SPEC.md
-    rg -n "phase3|compat|manual assembly|Signature Library|Sign and save" src tests docs
+    rg -n "acceptance|compat|manual assembly|Signature Library|Sign and save" src tests docs
 
 Do not begin the document-flow or reusable-object tranches until the foundation gate is green. Its
 observable proof is: `foliaseal gui` starts without a document; a restart preserves only the typed
@@ -888,7 +888,7 @@ no-op at the behavior boundary and must not reintroduce retired compatibility co
 Allowed child artifacts are focused tests, bounded local GUI screenshots or JSON evidence under
 ignored artifacts/, and documentation/status updates required to keep the repository truthful.
 Forbidden mixed changes include unrelated architecture scans, speculative V2 features, broad PDF
-editing, printing, cloud/trust administration, or new user-facing phase3 terminology.
+editing, printing, cloud/trust administration, or new user-facing acceptance terminology.
 
 ## Interfaces and Dependencies
 

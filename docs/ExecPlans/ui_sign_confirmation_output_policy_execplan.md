@@ -29,7 +29,7 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implement the smallest complete model/application/Qt path.
 - [x] (2026-08-10) Retain the `_paths_conflict` static wrapper because an existing test seam monkeypatches
   it; the wrapper delegates to the new neutral `paths_refer_to_same_file()` policy and is now an
-  explicitly documented compatibility boundary rather than dead product surface. No phase3 product
+  explicitly documented compatibility boundary rather than dead product surface. No acceptance product
   terminology was introduced or removed in this slice.
 - [x] (2026-08-10) Run focused, regression, and GUI validation; clean processes and artifacts:
   current focused confirmation/bridge/shell command is `136 passed`; the current full suite is
@@ -95,7 +95,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

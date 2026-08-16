@@ -798,7 +798,7 @@ def test_pyhanko_adapter_matches_existing_stamp_style_with_injected_horizontal_i
     monkeypatch,
     tmp_path,
 ) -> None:
-    from foliaseal.application import phase3_signing_backend as backend
+    from foliaseal.application import signing_backend as backend
     from foliaseal.application.horizontal_signature_reservation import (
         HorizontalSingleLineRenderedReference,
     )

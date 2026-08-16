@@ -154,7 +154,7 @@ the new Help resources/service, CLI parser/dispatch, command model/AppFrame bind
 PyInstaller/setuptools resource declarations, focused tests, architecture/ExecPlan status, and
 ignored temporary evidence. Do not mix diagnostics/log-folder implementation, rail/Library geometry,
 full packaging/release matrix work, new certificate/signing behavior, broad Markdown dependencies,
-or phase3-named product surfaces into this commit.
+or acceptance-named product surfaces into this commit.
 
 ## Plan of Work
 
@@ -173,7 +173,7 @@ optional topic ID, `--format markdown` (the default when a topic is supplied), a
 prints one stable line per topic in index order with ID and title. A topic prints exactly its canonical
 Markdown to stdout; `--path` prints only the resolved path. Missing topics, conflicting `--list`/
 topic, and unsupported path resources produce argparse-style errors and non-zero exit codes. Keep the
-existing phase2/phase3 command behavior unchanged, and add direct unit tests for parser/dispatch,
+existing phase2/acceptance command behavior unchanged, and add direct unit tests for parser/dispatch,
 unknown IDs, list order, Markdown exactness, and path output.
 
 Then add `HELP` to `AppFrameCommandId` and a `HELP_COMMAND_DEFINITIONS` tuple in

@@ -68,7 +68,7 @@ production interaction coverage.
 
 `src/foliaseal/application/document_links.py` remains Qt-free. `QtPdfRenderBackend.inspect_links()`
 is a concrete optional capability and may be adapted by the future safe-links viewer bridge. No
-URL launcher, subprocess, reload operation, history mutation, or product-facing phase3 terminology
+URL launcher, subprocess, reload operation, history mutation, or product-facing acceptance terminology
 may be introduced by this child.
 
 Revision note: 2026-08-10 / Codex. Created after the safe-links review found that QtPdf link

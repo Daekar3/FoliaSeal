@@ -1,4 +1,4 @@
-"""Deterministic preview rendering and semantic parity helpers for Phase 3."""
+"""Deterministic preview rendering and semantic parity helpers for Acceptance."""
 
 from __future__ import annotations
 

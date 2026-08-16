@@ -17,13 +17,13 @@ if TYPE_CHECKING:
         EvidenceMatrixRequest,
     )
     from foliaseal.presentation.qt.evidence_interactive_capture import (
-        Phase3HarnessCapture,
+        InteractiveHarnessCapture,
     )
 
 class CaptureOperation(Protocol):
     """Callable contract for one lazy interactive capture operation."""
 
-    def __call__(self, request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
+    def __call__(self, request: EvidenceCaptureRequest) -> InteractiveHarnessCapture:
         ...
 
 
@@ -42,7 +42,7 @@ class EvidenceHarnessRuntime:
     preview_matrix_operation: MatrixOperation
     signed_acceptance_matrix_operation: MatrixOperation
 
-    def capture(self, request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
+    def capture(self, request: EvidenceCaptureRequest) -> InteractiveHarnessCapture:
         return self.capture_operation(request)
 
     def preview_matrix(self, request: EvidenceMatrixRequest) -> Mapping[str, Any]:

@@ -1,4 +1,4 @@
-"""Phase 3 signing draft workflow and preview normalization."""
+"""Acceptance signing draft workflow and preview normalization."""
 
 from __future__ import annotations
 

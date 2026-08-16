@@ -8,22 +8,22 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from foliaseal.application.evidence_core import (
+    validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.evidence_ports import AssetGeneratorPort, MatrixRunnerPort
 from foliaseal.application.evidence_service import (
     EvidenceService,
 )
-from foliaseal.application.phase3_evidence_core import (
-    validate_signed_acceptance_matrix_summary,
-)
 from foliaseal.application.qa_evidence_contract import (
-    evaluate_phase3_evidence_contract,
+    evaluate_acceptance_evidence_contract,
 )
 from foliaseal.presentation.qt.evidence_runner_factories import (
     build_evidence_harness_runtime,
 )
 
 DEFAULT_SIGNED_ACCEPTANCE_EVIDENCE_SUMMARY_PATH = (
-    "artifacts/phase3_signed_acceptance_evidence_summary.md"
+    "artifacts/signed_acceptance_evidence_summary.md"
 )
 
 __all__ = [
@@ -139,7 +139,7 @@ def build_default_evidence_service(
             matrix_runner or runtime.signed_acceptance_matrix
         ),
         asset_generator=asset_generator,
-        capture_contract_evaluator=evaluate_phase3_evidence_contract,
+        capture_contract_evaluator=evaluate_acceptance_evidence_contract,
         text_writer=_write_evidence_markdown,
         matrix_runtime_context_factory=matrix_runtime_context,
     )

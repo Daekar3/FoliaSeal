@@ -77,7 +77,7 @@ workspace. Cancelled or failed actions leave the current document, draft, and se
   for the signing workflow.
   Date/Author: 2026-08-10 / Codex.
 - Decision: keep source-change recovery separate from URL activation, signing transaction artifacts,
-  and phase3 evidence nomenclature.
+  and acceptance evidence nomenclature.
   Rationale: each has a distinct ownership boundary and the product UI must use ordinary vocabulary.
   Date/Author: 2026-08-10 / Codex.
 
@@ -122,7 +122,7 @@ banner and polling hook.
 changed, missing, or unverifiable; it must not auto-reload or prevent ordinary navigation except by
 the existing readiness/signing gate. Reload/Locate must validate a candidate before disposing the
 current workspace. Ignore acknowledges the currently observed identity and leaves the mounted PDF
-as-is. Do not introduce product-facing `phase3` terminology.
+as-is. Do not introduce product-facing `acceptance` terminology.
 
 ## Change Slice
 

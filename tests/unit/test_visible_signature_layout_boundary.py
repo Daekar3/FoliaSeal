@@ -275,7 +275,7 @@ def test_compact_preview_derivation_is_prepared_once_and_memoized(tmp_path) -> N
 def test_horizontal_reservation_has_no_backend_private_color_dependency() -> None:
     source = inspect.getsource(horizontal_signature_reservation)
 
-    assert "phase3_signing_backend import _text_style_color_rgba" not in source
+    assert "signing_backend import _text_style_color_rgba" not in source
     assert "visible_signature_color import text_style_color_rgba" in source
 
 
@@ -289,7 +289,7 @@ def test_layout_module_uses_the_public_text_measurement_port() -> None:
 def test_layout_adapter_does_not_reach_back_into_signing_backend() -> None:
     source = inspect.getsource(visible_signature_layout_adapters)
 
-    assert "phase3_signing_backend" not in source
+    assert "signing_backend" not in source
 
 
 def test_artifact_adapter_owns_concrete_metrics_and_style_helpers() -> None:
@@ -315,12 +315,12 @@ def test_artifact_adapter_owns_concrete_metrics_and_style_helpers() -> None:
 
 def test_artifact_adapter_import_isolated_from_signing_backend() -> None:
     source = inspect.getsource(visible_signature_artifact_adapters)
-    assert "phase3_signing_backend" not in source
+    assert "signing_backend" not in source
 
     script = """
 import sys
 import foliaseal.application.visible_signature_artifact_adapters
-if 'foliaseal.application.phase3_signing_backend' in sys.modules:
+if 'foliaseal.application.signing_backend' in sys.modules:
     raise SystemExit('backend imported')
 """
     completed = subprocess.run(
@@ -376,7 +376,7 @@ blocked = (
     'PIL',
     'pyhanko',
     'PyQt',
-    'foliaseal.application.phase3_signing_backend',
+    'foliaseal.application.signing_backend',
 )
 loaded = sorted(
     name for name in sys.modules
@@ -404,8 +404,8 @@ if loaded:
     "imports",
     [
         "import foliaseal.application.visible_signature_layout_adapters\n"
-        "import foliaseal.application.phase3_signing_backend",
-        "import foliaseal.application.phase3_signing_backend\n"
+        "import foliaseal.application.signing_backend",
+        "import foliaseal.application.signing_backend\n"
         "import foliaseal.application.visible_signature_layout_adapters",
     ],
 )
@@ -425,11 +425,11 @@ def test_production_consumers_use_public_layout_adapter_names() -> None:
     workflow_source = inspect.getsource(signing_draft_workflow)
     qt_source = inspect.getsource(signature_preview_layout)
 
-    assert "phase3_signing_backend import (\n    RoundedBorderTextStampStyle" not in preview_source
+    assert "signing_backend import (\n    RoundedBorderTextStampStyle" not in preview_source
     assert "_stamp_background_for_path" not in preview_source
     assert "_visible_signature_fit_issues_for_stamp_text" not in workflow_source
     assert "_stamp_background_for_path" not in workflow_source
-    assert "phase3_signing_backend" not in qt_source
+    assert "signing_backend" not in qt_source
 
 
 @pytest.mark.parametrize(

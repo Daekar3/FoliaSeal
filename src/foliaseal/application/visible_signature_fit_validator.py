@@ -32,10 +32,10 @@ class BackendVisibleSignatureFitValidator:
         if not Path(self._certificate_path).exists():
             return ()
 
-        from foliaseal.application.phase3_signing_backend import (
+        from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+        from foliaseal.application.signing_backend import (
             validate_visible_signature_fit,
         )
-        from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
         from foliaseal.application.stamp_background import stamp_background_for_path
 
         try:

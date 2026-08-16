@@ -28,7 +28,7 @@ observable offscreen acceptance, not a generic refactor.
 - [x] (2026-08-09) Implement the smallest complete typed settings and Qt frame baseline.
 - [x] (2026-08-09) Audit the missing close-event persistence seam and define a main-frame-only geometry/restart correction.
 - [x] (2026-08-09) Add validated JSON geometry projection and restore/capture lifecycle hooks around the Qt event loop.
-- [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the named geometry/settings seams was met, so no unrelated removal was mixed into this slice.
+- [x] (2026-08-09) Review migrated compatibility and acceptance product cruft; no retirement condition in the named geometry/settings seams was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and offscreen Qt validation; record evidence and clean up.
 - [x] (2026-08-09) Updated relevant architecture/status documentation and this plan; the bounded
   implementation and validation are complete, with final acceptance owned by the release tranche.
@@ -90,7 +90,7 @@ readiness, sign/save, verify, and reopen. This slice must preserve the V1 anti-g
 printing, general PDF editing, cloud workflow, broad trust administration, or multiple pending
 signatures.
 
-The words “compatibility surface” mean an adapter kept only for old callers. “phase3” names identify
+The words “compatibility surface” mean an adapter kept only for old callers. “acceptance” names identify
 legacy evidence/harness infrastructure and must not appear in ordinary product-facing UI or new
 primary contracts; production backend/evidence imports may be renamed only after a neutral migration
 proves the old name is no longer required.

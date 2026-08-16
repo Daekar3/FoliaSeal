@@ -34,7 +34,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   creates a typed configuration without copying or changing the managed file, and refreshes the
   signing rail. Orphan configuration rows remain non-configurable and actionable only through
   their existing repair/delete surfaces.
-- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft. No new phase3 names or
+- [x] (2026-08-10) Reviewed compatibility and acceptance product cruft. No new acceptance names or
   compatibility wrappers were introduced; existing evidence contracts remain because their
   external consumers still exist. No safe retirement condition was met in this slice.
 - [x] (2026-08-10) Ran focused manager/dialog validation and repository hygiene checks. The final
@@ -84,7 +84,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

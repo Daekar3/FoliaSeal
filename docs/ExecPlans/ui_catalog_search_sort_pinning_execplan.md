@@ -54,7 +54,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Focused mutation/catalog/session tests pass: `22 passed`; Ruff and
   `git diff --check` are clean for the changed modules.
 - [x] (2026-08-10) Full regression passes: `1277 passed, 20 skipped, 1 warning in 48.66s`; the
-  warning is the pre-existing Pillow `Image.getdata` deprecation in `tests/unit/test_phase3_harness.py`.
+  warning is the pre-existing Pillow `Image.getdata` deprecation in `tests/unit/test_interactive_harness.py`.
 - [x] (2026-08-10) Bounded offscreen GUI launch reached the known isolated single-instance socket
   limitation (`SingleInstanceUnavailable`, exit code 1) before frame creation; process audit was
   empty and `/tmp/foliaseal-library-audit-BiU3I7` was removed.
@@ -118,7 +118,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

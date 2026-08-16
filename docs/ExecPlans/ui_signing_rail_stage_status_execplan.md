@@ -30,7 +30,7 @@ acceptance, not a generic refactor.
 - [x] (2026-08-09) Implement the bounded fixed-rail, protected-status, and typed recommended-action path.
 - [x] (2026-08-09) Re-audit commit 8cec447d0 and identify that its status region incorrectly contained interactive controls and that its recommended action was not visibly rendered.
 - [x] (2026-08-09) Move interactive signing controls above a read-only status region, add visible and accessible recommended-action treatment, and prove the real Qt geometry.
-- [x] (2026-08-09) Review migrated compatibility and phase3 product cruft; no retirement condition in the named sidebar/coordinator modules was met, so no unrelated removal was mixed into this slice.
+- [x] (2026-08-09) Review migrated compatibility and acceptance product cruft; no retirement condition in the named sidebar/coordinator modules was met, so no unrelated removal was mixed into this slice.
 - [x] (2026-08-09) Run focused, regression, and real offscreen Qt validation; record evidence and clean up.
 - [x] (2026-08-09) Updated this plan and relevant architecture/status documentation; the bounded
   implementation and correction are committed in `8d67d1652`, with remaining async/state-machine
@@ -113,7 +113,7 @@ readiness, sign/save, verify, and reopen. This slice must preserve the V1 anti-g
 printing, general PDF editing, cloud workflow, broad trust administration, or multiple pending
 signatures.
 
-The words “compatibility surface” mean an adapter kept only for old callers. “phase3” names identify
+The words “compatibility surface” mean an adapter kept only for old callers. “acceptance” names identify
 legacy evidence/harness infrastructure and must not appear in ordinary product-facing UI or new
 primary contracts; production backend/evidence imports may be renamed only after a neutral migration
 proves the old name is no longer required.

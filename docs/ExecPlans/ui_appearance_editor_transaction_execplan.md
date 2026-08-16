@@ -21,7 +21,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] (2026-08-10) Audit current behavior and add focused Save/Cancel and stable-id tests.
 - [x] (2026-08-10) Implement the document-independent Appearance create/edit model/application/Qt path.
-- [x] (2026-08-10) Confirm no phase3 product-facing compatibility path was introduced; evidence-only phase3 modules remain outside this product slice.
+- [x] (2026-08-10) Confirm no acceptance product-facing compatibility path was introduced; evidence-only acceptance modules remain outside this product slice.
 - [x] (2026-08-10) Run focused, regression, and offscreen Qt validation; clean processes and artifacts.
 - [x] (2026-08-10) Re-audit the current worktree and confirm the remaining gap is localized to `ReusableObjectLibraryDialog` and its Appearance editor composition; no product decision is pending.
 - [x] (2026-08-10) Add a Library-owned Appearance detail/editor mode that preserves the master selection and suspends/restores the parent catalog/name draft.
@@ -98,7 +98,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

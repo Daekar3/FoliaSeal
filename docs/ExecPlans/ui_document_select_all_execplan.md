@@ -129,7 +129,7 @@ shell-owned orchestration boundary, and `QtSigningWorkspaceSessionPort` in
 `FoliaSealAppFrame`. The AppFrame already routes Edit Select All to a focused `QLineEdit`/`QTextEdit`;
 the new fallback must route through the session port when the focused widget is not a native editor.
 
-A compatibility surface means an adapter kept for an older caller. “phase3” is legacy evidence/harness
+A compatibility surface means an adapter kept for an older caller. “acceptance” is legacy evidence/harness
 nomenclature, not a product feature label; do not add it to new code, tests, UI, or documentation.
 
 ## Change Slice
@@ -283,7 +283,7 @@ preserving the one-page selection rule in section 8. Focused validation passed w
 across the document-selection, workspace, AppFrame/runtime/session-port, and real offscreen Select
 All tests. Full validation passed with `1456 passed, 20 skipped, 1 warning`; the
 only warning is the existing Pillow `Image.Image.getdata` deprecation in
-`tests/unit/test_phase3_harness.py`. The real offscreen flow covers Edit -> Select All/Ctrl+A,
+`tests/unit/test_interactive_harness.py`. The real offscreen flow covers Edit -> Select All/Ctrl+A,
 clipboard copy, native-editor precedence, and no-document disablement; the selection engine and
 workspace tests cover current-page geometry plus empty/no-text and load-failure soft states. The
 bounded GUI launch audit exited through the known isolated `SingleInstanceUnavailable` endpoint;

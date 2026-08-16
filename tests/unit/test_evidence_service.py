@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.evidence_core import (
+    EvidenceMatrixKind,
+    validate_signed_acceptance_matrix_summary,
+)
 from foliaseal.application.evidence_service import (
     EvidenceCaptureRequest,
     EvidenceMatrixRequest,
     EvidenceService,
     EvidenceServiceValidationRequest,
     SignedAcceptanceEvidenceRequest,
-)
-from foliaseal.application.phase3_evidence_core import (
-    Phase3MatrixKind,
-    validate_signed_acceptance_matrix_summary,
 )
 from foliaseal.application.qa_signed_acceptance_generation import (
     GeneratedSignedAcceptanceAssets,
@@ -195,11 +195,11 @@ def test_evidence_service_normalizes_typed_matrix_results() -> None:
     preview = service.preview_matrix(request)
     signed = service.signed_acceptance_matrix(request)
 
-    assert preview.kind is Phase3MatrixKind.PREVIEW
+    assert preview.kind is EvidenceMatrixKind.PREVIEW
     assert preview.passed is True
     assert preview.summary_json_path == "artifacts/preview/summary.json"
     assert preview.successful_run_count == 2
-    assert signed.kind is Phase3MatrixKind.SIGNED_ACCEPTANCE
+    assert signed.kind is EvidenceMatrixKind.SIGNED_ACCEPTANCE
     assert signed.passed is True
     assert signed.summary_json_path == "artifacts/signed/summary.json"
     assert signed.successful_run_count == 2
@@ -356,7 +356,7 @@ def test_evidence_service_validate_loads_payload(
     tmp_path: Path,
 ) -> None:
     summary_path = tmp_path / "summary.json"
-    summary_path.write_text('{"contract_version": "phase3.v1"}', encoding="utf-8")
+    summary_path.write_text('{"contract_version": "evidence.v1"}', encoding="utf-8")
     captured: dict[str, object] = {}
 
     service = _service(

@@ -151,7 +151,7 @@ import sys
 import foliaseal.application.visible_signature_semantics
 blocked = (
     'foliaseal.application.signing_draft_workflow',
-    'foliaseal.application.phase3_signing_backend',
+    'foliaseal.application.signing_backend',
     'PyQt',
     'PySide6',
 )
@@ -178,7 +178,7 @@ import sys
 import foliaseal.application.signing_draft_contracts
 blocked = (
     'foliaseal.application.signing_draft_workflow',
-    'foliaseal.application.phase3_signing_backend',
+    'foliaseal.application.signing_backend',
     'PIL',
     'pyhanko',
     'PyQt',

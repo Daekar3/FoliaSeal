@@ -31,7 +31,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
+from foliaseal.application.signing_backend import build_signing_executor
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
 from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
 from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
@@ -978,7 +978,7 @@ def run_audit(
             certificate_catalog_store=cert_store,
             certificate_secret_provider=_InMemorySecretStore(),
             preset_catalog_store=profile_store,
-            sign_executor=build_phase3_signing_executor(),
+            sign_executor=build_signing_executor(),
         )
         frame.window.resize(1440, 980)
         frame.window.show()

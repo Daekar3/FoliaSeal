@@ -50,7 +50,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   panel through placement, unsupported-glyph field/character guidance, exact-fit blocking, and a
   ready preview/request. The first run exposed repeated preview refreshes regenerating signing time;
   `SigningDraftWorkflow.preview()` now reuses the frozen time while the draft fingerprint is unchanged.
-- [ ] (2026-08-09) Retire migrated compatibility or phase3 product cruft whose consumers are gone.
+- [ ] (2026-08-09) Retire migrated compatibility or acceptance product cruft whose consumers are gone.
 - [x] (2026-08-10) Implementation and adapter validation are complete: the focused parity/fit/
   renderer/readiness set is `104 passed`. The bounded real launch still stops at
   `SingleInstanceUnavailable` before window creation, so display-backed evidence remains open.
@@ -128,7 +128,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.
@@ -228,7 +228,7 @@ owned root is removed and no FoliaSeal process remains. The deterministic adapte
 `tests/integration/test_preview_readiness_walkthrough.py`, records the placement, glyph, exact-fit,
 ready, repeated-refresh, timestamp-equality, and cleanup states through the public panel surface,
 and does not claim screen-reader, high-contrast, DPI/monitor, physical-display, or package-manager
-evidence. Those gates, plus legacy phase3 compatibility/nomenclature retirement, remain open; this
+evidence. Those gates, plus legacy acceptance compatibility/nomenclature retirement, remain open; this
 child does not claim full release compliance.
 
 ## Idempotence and Recovery

@@ -17,10 +17,10 @@ from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.viewer_session import ViewerSession
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.infra.render.qt_backend import QtPdfRenderBackend
-from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import (
+from foliaseal.presentation.qt.interactive_harness_qt_lifecycle import (
     HarnessQtBindings as _QtHarnessBindings,
 )
-from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import (
+from foliaseal.presentation.qt.interactive_harness_qt_lifecycle import (
     HarnessQtLifecyclePort,
     HarnessWindowSpec,
     QtHarnessLifecycle,

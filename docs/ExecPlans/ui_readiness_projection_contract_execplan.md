@@ -52,7 +52,7 @@ projection and keeps all policy independent of Qt.
   inspection would create contradictory states. Evidence: `SignaturePropertiesViewState` already
   carries `certificate_readiness` and composed validation text.
 - Observation: the legacy callback pair is used by the production composition seam and unit tests,
-  while phase3 evidence captures only serialized validation text. The migration can therefore be
+  while acceptance evidence captures only serialized validation text. The migration can therefore be
   limited to the production action coordinator/setup port without expanding legacy evidence
   infrastructure.
 
@@ -117,7 +117,7 @@ Primary change class: behavior change with focused tests and minimum architectur
 Allowed files are the new application contract, setup port/panel, signing action coordinator and
 composition seam, focused tests, `docs/ARCHITECTURE.md`, this plan, the readiness parent, and the
 V1 compliance parent. Do not add Qt buttons, document monitoring, certificate parsing, recovery
-journaling, generated PDFs, or phase3 evidence refactors in this slice.
+journaling, generated PDFs, or acceptance evidence refactors in this slice.
 
 ## Plan of Work
 

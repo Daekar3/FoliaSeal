@@ -41,8 +41,8 @@ from foliaseal.presentation.qt.signed_acceptance_evidence import (
 
 DEFAULT_CHECKLIST_TEMPLATE_PATH = "docs/ExecPlans/phase2_manual_qa_checklist.md"
 DEFAULT_CHECKLIST_RESULTS_PATH = "artifacts/phase2_manual_qa_results.md"
-DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH = "artifacts/phase3_fr3b_acceptance_checklist.md"
-DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH = "artifacts/phase3_fr3b_acceptance_results.md"
+DEFAULT_ACCEPTANCE_CHECKLIST_TEMPLATE_PATH = "artifacts/acceptance_fr3b_acceptance_checklist.md"
+DEFAULT_ACCEPTANCE_CHECKLIST_RESULTS_PATH = "artifacts/acceptance_fr3b_acceptance_results.md"
 
 
 def launch_qt_app_frame(*args, **kwargs):
@@ -224,41 +224,41 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Template checklist used to seed the run-specific checklist results file.",
     )
 
-    phase3_harness = subparsers.add_parser(
-        "phase3-signing-harness",
-        help="Launch the interactive Qt signing harness for Phase 3 acceptance.",
+    interactive_harness = subparsers.add_parser(
+        "interactive-harness",
+        help="Launch the interactive Qt signing harness for acceptance testing.",
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--pdf-path",
         required=True,
         help="Path to the PDF to open in the interactive signing harness.",
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--certificate-path",
         default="demo-cert.p12",
         help="PKCS#12 certificate file used by the harness signing flow.",
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--passphrase",
         default="demo-passphrase",
         help="Passphrase for the PKCS#12 certificate file used by the harness.",
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--summary-json-path",
         default=None,
         help="Optional file path where the harness capture JSON should be written.",
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--checklist-results-path",
-        default=DEFAULT_PHASE3_CHECKLIST_RESULTS_PATH,
-        help=("File path where the run-specific Phase 3 acceptance results should be written."),
+        default=DEFAULT_ACCEPTANCE_CHECKLIST_RESULTS_PATH,
+        help=("File path where the run-specific acceptance results should be written."),
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--checklist-template-path",
-        default=DEFAULT_PHASE3_CHECKLIST_TEMPLATE_PATH,
-        help="Template checklist used to seed the run-specific Phase 3 results file.",
+        default=DEFAULT_ACCEPTANCE_CHECKLIST_TEMPLATE_PATH,
+        help="Template checklist used to seed the run-specific Acceptance results file.",
     )
-    phase3_harness.add_argument(
+    interactive_harness.add_argument(
         "--artifacts-dir",
         default=None,
         help=(
@@ -303,61 +303,64 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print the packaged Markdown file path instead of its contents.",
     )
 
-    phase3_matrix = subparsers.add_parser(
-        "phase3-signing-preview-matrix",
-        help="Run a repeatable Phase 3 preview scenario sweep and capture per-scenario artifacts.",
+    acceptance_matrix = subparsers.add_parser(
+        "preview-matrix",
+        help=(
+            "Run a repeatable Acceptance preview scenario sweep and capture "
+            "per-scenario artifacts."
+        ),
     )
-    phase3_matrix.add_argument(
+    acceptance_matrix.add_argument(
         "--pdf-path",
         required=True,
         help="Path to the PDF to open in the preview matrix runner.",
     )
-    phase3_matrix.add_argument(
+    acceptance_matrix.add_argument(
         "--certificate-path",
         required=True,
         help="PKCS#12 certificate file used to derive preview field values.",
     )
-    phase3_matrix.add_argument(
+    acceptance_matrix.add_argument(
         "--passphrase",
         required=True,
         help="Passphrase for the PKCS#12 certificate file used by the preview matrix.",
     )
-    phase3_matrix.add_argument(
+    acceptance_matrix.add_argument(
         "--scenario-manifest-path",
         required=True,
         help="JSON manifest describing the preview scenarios to execute.",
     )
-    phase3_matrix.add_argument(
+    acceptance_matrix.add_argument(
         "--artifacts-dir",
         required=True,
         help="Directory where per-scenario preview PNGs and the summary JSON should be written.",
     )
 
-    phase3_signed_matrix = subparsers.add_parser(
-        "phase3-signing-acceptance-matrix",
+    acceptance_signed_matrix = subparsers.add_parser(
+        "signed-acceptance",
         help="Run a representative signed-output acceptance sweep and capture artifacts.",
     )
-    phase3_signed_matrix.add_argument(
+    acceptance_signed_matrix.add_argument(
         "--pdf-path",
         required=True,
         help="Path to the PDF to open and sign in the signed acceptance matrix runner.",
     )
-    phase3_signed_matrix.add_argument(
+    acceptance_signed_matrix.add_argument(
         "--certificate-path",
         required=True,
         help="PKCS#12 certificate file used to sign acceptance matrix scenarios.",
     )
-    phase3_signed_matrix.add_argument(
+    acceptance_signed_matrix.add_argument(
         "--passphrase",
         required=True,
         help="Passphrase for the PKCS#12 certificate file used by the signed matrix.",
     )
-    phase3_signed_matrix.add_argument(
+    acceptance_signed_matrix.add_argument(
         "--scenario-manifest-path",
         required=True,
         help="JSON manifest describing the signed acceptance scenarios to execute.",
     )
-    phase3_signed_matrix.add_argument(
+    acceptance_signed_matrix.add_argument(
         "--artifacts-dir",
         required=True,
         help=(
@@ -366,16 +369,16 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    phase3_signed_evidence = subparsers.add_parser(
-        "phase3-signing-acceptance-evidence",
+    acceptance_signed_evidence = subparsers.add_parser(
+        "signed-acceptance-evidence",
         help="Regenerate signed acceptance assets and run all signed evidence matrices.",
     )
-    phase3_signed_evidence.add_argument(
+    acceptance_signed_evidence.add_argument(
         "--artifacts-root",
         default=".",
         help=("Repository or workspace root under which ignored artifacts should be generated."),
     )
-    phase3_signed_evidence.add_argument(
+    acceptance_signed_evidence.add_argument(
         "--summary-markdown-path",
         default=None,
         help=(
@@ -384,14 +387,14 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    phase3_validate = subparsers.add_parser(
-        "phase3-signing-harness-validate",
-        help="Validate an existing Phase 3 harness capture JSON without launching the GUI.",
+    acceptance_validate = subparsers.add_parser(
+        "acceptance-harness-validate",
+        help="Validate an existing Acceptance harness capture JSON without launching the GUI.",
     )
-    phase3_validate.add_argument(
+    acceptance_validate.add_argument(
         "--summary-json-path",
         required=True,
-        help="Path to an existing Phase 3 harness capture JSON file.",
+        help="Path to an existing Acceptance harness capture JSON file.",
     )
 
     return parser
@@ -477,7 +480,7 @@ def _run_evidence_harness_validate(args: argparse.Namespace) -> None:
     evaluation = _build_evidence_program().validate(
         EvidenceValidationRequest(summary_json_path=args.summary_json_path)
     )
-    print("Phase 3 evidence contract")
+    print("Acceptance evidence contract")
     print(f"- acceptance tier: {evaluation.acceptance_tier}")
     print(f"- gate verdict: {evaluation.gate_verdict}")
     print(f"- validation passed: {'yes' if evaluation.passed else 'no'}")
@@ -487,7 +490,7 @@ def _run_evidence_harness_validate(args: argparse.Namespace) -> None:
     if evaluation.warnings:
         print(f"- warnings: {list(evaluation.warnings)}")
     if not evaluation.passed:
-        raise ValueError("Phase 3 harness capture failed evidence contract validation.")
+        raise ValueError("Acceptance harness capture failed evidence contract validation.")
 
 
 def _build_evidence_service():
@@ -551,7 +554,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             checklist_template_path=args.checklist_template_path,
         )
         return 0
-    if args.command == "phase3-signing-harness":
+    if args.command == "interactive-harness":
         _build_evidence_program().capture(_build_evidence_capture_request(args))
         return 0
     if args.command == "help":
@@ -585,30 +588,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             initial_pdf_path=args.pdf_path,
         )
 
-    if args.command == "phase3-signing-preview-matrix":
-        result = _build_evidence_program().preview_matrix(
-            _build_evidence_matrix_request(args)
-        )
-        print("Phase 3 preview matrix")
+    if args.command == "preview-matrix":
+        result = _build_evidence_program().preview_matrix(_build_evidence_matrix_request(args))
+        print("Acceptance preview matrix")
         print(f"- scenarios executed: {result.scenario_count}")
         print(f"- artifacts directory: {result.artifacts_dir}")
         print(f"- summary json: {result.summary_json_path}")
         return 0
-    if args.command == "phase3-signing-acceptance-matrix":
+    if args.command == "signed-acceptance":
         result = _build_evidence_program().signed_acceptance_matrix(
             _build_evidence_matrix_request(args)
         )
-        print("Phase 3 signed acceptance matrix")
+        print("Signed acceptance matrix")
         print(f"- scenarios executed: {result.scenario_count}")
         print(f"- successful signings: {result.successful_run_count}")
         print(f"- artifacts directory: {result.artifacts_dir}")
         print(f"- summary json: {result.summary_json_path}")
         return 0
-    if args.command == "phase3-signing-acceptance-evidence":
+    if args.command == "signed-acceptance-evidence":
         evidence = _build_evidence_program().signed_acceptance_evidence(
             _build_signed_acceptance_evidence_request(args)
         )
-        print("Phase 3 signed acceptance evidence")
+        print("Signed acceptance evidence")
         print(f"- summary markdown: {evidence.summary_markdown_path}")
         for result in evidence.matrix_results:
             counters = result.counters
@@ -618,7 +619,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"{counters.successful_signing_run_count} successful signings)"
             )
         return 0
-    if args.command == "phase3-signing-harness-validate":
+    if args.command == "acceptance-harness-validate":
         _run_evidence_harness_validate(args)
         return 0
 

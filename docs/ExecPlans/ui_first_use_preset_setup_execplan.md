@@ -26,7 +26,7 @@ mapped to UI_SPEC WF02/WF03 and acceptance scenario 2.
 
 - [x] (2026-08-10) Audit the no-preset rail state, Library entry point, and callback composition seams.
 - [x] (2026-08-10) Implement the smallest complete no-preset guidance and Library create/manage path.
-- [x] (2026-08-10) Confirm no phase3 product-facing compatibility path was introduced; the callback uses existing neutral workspace boundaries.
+- [x] (2026-08-10) Confirm no acceptance product-facing compatibility path was introduced; the callback uses existing neutral workspace boundaries.
 - [x] (2026-08-10) Run focused shell/AppFrame/workspace validation and clean processes/artifacts.
 - [x] (2026-08-10) Force first-use Library entry to the Presets catalog without changing the
   persisted last-catalog preference.
@@ -73,7 +73,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

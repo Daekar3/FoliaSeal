@@ -26,7 +26,7 @@ tests, and observable acceptance; it is not a generic refactor.
 - [x] (2026-08-09) Implement the bounded single-owner and initial/second-invocation forwarding path.
 - [x] (2026-08-10) Route forwarded requests through the existing frame and defer the newest request during active signing.
 - [x] (2026-08-10) Add the condition-only queued-filename surface and keyboard-accessible Cancel pending open action.
-- [ ] (2026-08-10) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
+- [ ] (2026-08-10) Remove migrated compatibility or acceptance product cruft whose retirement condition is met.
 - [x] (2026-08-09) Run focused, regression, and bounded Qt validation; record evidence and clean up.
 - [x] (2026-08-10) Run focused production-widget and regression validation, then reconcile architecture/status documentation; commit remains an explicit parent handoff step.
 
@@ -86,7 +86,7 @@ untouched; after a terminal signing/recovery state, the existing open/dirty poli
 replace it, and terminal/close paths clear the surface. Focused validation is `62 passed, 1 skipped`;
 the full suite is `1447 passed, 20 skipped, 1 warning`; the real offscreen pending-open widget test
 passes. QLocalServer cannot bind a Unix endpoint in this sandbox (`Unknown error 1`), so the
-production transport test remains explicitly skipped; compatibility/phase3 retirement and
+production transport test remains explicitly skipped; compatibility/acceptance retirement and
 display-backed two-process smoke evidence remain open.
 
 ## Context and Orientation
@@ -97,7 +97,7 @@ readiness, sign/save, verify, and reopen. This slice must preserve the V1 anti-g
 printing, general PDF editing, cloud workflow, broad trust administration, or multiple pending
 signatures.
 
-The words “compatibility surface” mean an adapter kept only for old callers. “phase3” names identify
+The words “compatibility surface” mean an adapter kept only for old callers. “acceptance” names identify
 legacy evidence/harness infrastructure and must not appear in ordinary product-facing UI or new
 primary contracts; production backend/evidence imports may be renamed only after a neutral migration
 proves the old name is no longer required.

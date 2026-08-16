@@ -25,8 +25,8 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implemented cancellation for unfinished placement and overlay-resize drags without
   mutating the completed draft overlay; a completed pointer drag remains persistent across refreshes
   and mode changes.
-- [x] (2026-08-10) Reviewed compatibility and phase3 product cruft; no migrated consumer retirement
-  condition was proven in this narrow viewer edge, and no new phase3 nomenclature was introduced.
+- [x] (2026-08-10) Reviewed compatibility and acceptance product cruft; no migrated consumer retirement
+  condition was proven in this narrow viewer edge, and no new acceptance nomenclature was introduced.
 - [x] (2026-08-10) Focused viewer/interaction and offscreen pointer integration validation passed
   (`40 passed`); the full suite passed (`1296 passed, 20 skipped, 1 warning`), with GUI audit,
   docs, and commit gates remaining.
@@ -71,7 +71,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

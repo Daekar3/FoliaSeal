@@ -10,10 +10,10 @@ from foliaseal.application.evidence_ports import CaptureResultPort
 from foliaseal.application.evidence_service import (
     EvidenceCaptureRequest,
     EvidenceMatrixRequest,
+    EvidenceMatrixResult,
     EvidenceServiceValidationRequest,
-    Phase3MatrixResult,
-    Phase3SignedAcceptanceEvidenceResult,
     SignedAcceptanceEvidenceRequest,
+    SignedAcceptanceEvidenceResult,
 )
 from foliaseal.application.qa_evidence_contract import EvidenceContractEvaluation
 
@@ -24,19 +24,19 @@ class EvidenceProgramServicePort(Protocol):
     def capture(self, request: EvidenceCaptureRequest) -> CaptureResultPort:
         """Capture one interactive harness run."""
 
-    def preview_matrix(self, request: EvidenceMatrixRequest) -> Phase3MatrixResult:
+    def preview_matrix(self, request: EvidenceMatrixRequest) -> EvidenceMatrixResult:
         """Run and normalize one preview matrix."""
 
     def signed_acceptance_matrix(
         self,
         request: EvidenceMatrixRequest,
-    ) -> Phase3MatrixResult:
+    ) -> EvidenceMatrixResult:
         """Run and normalize one signed-acceptance matrix."""
 
     def signed_acceptance_evidence(
         self,
         request: SignedAcceptanceEvidenceRequest,
-    ) -> Phase3SignedAcceptanceEvidenceResult:
+    ) -> SignedAcceptanceEvidenceResult:
         """Run aggregate signed-acceptance evidence."""
 
     def validate(
@@ -55,22 +55,22 @@ class EvidenceValidationRequest:
 
 @dataclass(frozen=True)
 class EvidenceProgram:
-    """Deep application boundary over runner-specific Phase 3 adapters."""
+    """Deep application boundary over runner-specific Acceptance adapters."""
 
     service: EvidenceProgramServicePort
 
     def capture(self, request: EvidenceCaptureRequest) -> CaptureResultPort:
         return self.service.capture(request)
 
-    def preview_matrix(self, request: EvidenceMatrixRequest) -> Phase3MatrixResult:
+    def preview_matrix(self, request: EvidenceMatrixRequest) -> EvidenceMatrixResult:
         return self.service.preview_matrix(request)
 
-    def signed_acceptance_matrix(self, request: EvidenceMatrixRequest) -> Phase3MatrixResult:
+    def signed_acceptance_matrix(self, request: EvidenceMatrixRequest) -> EvidenceMatrixResult:
         return self.service.signed_acceptance_matrix(request)
 
     def signed_acceptance_evidence(
         self, request: SignedAcceptanceEvidenceRequest
-    ) -> Phase3SignedAcceptanceEvidenceResult:
+    ) -> SignedAcceptanceEvidenceResult:
         return self.service.signed_acceptance_evidence(request)
 
     def for_pdf(
@@ -79,7 +79,7 @@ class EvidenceProgram:
         *,
         certificate_path: str,
         passphrase: str,
-        artifacts_dir: str = "artifacts/phase3",
+        artifacts_dir: str = "artifacts/acceptance",
     ) -> EvidenceSession:
         return EvidenceSession(
             program=self,
@@ -112,11 +112,11 @@ class EvidenceSession:
     pdf_path: str
     certificate_path: str
     passphrase: str
-    artifacts_dir: str = "artifacts/phase3"
+    artifacts_dir: str = "artifacts/acceptance"
 
     def preview(
         self, manifest_path: str | Path, *, artifacts_dir: str | None = None
-    ) -> Phase3MatrixResult:
+    ) -> EvidenceMatrixResult:
         return self.program.preview_matrix(
             EvidenceMatrixRequest(
                 pdf_path=self.pdf_path,
@@ -129,7 +129,7 @@ class EvidenceSession:
 
     def signed_acceptance(
         self, manifest_path: str | Path, *, artifacts_dir: str | None = None
-    ) -> Phase3MatrixResult:
+    ) -> EvidenceMatrixResult:
         return self.program.signed_acceptance_matrix(
             EvidenceMatrixRequest(
                 pdf_path=self.pdf_path,
@@ -144,8 +144,8 @@ class EvidenceSession:
         self,
         *,
         summary_json_path: str | Path | None = None,
-        checklist_results_path: str = "artifacts/phase3_fr3b_acceptance_results.md",
-        checklist_template_path: str = "artifacts/phase3_fr3b_acceptance_checklist.md",
+        checklist_results_path: str = "artifacts/acceptance_fr3b_acceptance_results.md",
+        checklist_template_path: str = "artifacts/acceptance_fr3b_acceptance_checklist.md",
         artifacts_dir: str | None = None,
     ) -> CaptureResultPort:
         return self.program.capture(

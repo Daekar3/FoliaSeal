@@ -12,18 +12,18 @@ from typing import TYPE_CHECKING, Any
 from foliaseal.application.evidence_service import EvidenceCaptureRequest
 
 if TYPE_CHECKING:
-    from foliaseal.presentation.qt.phase3_harness_capture_assembler import (
-        Phase3HarnessCaptureAssembler,
+    from foliaseal.presentation.qt.interactive_harness_capture_assembler import (
+        InteractiveHarnessCaptureAssembler,
     )
-    from foliaseal.presentation.qt.phase3_harness_session_runner import (
-        Phase3HarnessSessionRunner,
+    from foliaseal.presentation.qt.interactive_harness_session_runner import (
+        InteractiveHarnessSessionRunner,
         _QtHarnessBindings,
     )
 
 
 @dataclass(frozen=True)
-class Phase3HarnessCapture:
-    """Structured capture emitted by the interactive Phase 3 harness."""
+class InteractiveHarnessCapture:
+    """Structured capture emitted by the interactive Acceptance harness."""
 
     pdf_path: str
     summary_json_path: str | None
@@ -79,10 +79,10 @@ def build_capture_from_payload(
     summary_json_path: str | None,
     checklist_results_path: str,
     checklist_results_written: bool,
-) -> Phase3HarnessCapture:
+) -> InteractiveHarnessCapture:
     """Project the stable assembler payload into the public capture DTO."""
 
-    return Phase3HarnessCapture(
+    return InteractiveHarnessCapture(
         pdf_path=capture_payload["pdf_path"],
         summary_json_path=summary_json_path,
         summary_json_written=summary_json_path is not None,
@@ -151,21 +151,21 @@ class InteractiveCaptureEngine:
     load_page_count: Callable[..., int]
     render_backend_factory: Callable[[], Any]
     profile_store_factory: Callable[[], Any]
-    build_phase3_signing_executor: Callable[[], Any]
-    session_runner: Phase3HarnessSessionRunner
-    capture_assembler: Phase3HarnessCaptureAssembler
+    build_signing_executor: Callable[[], Any]
+    session_runner: InteractiveHarnessSessionRunner
+    capture_assembler: InteractiveHarnessCaptureAssembler
     contract_evaluator: Callable[..., Any]
-    capture_factory: Callable[..., Phase3HarnessCapture]
+    capture_factory: Callable[..., InteractiveHarnessCapture]
     checklist_renderer: Callable[..., str]
     report_finalizer: Callable[..., Any]
     artifact_policy: InteractiveEvidenceArtifactPolicy
 
-    def run(self, request: EvidenceCaptureRequest) -> Phase3HarnessCapture:
+    def run(self, request: EvidenceCaptureRequest) -> InteractiveHarnessCapture:
         from foliaseal.application import SigningDraftWorkflow
         from foliaseal.application.viewer_session import ViewerSession
         from foliaseal.application.viewer_workflow import ViewerWorkflow
-        from foliaseal.presentation.qt.phase3_harness_reporting import (
-            Phase3HarnessReportRequest,
+        from foliaseal.presentation.qt.interactive_harness_reporting import (
+            InteractiveHarnessReportRequest,
         )
 
         bindings = self.load_qt_harness_bindings()
@@ -207,7 +207,7 @@ class InteractiveCaptureEngine:
             viewer_workflow=viewer_workflow,
             signing_workflow=signing_workflow,
             profile_store=self.profile_store_factory(),
-            sign_executor=self.build_phase3_signing_executor(),
+            sign_executor=self.build_signing_executor(),
             capture_assembler=self.capture_assembler,
         )
         capture_payload = self.capture_assembler.build_capture_payload(
@@ -218,7 +218,7 @@ class InteractiveCaptureEngine:
             session=session,
         )
         report = self.report_finalizer(
-            Phase3HarnessReportRequest(
+            InteractiveHarnessReportRequest(
                 capture_payload=capture_payload,
                 summary_json_path=request.summary_json_path,
                 checklist_results_path=request.checklist_results_path,
@@ -231,11 +231,11 @@ class InteractiveCaptureEngine:
         )
         capture = report.capture
         if request.summary_json_path is None:
-            print("Phase 3 harness capture")
+            print("Acceptance harness capture")
             print(capture.to_json())
             print()
         else:
-            print("Phase 3 harness capture written")
+            print("Acceptance harness capture written")
             print(f"- summary json: {request.summary_json_path}")
             print(f"- acceptance tier: {capture.acceptance_tier}")
             print(f"- gate verdict: {capture.gate_verdict}")
@@ -244,7 +244,7 @@ class InteractiveCaptureEngine:
             print()
         print(f"Checklist results file: {request.checklist_results_path}")
         print("Review the pre-checked items, complete the remaining manual-only checks, and")
-        print("use the generated file as the acceptance worksheet for Phase 3.")
+        print("use the generated file as the acceptance worksheet for Acceptance.")
         return capture
 
 

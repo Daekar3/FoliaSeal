@@ -118,7 +118,7 @@ shutdown path captures settings after the Qt event loop and then calls `AppSetti
 Primary change class: behavior change. Allowed files are the typed UI settings projection, the
 Qt binding/composition/view lifecycle seams, focused unit/integration tests, and the minimum
 architecture/ExecPlan status updates. Do not mix Library geometry, monitor/DPI rendering, toolbar
-overflow, document reopening, signing-state changes, packaging, or phase3 nomenclature migration.
+overflow, document reopening, signing-state changes, packaging, or acceptance nomenclature migration.
 Generated PDFs, private keys, screenshots, and machine-local paths are forbidden in the commit.
 
 ## Plan of Work

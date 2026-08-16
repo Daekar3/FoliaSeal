@@ -47,7 +47,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-10) Implemented the smallest complete model/application/Qt path for the bounded
   topology outcome; richer nested editors remain deferred to their owning children.
 - [x] (2026-08-10) Retained only the test-binding compatibility fallback; no new product-facing
-  compatibility or phase3 terminology was introduced. Further retirement remains tracked by the
+  compatibility or acceptance terminology was introduced. Further retirement remains tracked by the
   owning migration child where consumers still exist.
 - [x] (2026-08-10) Ran focused, regression, offscreen GUI, static, and process-cleanup validation;
   no owned FoliaSeal/PySide6/pytest process or temporary audit root remains.
@@ -114,7 +114,7 @@ primary flow is open, review, select reusable setup, place one visible signature
 readiness, sign/save, verify, and reopen. V1 excludes tabs, printing, broad PDF editing, cloud
 workflow, enterprise trust administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.
@@ -146,7 +146,7 @@ Add `q_list_widget` and `q_splitter` bindings only at the AppFrame composition e
 reopen, and work with no active workspace. Placement create/edit continues to use the already landed
 blank-page editor; appearance/certificate/preset nested editors remain follow-on child boundaries.
 When the old selector path is replaced, preserve compatibility attributes only for existing tests or
-callers and record their retirement condition; do not introduce new product-facing phase3 names.
+callers and record their retirement condition; do not introduce new product-facing acceptance names.
 
 ## Milestones
 

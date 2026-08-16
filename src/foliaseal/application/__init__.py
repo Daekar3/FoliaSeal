@@ -104,7 +104,7 @@ _EXPORT_MODULES = {
     **dict.fromkeys(("ViewerPerformanceTracker", "ViewerTimingSnapshot"), "performance_timing"),
     **dict.fromkeys(
         ("BackendReservationEvidence", "build_backend_reservation_evidence"),
-        "phase3_signing_backend",
+        "signing_backend",
     ),
     **dict.fromkeys(
         (

@@ -103,7 +103,7 @@ startup.
 Primary change class: behavior change. Allowed files are the typed UI settings projection, the
 Library dialog and AppFrame capture/restore seams, focused unit/integration tests, and the minimum
 architecture/ExecPlan status updates. Do not mix monitor/DPI support, toolbar persistence,
-certificate lifecycle, nested editor redesign, signing behavior, package work, or phase3
+certificate lifecycle, nested editor redesign, signing behavior, package work, or acceptance
 nomenclature migration. Generated PDFs, private keys, screenshots, and machine-local paths are
 forbidden in the commit.
 

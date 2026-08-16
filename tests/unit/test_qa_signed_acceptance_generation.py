@@ -22,7 +22,7 @@ from foliaseal.application.qa_signed_acceptance_generation import (
     build_signed_preview_parity_manifest,
     generate_signed_acceptance_assets,
 )
-from foliaseal.presentation.qt.phase3_harness import _load_preview_matrix_manifest
+from foliaseal.presentation.qt.interactive_harness import _load_preview_matrix_manifest
 
 
 def _read_json(path: Path) -> dict:

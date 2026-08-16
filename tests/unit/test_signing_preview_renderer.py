@@ -7,12 +7,12 @@ from PIL import Image
 
 from foliaseal.application import compare_preview_to_request, render_signing_preview
 from foliaseal.application.coordinate_transform import PageBox
-from foliaseal.application.phase3_signing_backend import (
+from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
+from foliaseal.application.signing_backend import (
     _BackendHorizontalInkMeasurer,
     _prepare_backend_layout,
     _visible_signature_fit_issues_for_stamp_text,
 )
-from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
     SigningDraftPreview,
@@ -54,7 +54,8 @@ from tests.support.signing_builders import (
 _MANUAL_HORIZONTAL_SINGLE_LINE_REPLAY_PATH = (
     Path(__file__).resolve().parents[1]
     / "fixtures"
-    / "phase3_horizontal_single_line_manual_replay.json"
+    / "evidence"
+    / "horizontal_single_line_manual_replay.json"
 )
 
 

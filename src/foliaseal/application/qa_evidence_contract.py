@@ -1,11 +1,11 @@
-"""Machine-validated evidence contract for Phase 3 harness artifacts."""
+"""Machine-validated evidence contract for Acceptance harness artifacts."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-PHASE3_EVIDENCE_CONTRACT_VERSION = "phase3_evidence_v1"
+EVIDENCE_CONTRACT_VERSION = "evidence_v1"
 ENGINEERING_RUN = "engineering_run"
 GATE_CANDIDATE = "gate_candidate"
 RELEASE_GATE_PASSED = "release_gate_passed"
@@ -24,7 +24,7 @@ _SYNCED_APPEARANCE_FIELDS = (
 
 @dataclass(frozen=True)
 class EvidenceContractEvaluation:
-    """Structured contract verdict for a Phase 3 harness capture."""
+    """Structured contract verdict for a Acceptance harness capture."""
 
     contract_version: str
     acceptance_tier: str
@@ -34,10 +34,10 @@ class EvidenceContractEvaluation:
     warnings: tuple[str, ...]
 
 
-def evaluate_phase3_evidence_contract(
+def evaluate_acceptance_evidence_contract(
     capture: dict[str, Any],
 ) -> EvidenceContractEvaluation:
-    """Validate a Phase 3 harness capture and derive a gate-ready classification."""
+    """Validate a Acceptance harness capture and derive a gate-ready classification."""
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -285,7 +285,7 @@ def evaluate_phase3_evidence_contract(
     gate_verdict = GATE_CANDIDATE if gate_candidate_ready else NON_GATING
 
     return EvidenceContractEvaluation(
-        contract_version=PHASE3_EVIDENCE_CONTRACT_VERSION,
+        contract_version=EVIDENCE_CONTRACT_VERSION,
         acceptance_tier=acceptance_tier,
         gate_verdict=gate_verdict,
         passed=not errors,

@@ -15,7 +15,7 @@ class InteractiveEvidenceProviders:
     load_page_count: Callable[..., Any]
     render_backend_factory: Callable[..., Any]
     profile_store_factory: Callable[..., Any]
-    build_phase3_signing_executor: Callable[..., Any]
+    build_signing_executor: Callable[..., Any]
     session_runner: Any
     capture_assembler: Any
     contract_evaluator: Callable[..., Any]
@@ -43,7 +43,7 @@ class SignedAcceptanceEvidenceProviders:
 
     load_qt_harness_bindings: Callable[..., Any]
     load_preview_matrix_manifest: Callable[..., Any]
-    build_phase3_signing_executor: Callable[..., Any]
+    build_signing_executor: Callable[..., Any]
     build_dummy_timestamper: Callable[..., Any]
     load_page_count: Callable[..., Any]
     build_workspace: Callable[..., Any]

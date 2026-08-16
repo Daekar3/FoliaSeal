@@ -91,7 +91,7 @@ SHA-256 fingerprint metadata for newly created/imported certificates. Old local
 records remain readable with unknown expiration. The Library's existing
 configured-first/pinned-first identity partitions now sort known certificates by
 expiration and expose the third Qt choice through the existing preference key.
-No new phase3 vocabulary, duplicate settings path, password, or private key was
+No new acceptance vocabulary, duplicate settings path, password, or private key was
 introduced. The bounded GUI launch remains limited by the isolated single-instance
 socket environment, while fake-binding Qt behavior and the full suite are green.
 
@@ -120,7 +120,7 @@ This is one behavior-change slice plus the necessary governing-document/status
 updates. Allowed files are the certificate model/codec/manager, Library session
 and Qt dialog, their focused tests, this plan, the parent/catalog/architecture
 records, and ignored temporary audit files. Do not mix signing execution,
-placement, packaging, evidence rebaselines, or unrelated phase3 renames.
+placement, packaging, evidence rebaselines, or unrelated acceptance renames.
 
 ## Plan of Work
 

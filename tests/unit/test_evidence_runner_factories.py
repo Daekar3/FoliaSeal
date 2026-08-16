@@ -36,7 +36,7 @@ def _fake_providers() -> EvidenceRunnerProviders:
             load_page_count=callback,
             render_backend_factory=callback,
             profile_store_factory=callback,
-            build_phase3_signing_executor=callback,
+            build_signing_executor=callback,
             session_runner=object(),
             capture_assembler=object(),
             contract_evaluator=callback,
@@ -56,7 +56,7 @@ def _fake_providers() -> EvidenceRunnerProviders:
         signed=SignedAcceptanceEvidenceProviders(
             load_qt_harness_bindings=callback,
             load_preview_matrix_manifest=callback,
-            build_phase3_signing_executor=callback,
+            build_signing_executor=callback,
             build_dummy_timestamper=callback,
             load_page_count=callback,
             build_workspace=callback,
@@ -190,7 +190,7 @@ import json
 import sys
 import foliaseal.presentation.qt.evidence_runner_providers
 import foliaseal.presentation.qt.evidence_runner_factories
-heavy = ("PySide6", "PIL", "pyhanko", "foliaseal.presentation.qt.phase3_harness")
+heavy = ("PySide6", "PIL", "pyhanko", "foliaseal.presentation.qt.interactive_harness")
 loaded = sorted(
     name for name in sys.modules
     if any(name == prefix or name.startswith(prefix + ".") for prefix in heavy)
@@ -308,7 +308,7 @@ InteractiveCaptureEngine(
     load_page_count=lambda **_: 1,
     render_backend_factory=lambda: None,
     profile_store_factory=lambda: None,
-    build_phase3_signing_executor=lambda: None,
+    build_signing_executor=lambda: None,
     session_runner=None,
     capture_assembler=None,
     contract_evaluator=lambda **_: None,

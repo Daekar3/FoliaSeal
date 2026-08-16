@@ -24,7 +24,7 @@ generic refactor.
   draft, or recent file.
 - [x] (2026-08-09) Changed the direct Library entry point to reuse one modeless dialog instance;
   the deeper three-column Library/editor topology remains owned by the next tranche.
-- [ ] (2026-08-09) Remove migrated compatibility or phase3 product cruft whose retirement condition is met.
+- [ ] (2026-08-09) Remove migrated compatibility or acceptance product cruft whose retirement condition is met.
 - [x] (2026-08-09) Ran focused Qt tests, Ruff, and the bounded no-document launch cleanup check.
 - [x] (2026-08-09) Ran the full regression suite: `1153 passed, 19 skipped, 1 warning`.
 - [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit the implementation slice.
@@ -71,7 +71,7 @@ readiness, sign/save, verify, and reopen. This slice must preserve the V1 anti-g
 printing, general PDF editing, cloud workflow, broad trust administration, or multiple pending
 signatures.
 
-The words “compatibility surface” mean an adapter kept only for old callers. “phase3” names identify
+The words “compatibility surface” mean an adapter kept only for old callers. “acceptance” names identify
 legacy evidence/harness infrastructure and must not appear in ordinary product-facing UI or new
 primary contracts; production backend/evidence imports may be renamed only after a neutral migration
 proves the old name is no longer required.

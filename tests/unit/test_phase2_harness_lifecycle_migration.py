@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 import foliaseal.presentation.qt.phase2_harness as phase2_module
-from foliaseal.presentation.qt.phase3_harness_qt_lifecycle import HarnessQtSurface
+from foliaseal.presentation.qt.interactive_harness_qt_lifecycle import HarnessQtSurface
 
 
 class _Layout:

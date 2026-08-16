@@ -30,7 +30,7 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   effects, modeless ownership, bridge routing, and close/replacement cleanup.
 - [x] (2026-08-10) Implement the smallest complete model/application/Qt path: a modeless Document
   Signatures window, a View command, typed selection/jump/highlight, and integrity-first details.
-- [ ] Retire migrated compatibility or phase3 product cruft only where this slice proves its callers
+- [ ] Retire migrated compatibility or acceptance product cruft only where this slice proves its callers
   are gone; do not rename unrelated evidence infrastructure.
 - [x] (2026-08-10) Run focused, regression, and real offscreen Qt validation; clean processes and
   artifacts.
@@ -116,7 +116,7 @@ bottom-left coordinate convention; a modeless window is a non-blocking window th
 frame usable. V1 excludes tabs, printing, broad PDF editing, cloud workflow, enterprise trust
 administration, and multiple pending signatures.
 
-A compatibility surface is an adapter retained only for old callers. “phase3” names identify legacy
+A compatibility surface is an adapter retained only for old callers. “acceptance” names identify legacy
 evidence/harness infrastructure and must not be introduced into ordinary product UI or new primary
 contracts; production backend/evidence imports may be renamed only after a neutral migration proves
 the old name is no longer required.

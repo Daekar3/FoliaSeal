@@ -10,12 +10,14 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageChops
 
-from foliaseal.application.phase3_signing_backend import build_phase3_signing_executor
 from foliaseal.application.signature_image_import import ManagedSignatureImageStore
+from foliaseal.application.signing_backend import build_signing_executor
 from foliaseal.application.signing_draft_workflow import SigningDraftWorkflow
 from foliaseal.application.signing_preview_renderer import render_canonical_signature_preview
 from foliaseal.domain.models import SignatureRect
-from foliaseal.presentation.qt.phase3_harness import _render_signed_annotation_appearance_direct
+from foliaseal.presentation.qt.interactive_harness import (
+    _render_signed_annotation_appearance_direct,
+)
 from tests.support.signing_builders import (
     build_signature_appearance,
     write_test_pdf,
@@ -74,7 +76,7 @@ def _render_and_sign(
     )
     assert canonical is not None
 
-    result = build_phase3_signing_executor().execute(request)
+    result = build_signing_executor().execute(request)
     assert result.success is True, result
     signed = _render_signed_annotation_appearance_direct(
         output_pdf_path=str(output_pdf),

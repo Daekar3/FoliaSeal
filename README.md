@@ -108,22 +108,22 @@ directory. It is local run output, not a required input to a fresh clone.
 Validate an existing harness capture without launching Qt:
 
 ```bash
-foliaseal phase3-signing-harness-validate \
-  --summary-json-path artifacts/phase3_harness_capture.json
+foliaseal acceptance-harness-validate \
+  --summary-json-path artifacts/interactive_harness_capture.json
 ```
 
 Run the bundled signed-acceptance evidence workflow, which regenerates local fixture assets and
 writes a concise summary:
 
 ```bash
-foliaseal phase3-signing-acceptance-evidence
+foliaseal signed-acceptance-evidence
 ```
 
 For explicit scenario sweeps, the preview and signed-output matrix commands require a PDF,
 PKCS#12 identity, passphrase, JSON manifest, and artifact directory:
 
 ```bash
-foliaseal phase3-signing-preview-matrix \
+foliaseal preview-matrix \
   --pdf-path /path/to/document.pdf \
   --certificate-path /path/to/identity.p12 \
   --passphrase 'test-passphrase' \
@@ -134,11 +134,11 @@ foliaseal phase3-signing-preview-matrix \
 The interactive harnesses launch Qt and are intended for manual review:
 
 ```bash
-foliaseal phase3-signing-harness \
+foliaseal interactive-harness \
   --pdf-path /path/to/document.pdf \
   --certificate-path /path/to/identity.p12 \
   --passphrase 'test-passphrase' \
-  --artifacts-dir artifacts/phase3_preview_debug
+  --artifacts-dir artifacts/acceptance_preview_debug
 ```
 
 Do not put production passphrases in shell history or checked-in manifests. Use test identities
