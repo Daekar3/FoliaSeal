@@ -74,7 +74,8 @@ Document-flow tranche:
 - [x] docs/ExecPlans/ui_single_instance_open_routing_execplan.md — per-user single-owner forwarding,
   AppFrame newest-request deferral, condition-only queued-filename/Cancel surface, terminal cleanup,
   focused/offscreen evidence, and architecture reconciliation are complete; QLocalServer bind and
-  display-backed two-process acceptance remain environment-limited.
+  display-backed two-process acceptance was later closed by the bounded Cinnamon/X11 source-tree
+  smoke; packaged and Wayland transport remain out of scope.
 - [x] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md — dirty-draft, candidate replacement,
   source Reload/Ignore/Locate/Close, pending-open handling, and secret clearing are implemented;
   verified interrupted-signing artifact recovery is owned by the journal/recovery-GUI children;
@@ -581,8 +582,9 @@ Release tranche:
   surface, and exposes keyboard-accessible Cancel pending open. Cancel, terminal acceptance/
   cancellation, workspace close, and teardown clear the surface. Focused validation is `62 passed,
   1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`; the real offscreen pending-open
-  widget test passes. QLocalServer remains unable to bind in this sandbox (`Unknown error 1`), so
-  display-backed two-process smoke acceptance and compatibility retirement remain open.
+  widget test passes. QLocalServer remains unable to bind in this sandbox (`Unknown error 1`), a
+  historical isolated-test limitation; the later unsandboxed Cinnamon/X11 two-process smoke closed
+  the source-tree display-backed acceptance, while compatibility retirement remains open.
 - [x] (2026-08-10) Closed the viewer keyboard-contract correction: fake and real offscreen Qt
   evidence proves bare Home/End are not consumed or rendered as page jumps, while Ctrl+Home/End
   perform exactly one first/last-page transition. The combined viewer/navigation validation is
@@ -612,6 +614,12 @@ Release tranche:
   cleanly with an explicit checklist template. This is not four-case human acceptance and does not
   close screen-reader/high-contrast, physical-DPI/multi-monitor, packaged, privileged-install, or
   final release gates; Wayland is intentionally deferred for Mint 22.3.
+- [x] (2026-08-16) Completed the canonical parent semantic workflow audit on Cinnamon/X11. The
+  source-tree runner passed 19 checkpoints across setup, reusable-object clarity, placement,
+  asynchronous signing, reopen, and a second signature; retained outputs locally verified with one
+  and two signatures. The run also corrected a reproducible selected-preset loss during confirmation
+  synchronization and hardened owned-draft teardown. This closes the source-tree X11 semantic gate,
+  not human accessibility, packaged/privileged release, or Wayland acceptance.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

@@ -537,6 +537,46 @@ def test_coordinator_apply_visible_setup_wrapper_updates_workflow_and_state(
     )
 
 
+def test_coordinator_apply_visible_setup_preserves_unchanged_selected_preset(
+    tmp_path: Path,
+) -> None:
+    workflow = _ready_workflow(tmp_path)
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    selected = coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+
+    state = coordinator.apply_visible_setup(selected.visible_signature_setup_draft)
+
+    assert state.selected_signature_preset_name == "Compact"
+    assert workflow.selected_signature_preset_id == "preset-compact"
+    assert workflow.selected_appearance_profile_id == "appearance-compact"
+    assert workflow.selected_placement_profile_id == "placement-compact"
+
+
+def test_coordinator_apply_visible_setup_preserves_unchanged_preset_without_placement(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(),
+    )
+    selected = coordinator.reconcile(ApplySignaturePreset(selected_name="Compact"))
+    assert selected.visible_signature_setup_draft.placement.enabled is False
+
+    state = coordinator.apply_visible_setup(selected.visible_signature_setup_draft)
+
+    assert state.selected_signature_preset_name == "Compact"
+    assert workflow.selected_signature_preset_id == "preset-compact"
+    assert workflow.selected_appearance_profile_id == "appearance-compact"
+    assert workflow.selected_placement_profile_id == "placement-compact"
+
+
 def test_coordinator_apply_visible_setup_wrapper_preserves_control_issue_folding(
     tmp_path: Path,
 ) -> None:

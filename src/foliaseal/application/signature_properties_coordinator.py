@@ -432,19 +432,42 @@ class DefaultSignaturePropertiesCoordinator:
             return None
 
     def _apply_visible_signature_setup(self, command: ApplyVisibleSignatureSetup) -> None:
-        self.workflow.set_signature_appearance(command.draft.appearance)
+        # ``apply_changes`` is also used to synchronize the visible form before
+        # confirmation.  That synchronization must not turn an unchanged,
+        # explicitly selected preset into an anonymous custom setup.  Preserve
+        # the selection when the form still describes the workflow exactly;
+        # clear it only when the user actually edited appearance or placement.
+        current_rect = self.workflow.signature_rect
         placement = command.draft.placement
-        if placement.enabled:
-            self.workflow.set_signature_rect(
-                SignatureRect(
-                    page_index=placement.page_number - 1,
-                    left_pt=placement.left_pt,
-                    bottom_pt=placement.bottom_pt,
-                    width_pt=placement.width_pt,
-                    height_pt=placement.height_pt,
-                )
+        draft_rect = (
+            SignatureRect(
+                page_index=placement.page_number - 1,
+                left_pt=placement.left_pt,
+                bottom_pt=placement.bottom_pt,
+                width_pt=placement.width_pt,
+                height_pt=placement.height_pt,
             )
-        if self._selected_signature_preset_name is not None:
+            if placement.enabled
+            else None
+        )
+        preserves_selected_preset = (
+            self._selected_signature_preset_name is not None
+            and self.workflow.signature_appearance == command.draft.appearance
+            and current_rect == draft_rect
+        )
+        selected_preset_id = self.workflow.selected_signature_preset_id
+        selected_appearance_profile_id = self.workflow.selected_appearance_profile_id
+        selected_placement_profile_id = self.workflow.selected_placement_profile_id
+        self.workflow.set_signature_appearance(command.draft.appearance)
+        if placement.enabled:
+            self.workflow.set_signature_rect(draft_rect)
+        elif current_rect is not None:
+            self.workflow.clear_signature_rect()
+        if preserves_selected_preset:
+            self.workflow.selected_signature_preset_id = selected_preset_id
+            self.workflow.selected_appearance_profile_id = selected_appearance_profile_id
+            self.workflow.selected_placement_profile_id = selected_placement_profile_id
+        if self._selected_signature_preset_name is not None and not preserves_selected_preset:
             self._selected_signature_preset_name = None
 
     def _apply_signature_appearance(self, command: SetSignatureAppearance) -> None:

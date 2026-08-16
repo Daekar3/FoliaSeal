@@ -107,6 +107,11 @@ Qt surface, focused tests, and observable acceptance.
   Cinnamon/X11 two-process routing smoke and interactive-harness launch/close checkpoint with clean
   owned-process cleanup. This does not substitute for packaged GUI, screen-reader/high-contrast,
   physical-DPI/multi-monitor, privileged-install, or final release-matrix acceptance.
+- [x] (2026-08-16) Added the completed source-tree semantic parent workflow evidence: the canonical
+  X11 runner passed 19 checkpoints through asynchronous signing, reopen, and a second locally
+  verified signature. This closes the source-tree X11 workflow gate; human accessibility, packaged
+  GUI, privileged host installation, and final release gates remain open. Wayland is deferred until
+  Mint treats it as a first-class supported session.
 - [ ] (remaining release gate) Retire migrated compatibility or acceptance product cruft whose
   consumers are gone; this is intentionally separate from the preview behavior closure.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager

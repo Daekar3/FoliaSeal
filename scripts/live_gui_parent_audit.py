@@ -183,10 +183,15 @@ class _NonNativeAuditDirectoryDialog:
 def _button_with_text(root: Any, text: str) -> Any:
     from PySide6.QtWidgets import QPushButton
 
-    for button in root.findChildren(QPushButton):
+    for button in _widget_root(root).findChildren(QPushButton):
         if button.text().strip() == text:
             return button
     raise RuntimeError(f"Could not find button {text!r} in {root.windowTitle()!r}.")
+
+
+def _widget_root(root: Any) -> Any:
+    """Return the mounted QWidget behind a concrete shell facade."""
+    return getattr(root, "container", root)
 
 
 def _line_edit_for_form_label(dialog: Any, label_text: str) -> Any:
@@ -221,11 +226,24 @@ def _single_line_edit(dialog: Any) -> Any:
 def _assert_visible_text(root: Any, expected: str) -> None:
     from PySide6.QtWidgets import QLabel
 
-    for label in root.findChildren(QLabel):
+    for label in _widget_root(root).findChildren(QLabel):
         is_visible = getattr(label, "isVisible", None)
         if (not callable(is_visible) or is_visible()) and expected in label.text():
             return
     raise RuntimeError(f"Could not find visible explanatory text: {expected!r}.")
+
+
+def _assert_visible_text_any(root: Any, expected: tuple[str, ...]) -> None:
+    """Assert that one of the current state-specific explanatory labels is visible."""
+    from PySide6.QtWidgets import QLabel
+
+    for label in _widget_root(root).findChildren(QLabel):
+        is_visible = getattr(label, "isVisible", None)
+        if (not callable(is_visible) or is_visible()) and any(
+            candidate in label.text() for candidate in expected
+        ):
+            return
+    raise RuntimeError(f"Could not find any visible explanatory text: {expected!r}.")
 
 
 def _active_modal(app: Any, title: str) -> Any | None:
@@ -287,8 +305,18 @@ def _dismiss_information_box(app: Any) -> None:
         modal = app.activeModalWidget()
         if isinstance(modal, QMessageBox):
             modal.accept()
+            return
+        for candidate in app.topLevelWidgets():
+            if isinstance(candidate, QMessageBox) and candidate.isVisible():
+                candidate.accept()
+                return
+        # Certificate creation opens informational and optional-export question
+        # boxes after the create dialog's nested event loop starts. Keep
+        # polling until those nested dialogs exist instead of relying on a
+        # one-shot timer race.
+        QTimer.singleShot(25, dismiss)
 
-    QTimer.singleShot(25, dismiss)
+    QTimer.singleShot(0, dismiss)
 
 
 def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
@@ -296,6 +324,30 @@ def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
     from PySide6.QtWidgets import QCheckBox
 
     clicked = False
+    dialog_port = frame._certificate_dialog_port
+    original_bindings = dialog_port._bindings
+    original_message_box = original_bindings.q_message_box
+
+    class _AuditCertificateMessageBox:
+        """Avoid unattended informational/export dialogs in the certificate audit."""
+
+        Yes = getattr(original_message_box, "Yes", 1)
+        No = getattr(original_message_box, "No", 0)
+        Ok = getattr(original_message_box, "Ok", 0)
+
+        @staticmethod
+        def information(*_args: Any, **_kwargs: Any) -> int:
+            return _AuditCertificateMessageBox.Ok
+
+        @staticmethod
+        def question(*_args: Any, **_kwargs: Any) -> int:
+            return _AuditCertificateMessageBox.No
+
+        @staticmethod
+        def warning(*args: Any, **kwargs: Any) -> Any:
+            return original_message_box.warning(*args, **kwargs)
+
+    dialog_port._bindings = replace(original_bindings, q_message_box=_AuditCertificateMessageBox)
 
     def drive(app: Any) -> bool:
         nonlocal clicked
@@ -304,8 +356,10 @@ def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
             return False
         if clicked:
             return True
+        _line_edit_for_form_label(dialog, "Full name").setText("FoliaSeal Live Audit")
         _line_edit_for_form_label(dialog, "Display name").setText(AUDIT_CERTIFICATE_NAME)
         _line_edit_for_form_label(dialog, "Password").setText(AUDIT_PASSPHRASE)
+        _line_edit_for_form_label(dialog, "Confirm password").setText(AUDIT_PASSPHRASE)
         checkboxes = dialog.findChildren(QCheckBox)
         save_password = next(
             (box for box in checkboxes if box.text() == "Save password securely"),
@@ -314,14 +368,14 @@ def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
         if save_password is None:
             raise RuntimeError("Certificate dialog has no saved-password checkbox.")
         save_password.setChecked(True)
-        # ``information`` enters a nested Qt event loop; schedule its dismissal
-        # before clicking Create so no unattended dialog survives this audit.
-        _dismiss_information_box(app)
         _button_with_text(dialog, "Create").click()
         clicked = True
         return True
 
-    result = _run_modal_action(audit.app, frame.show_certificate_creation, drive)
+    try:
+        result = _run_modal_action(audit.app, frame.show_certificate_creation, drive)
+    finally:
+        dialog_port._bindings = original_bindings
     if result is None:
         raise RuntimeError("Create certificate dialog did not return a creation result.")
     return result
@@ -334,9 +388,12 @@ def _accept_confirm_signing(app: Any) -> bool:
     modal = app.activeModalWidget()
     if not isinstance(modal, QMessageBox) or modal.windowTitle() != "Confirm signing":
         return False
-    button = modal.button(QMessageBox.StandardButton.Yes)
+    button = next(
+        (candidate for candidate in modal.buttons() if candidate.text().strip() == "Sign and save"),
+        None,
+    )
     if button is None:
-        raise RuntimeError("Confirm signing dialog did not provide a Yes button.")
+        raise RuntimeError("Confirm signing dialog did not provide a Sign and save button.")
     button.click()
     return True
 
@@ -345,7 +402,7 @@ def _select_certificate_configuration(shell: Any, display_name: str) -> None:
     """Select the created identity through its real Qt combo-box signal path."""
     from PySide6.QtWidgets import QComboBox
 
-    for combo in shell.findChildren(QComboBox):
+    for combo in _widget_root(shell).findChildren(QComboBox):
         index = combo.findText(display_name)
         if index >= 0:
             combo.setCurrentIndex(index)
@@ -354,14 +411,20 @@ def _select_certificate_configuration(shell: Any, display_name: str) -> None:
 
 
 def _audit_certificate_and_preset_clarity(shell: Any, audit: _Audit) -> None:
-    """Assert the mounted shell explains the two reusable-object choices."""
-    _assert_visible_text(
+    """Assert the mounted shell explains the current reusable-object choices."""
+    _assert_visible_text_any(
         shell,
-        "Certificate configurations are saved signing identities.",
+        (
+            "Certificate configurations are saved signing identities.",
+            "Select a certificate configuration before signing.",
+        ),
     )
-    _assert_visible_text(
+    _assert_visible_text_any(
         shell,
-        "Signature presets reuse saved appearance and placement choices.",
+        (
+            "Signature presets reuse saved appearance and placement choices.",
+            "No saved presets yet. Open the Signature Library to create a required Appearance",
+        ),
     )
     audit.checkpoint("certificate-and-preset-clarity", "Step 2 of 6 — Choose signing setup")
 
@@ -372,7 +435,7 @@ def _visible_group_titles(root: Any) -> set[str]:
 
     return {
         group.title().strip()
-        for group in root.findChildren(QGroupBox)
+        for group in _widget_root(root).findChildren(QGroupBox)
         if group.isVisible()
     }
 
@@ -415,7 +478,7 @@ def _audit_preset_first_shell(shell: Any, audit: _Audit) -> None:
 
     if any(
         editor.isVisible() and editor.placeholderText().strip() == "Enter a preset name"
-        for editor in shell.findChildren(QLineEdit)
+        for editor in _widget_root(shell).findChildren(QLineEdit)
     ):
         raise RuntimeError("Default shell leaked the inline preset-name editor.")
     audit.checkpoint("preset-first-default-shell", "Step 2 of 6 — Choose signing setup")
@@ -450,20 +513,22 @@ def _audit_preset_first_shell(shell: Any, audit: _Audit) -> None:
 
 def _audit_profile_library(frame: Any, audit: _Audit) -> None:
     """Verify the visible Settings route manages saved presets without shell internals."""
-    def drive(app: Any) -> bool:
-        dialog = _active_modal(app, "Manage signing profiles")
-        if dialog is None:
-            return False
-        _assert_visible_text(dialog, "References")
-        from PySide6.QtWidgets import QComboBox
+    dialog = frame.show_reusable_object_library(initial_catalog="presets")
+    audit.process_events()
+    widget = dialog.controls.dialog
+    _assert_visible_text(widget, "saved references")
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QListWidget
 
-        combos = dialog.findChildren(QComboBox)
-        if len(combos) != 1 or combos[0].findText(f"Preset: {AUDIT_SIGNATURE_PRESET}") < 0:
-            raise RuntimeError("Profile library did not visibly list the saved signature preset.")
-        _button_with_text(dialog, "Close").click()
-        return True
-
-    _run_modal_action(audit.app, frame.show_signature_profile_library, drive)
+    selectors = widget.findChildren(QListWidget)
+    if not selectors or not any(
+        any(item.text() == AUDIT_SIGNATURE_PRESET for item in selector.findItems(
+            AUDIT_SIGNATURE_PRESET, Qt.MatchFlag.MatchExactly
+        ))
+        for selector in selectors
+    ):
+        raise RuntimeError("Profile library did not visibly list the saved signature preset.")
+    _button_with_text(widget, "Close").click()
     audit.checkpoint("profile-library-clarity", "Step 4 of 6 — Review reusable signing objects")
 
 
@@ -647,6 +712,18 @@ def _save_and_reselect_signature_preset(
         raise RuntimeError(
             "Saved signature preset could not be reselected through the workspace selector."
         )
+    # QComboBox's production signal path applies the resolved preset through
+    # queued coordinator effects; let that path settle before the next visible
+    # control is touched or the final confirmation snapshot is taken.
+    audit.process_events()
+    selected_state = shell.properties_panel.load_setup_state()
+    if selected_state.selected_signature_preset_name != AUDIT_SIGNATURE_PRESET:
+        raise RuntimeError(
+            "Workspace selector displayed the saved preset but did not apply it to the "
+            "setup state: "
+            f"selected={selected_state.selected_signature_preset_name!r}, "
+            f"validation={selected_state.validation_text!r}."
+        )
     certificate_combo = _combo_with_item(shell, expected_certificate_name)
     if certificate_combo is None or certificate_combo.currentText() != expected_certificate_name:
         raise RuntimeError(
@@ -667,7 +744,7 @@ def _open_refinement_from_visible_control(
 def _visible_button_with_text(root: Any, text: str) -> Any:
     from PySide6.QtWidgets import QPushButton
 
-    for button in root.findChildren(QPushButton):
+    for button in _widget_root(root).findChildren(QPushButton):
         if button.text().strip() != text:
             continue
         is_visible = getattr(button, "isVisible", None)
@@ -680,7 +757,7 @@ def _combo_with_item(root: Any, text: str) -> Any | None:
     """Return a visible Qt combo which exposes the expected persisted item."""
     from PySide6.QtWidgets import QComboBox
 
-    for combo in root.findChildren(QComboBox):
+    for combo in _widget_root(root).findChildren(QComboBox):
         is_visible = getattr(combo, "isVisible", None)
         if callable(is_visible) and not is_visible():
             continue
@@ -701,6 +778,18 @@ def _sidebar_button(shell: Any, attribute: str, *, label: str) -> Any:
     return button
 
 
+def _concrete_shell(frame: Any) -> Any:
+    """Recover the concrete Qt shell behind the public opaque workspace view."""
+    workspace = frame.current_workspace
+    if workspace is None:
+        raise RuntimeError("FoliaSeal has no active workspace.")
+    view = workspace.view
+    shell = getattr(view, "shell", None)
+    if shell is None:
+        raise RuntimeError("Active workspace view does not expose the Qt shell to this audit.")
+    return shell
+
+
 def _place_signature_with_viewer_drag(
     shell: Any,
     audit: _Audit,
@@ -712,6 +801,10 @@ def _place_signature_with_viewer_drag(
     from PySide6.QtCore import QPoint, Qt
     from PySide6.QtTest import QTest
 
+    set_mode = getattr(shell, "set_viewer_interaction_mode", None)
+    if not callable(set_mode):
+        raise RuntimeError("Mounted shell cannot enter signature placement mode.")
+    set_mode("signature")
     viewer = shell.viewer_widget
     canvas = viewer.widget()
     if canvas.width() < 220 or canvas.height() < 220:
@@ -832,7 +925,12 @@ def _choose_output_path(shell: Any, audit: _Audit, output_path: Path) -> None:
         raise RuntimeError(f"Output chooser selected {selected!r}, not {str(output_path)!r}.")
 
 
-def _accept_confirm_signing_with_assertion(app: Any, expected_output: Path) -> bool:
+def _accept_confirm_signing_with_assertion(
+    app: Any,
+    expected_output: Path,
+    *,
+    require_preset_name: bool = True,
+) -> bool:
     """Assert the visible confirmation summary before accepting the real dialog."""
     from PySide6.QtWidgets import QMessageBox
 
@@ -840,17 +938,21 @@ def _accept_confirm_signing_with_assertion(app: Any, expected_output: Path) -> b
     if not isinstance(modal, QMessageBox) or modal.windowTitle() != "Confirm signing":
         return False
     text = modal.text()
-    for expected in (
-        str(expected_output),
-        AUDIT_CERTIFICATE_NAME,
-        AUDIT_SIGNATURE_PRESET,
-        "Readiness:",
-    ):
+    expected_values = [str(expected_output), AUDIT_CERTIFICATE_NAME, "Readiness:"]
+    if require_preset_name:
+        expected_values.insert(1, AUDIT_SIGNATURE_PRESET)
+    for expected in expected_values:
         if expected not in text:
-            raise RuntimeError(f"Confirmation dialog omitted expected summary text: {expected!r}.")
-    button = modal.button(QMessageBox.StandardButton.Yes)
+            raise RuntimeError(
+                "Confirmation dialog omitted expected summary text: "
+                f"{expected!r}; actual summary was {text!r}."
+            )
+    button = next(
+        (candidate for candidate in modal.buttons() if candidate.text().strip() == "Sign and save"),
+        None,
+    )
     if button is None:
-        raise RuntimeError("Confirm signing dialog did not provide a Yes button.")
+        raise RuntimeError("Confirm signing dialog did not provide a Sign and save button.")
     button.click()
     return True
 
@@ -862,11 +964,12 @@ def _sign_current_shell(
     output_path: Path,
     *,
     checkpoint_prefix: str,
+    require_preset_name: bool = True,
 ) -> Path:
     """Choose output, confirm, and sign the currently mounted workspace."""
     _choose_output_path(shell, audit, output_path)
     audit.checkpoint(f"{checkpoint_prefix}-output-selected", "Step 5 of 6 — Confirm and sign")
-    if not frame.current_shell.is_sign_action_enabled():
+    if not shell.is_sign_action_enabled():
         raise RuntimeError(f"{checkpoint_prefix} sign action remained disabled.")
     audit.checkpoint(f"{checkpoint_prefix}-ready-to-sign", "Step 5 of 6 — Confirm and sign")
     sign_button = _sidebar_button(shell, "sign_button", label="Confirm and sign")
@@ -875,14 +978,36 @@ def _sign_current_shell(
     _run_modal_action(
         audit.app,
         sign_button.click,
-        lambda app: _accept_confirm_signing_with_assertion(app, output_path),
+        lambda app: _accept_confirm_signing_with_assertion(
+            app,
+            output_path,
+            require_preset_name=require_preset_name,
+        ),
     )
-    audit.process_events()
+    _wait_for_signed_output(frame, audit, output_path)
     actual_output = Path(frame.current_signing_workflow.output_pdf_path)
     if not actual_output.is_file():
         raise RuntimeError(f"{checkpoint_prefix} signing did not create {actual_output}.")
     audit.checkpoint(f"{checkpoint_prefix}-signed", "Step 6 of 6 — Verify signed PDF")
     return actual_output
+
+
+def _wait_for_signed_output(frame: Any, audit: _Audit, output_path: Path) -> None:
+    """Let the production asynchronous signing transaction finish and poll it."""
+    import time
+
+    from PySide6.QtTest import QTest
+
+    deadline = time.monotonic() + 30.0
+    while time.monotonic() < deadline:
+        audit.process_events()
+        shell = _concrete_shell(frame)
+        shell.poll_signing_transaction()
+        audit.process_events()
+        if output_path.is_file() and shell.last_signing_result is not None:
+            return
+        QTest.qWait(100)
+    raise RuntimeError(f"Signing transaction did not create {output_path} within 30 seconds.")
 
 
 def _assert_two_signature_review(shell: Any, signed_output: Path) -> None:
@@ -917,7 +1042,9 @@ def _assert_two_signature_review(shell: Any, signed_output: Path) -> None:
             raise RuntimeError(
                 f"Mounted review selector item {index} was {selector.currentText()!r}."
             )
-    review_text = "\n".join(label.text() for label in shell.findChildren(QLabel)).lower()
+    review_text = "\n".join(
+        label.text() for label in _widget_root(shell).findChildren(QLabel)
+    ).lower()
     if "signature 1" not in review_text or "signature 2" not in review_text:
         raise RuntimeError("Mounted review surface did not render both signature labels.")
 
@@ -985,7 +1112,8 @@ def run_audit(
         audit = _Audit(app=app, window=frame.window, artifact_dir=artifact_dir, checkpoints=[])
         audit.process_events()
 
-        shell = frame.open_pdf_path(input_pdf)
+        frame.open_pdf_path(input_pdf)
+        shell = _concrete_shell(frame)
         if shell is None:
             raise RuntimeError("FoliaSeal did not open the representative PDF.")
         audit.checkpoint("document-review", "Step 2 of 6 — Choose signing setup")
@@ -1041,7 +1169,7 @@ def run_audit(
         selected_output = root / "chosen-signed-output.pdf"
         _choose_output_path(shell, audit, selected_output)
         audit.checkpoint("output-selected", "Step 5 of 6 — Confirm and sign")
-        if not frame.current_shell.is_sign_action_enabled():
+        if not shell.is_sign_action_enabled():
             workflow = frame.current_signing_workflow
             raise RuntimeError(
                 "Sign action remained disabled after certificate setup and placement "
@@ -1067,7 +1195,7 @@ def run_audit(
             sign_button.click,
             lambda app: _accept_confirm_signing_with_assertion(app, selected_output),
         )
-        audit.process_events()
+        _wait_for_signed_output(frame, audit, selected_output)
         output_path = Path(frame.current_signing_workflow.output_pdf_path)
         if not output_path.is_file():
             raise RuntimeError(f"Signing did not create the expected output: {output_path}")
@@ -1082,7 +1210,7 @@ def run_audit(
             raise RuntimeError("Visible Open signed PDF control was not enabled after signing.")
         open_signed_output_button.click()
         audit.process_events()
-        reopened_shell = frame.current_shell
+        reopened_shell = _concrete_shell(frame)
         if reopened_shell is shell:
             raise RuntimeError("Open signed output did not mount a fresh signed-PDF workspace.")
         if Path(frame.current_signing_workflow.input_pdf_path) != output_path:
@@ -1101,7 +1229,7 @@ def run_audit(
 
         review_text = "\n".join(
             label.text()
-            for label in reopened_shell.findChildren(QLabel)
+            for label in _widget_root(reopened_shell).findChildren(QLabel)
         ).lower()
         if "signature" not in review_text:
             raise RuntimeError(
@@ -1118,6 +1246,15 @@ def run_audit(
         if preset_combo is None:
             raise RuntimeError("Reopened workspace did not expose the stored signature preset.")
         preset_combo.setCurrentText(AUDIT_SIGNATURE_PRESET)
+        audit.process_events()
+        selected_state = reopened_shell.properties_panel.load_setup_state()
+        if selected_state.selected_signature_preset_name != AUDIT_SIGNATURE_PRESET:
+            raise RuntimeError(
+                "Reopened workspace displayed the saved preset but did not apply it to the "
+                "setup state: "
+                f"selected={selected_state.selected_signature_preset_name!r}, "
+                f"validation={selected_state.validation_text!r}."
+            )
         frame.current_signing_workflow.tsa_url = "https://tsa.example.invalid"
         frame.current_signing_workflow.timestamp_required = False
         audit.process_events()
@@ -1144,6 +1281,7 @@ def run_audit(
             audit,
             second_output,
             checkpoint_prefix="second-signature",
+            require_preset_name=False,
         )
         if output_path.read_bytes() != first_output_bytes:
             raise RuntimeError("The first signed output changed during the second signing.")
@@ -1157,7 +1295,7 @@ def run_audit(
             raise RuntimeError("Open signed PDF was not enabled after the second signature.")
         second_open_button.click()
         audit.process_events()
-        final_shell = frame.current_shell
+        final_shell = _concrete_shell(frame)
         if final_shell is reopened_shell:
             raise RuntimeError("Second signed output did not mount a fresh workspace.")
         final_shell.refresh_viewer()
@@ -1204,6 +1342,12 @@ def run_audit(
     finally:
         # Close frame-owned and modal windows even on failures.  This avoids the
         # unattended FoliaSeal/dialog processes that coordinate-driven audit left.
+        if frame is not None:
+            workspace = getattr(frame, "current_workspace", None)
+            maintenance = getattr(workspace, "maintenance", None)
+            discard = getattr(maintenance, "discard_draft", None)
+            if callable(discard):
+                discard()
         for widget in list(app.topLevelWidgets()):
             widget.close()
         app.processEvents()

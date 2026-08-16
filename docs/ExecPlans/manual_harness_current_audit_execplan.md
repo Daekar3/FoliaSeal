@@ -254,3 +254,10 @@ Recorded the newly available unsandboxed Cinnamon/X11 session, the successful in
 visual checkpoint and clean close, the explicit checklist-template friction, and the remaining
 four-case/accessibility/package gates. Wayland is intentionally deferred until Mint provides a
 first-class supported session.
+
+Revision note: 2026-08-16
+The sibling `x11_parent_workflow_acceptance_execplan.md` completed the deeper source-tree semantic
+parent audit on the same Cinnamon/X11 session: 19 checkpoints passed through two locally verified
+signatures and reopen. This strengthens the X11 source-tree evidence but does not close this plan's
+four-case human walkthrough, screen-reader/high-contrast/DPI/monitor, packaged, privileged-install,
+or final release gates. Wayland remains intentionally deferred.
