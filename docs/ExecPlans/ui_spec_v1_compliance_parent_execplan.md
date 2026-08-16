@@ -642,6 +642,15 @@ Release tranche:
   and the owned GUI process were cleaned. This closes packaged-X11 startup
   evidence only; human accessibility, privileged installation, final release,
   and Wayland remain open/deferred.
+- [x] (2026-08-16) Completed the bounded source-tree X11 visual/geometry child.
+  The audit captured and inspected the exact Qt-owned 1100x700 no-document
+  client frame on primary `DP-4` (1920x1080, DPR 1.0, 96 DPI), including the
+  menu row, no-document message, and full-width Open/Library controls. The
+  initial desktop-helper image was rejected and replaced with deterministic
+  `QWidget.grab()` evidence; native F1 and owned-resource cleanup remained
+  green. This closes only concrete X11 visual geometry evidence; human
+  screen-reader/contrast/DPI/monitor, privileged, final-release, and Wayland
+  gates remain open or deferred.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

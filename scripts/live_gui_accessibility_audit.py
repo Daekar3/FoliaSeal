@@ -220,13 +220,71 @@ def _metadata(frame: Any) -> dict[str, Any]:
     }
 
 
+def _rect_metadata(rect: Any) -> dict[str, int]:
+    return {
+        "x": int(rect.x()),
+        "y": int(rect.y()),
+        "width": int(rect.width()),
+        "height": int(rect.height()),
+    }
+
+
+def _capture_window(window: Any, window_id: int, path: Path, screen: Any) -> None:
+    grab = getattr(window, "grab", None)
+    if callable(grab):
+        pixmap = grab()
+        if not pixmap.isNull() and pixmap.save(str(path), "PNG"):
+            return
+    pixmap = screen.grabWindow(window_id)
+    if pixmap.isNull() or not pixmap.save(str(path), "PNG"):
+        raise RuntimeError("display screenshot capture failed")
+
+
+def _visual_metadata(frame: Any, app: Any, artifacts_dir: Path, *, capture: bool) -> dict[str, Any]:
+    from PySide6.QtWidgets import QPushButton
+
+    screen = frame.window.screen() or app.primaryScreen()
+    if screen is None:
+        raise RuntimeError("audit window has no associated display screen")
+    buttons = {
+        button.accessibleName(): _rect_metadata(button.geometry())
+        for button in frame.window.findChildren(QPushButton)
+        if getattr(button, "accessibleName", lambda: "")()
+    }
+    metadata: dict[str, Any] = {
+        "window_geometry": _rect_metadata(frame.window.geometry()),
+        "window_size": [int(frame.window.width()), int(frame.window.height())],
+        "screen_name": str(screen.name()),
+        "screen_count": len(app.screens()),
+        "screen_geometry": _rect_metadata(screen.geometry()),
+        "available_geometry": _rect_metadata(screen.availableGeometry()),
+        "device_pixel_ratio": float(screen.devicePixelRatio()),
+        "logical_dpi": {
+            "x": float(screen.logicalDotsPerInchX()),
+            "y": float(screen.logicalDotsPerInchY()),
+        },
+        "primary_button_geometries": buttons,
+        "menu_bar_geometry": _rect_metadata(frame.window.menuBar().geometry()),
+        "central_widget_geometry": (
+            _rect_metadata(frame.window.centralWidget().geometry())
+            if frame.window.centralWidget() is not None
+            else None
+        ),
+    }
+    if capture:
+        screenshot_path = artifacts_dir / "frame.png"
+        _capture_window(frame.window, int(frame.window.winId()), screenshot_path, screen)
+        metadata["screenshot"] = screenshot_path.name
+    return metadata
+
+
 def _help_command_id() -> Any:
     from foliaseal.presentation.qt.app_frame_command_model import AppFrameCommandId
 
     return AppFrameCommandId.HELP
 
 
-def run_audit(artifacts_dir: Path, timeout_seconds: float) -> int:
+def run_audit(artifacts_dir: Path, timeout_seconds: float, capture_screenshot: bool) -> int:
     report: dict[str, Any] = {
         "status": "failed",
         "display": os.environ.get("DISPLAY"),
@@ -248,6 +306,7 @@ def run_audit(artifacts_dir: Path, timeout_seconds: float) -> int:
         },
     }
     report_path = artifacts_dir / "audit.json"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
     app: Any = None
     frame: Any = None
     exit_code = 1
@@ -274,7 +333,16 @@ def run_audit(artifacts_dir: Path, timeout_seconds: float) -> int:
                     if hasattr(frame.window, "requestActivate"):
                         frame.window.requestActivate()
                     app.processEvents()
+                    wmctrl_activation = _activate_window(int(frame.window.winId()))
+                    report["native_input"] = {"wmctrl_activation": wmctrl_activation}
+                    if not wmctrl_activation:
+                        raise RuntimeError("wmctrl could not activate the audit-owned window")
+                    app.processEvents()
                     report["metadata"] = _metadata(frame)
+                    if capture_screenshot:
+                        report["visual"] = _visual_metadata(
+                            frame, app, artifacts_dir, capture=True
+                        )
                     frame.command_actions()[_help_command_id()].trigger()
                     app.processEvents()
                     if frame.help_viewer is None:
@@ -284,9 +352,9 @@ def run_audit(artifacts_dir: Path, timeout_seconds: float) -> int:
                     if frame.help_viewer is not None:
                         raise AssertionError("direct Help viewer did not close cleanly")
                     wmctrl_activation = _activate_window(int(frame.window.winId()))
-                    report["native_input"] = {"wmctrl_activation": wmctrl_activation}
+                    report["native_input"]["wmctrl_activation_before_f1"] = wmctrl_activation
                     if not wmctrl_activation:
-                        raise RuntimeError("wmctrl could not activate the audit-owned window")
+                        raise RuntimeError("wmctrl could not reactivate the audit-owned window")
                     with _X11Input() as x11:
                         x11.focus_and_press_f1(int(frame.window.winId()))
                     deadline = time.monotonic() + 2.0
@@ -347,8 +415,13 @@ def main() -> int:
         default=Path("/tmp/foliaseal-x11-accessibility-audit"),
     )
     parser.add_argument("--timeout-seconds", type=float, default=15.0)
+    parser.add_argument(
+        "--capture-screenshot",
+        action="store_true",
+        help="Capture the audit-owned X11 frame as frame.png and record display geometry.",
+    )
     args = parser.parse_args()
-    return run_audit(args.artifacts_dir, args.timeout_seconds)
+    return run_audit(args.artifacts_dir, args.timeout_seconds, args.capture_screenshot)
 
 
 if __name__ == "__main__":

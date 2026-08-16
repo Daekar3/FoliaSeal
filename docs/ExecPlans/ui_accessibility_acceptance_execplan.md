@@ -139,6 +139,15 @@ physical-DPI interpretation, installed-package GUI, privileged installation, and
 matrix remain outstanding and must not be inferred from this evidence; Wayland is deferred for Mint
 22.3.
 
+The child visual/geometry audit also passed on X11. Qt-owned widget capture
+showed the complete 1100x700 no-document client frame, menu row, message, and
+full-width Open/Library controls on the primary 1920x1080 screen; DPR and
+logical DPI were 1.0 and 96.0. A desktop screenshot helper was rejected after
+selecting the underlying editor, and the exact-widget rerun passed with
+owned-window, process, and temporary-root cleanup. This remains concrete X11
+evidence, not human screen-reader, contrast, physical-DPI, monitor-move,
+packaged, or final release approval; Wayland is deferred for Mint 22.3.
+
 ## Context and Orientation
 
 `src/foliaseal/presentation/qt/app_frame.py` constructs the real `QMainWindow`, typed menu actions,

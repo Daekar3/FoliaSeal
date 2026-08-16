@@ -133,6 +133,14 @@ Qt surface, focused tests, and observable acceptance.
   Help, Poppler support, and clean owned-process/root teardown. This does not
   close human accessibility, privileged host installation, final release
   matrix, or Wayland.
+- [x] (2026-08-16) Completed the source-tree X11 visual/geometry evidence child
+  `x11_visual_layout_audit_execplan.md`. The exact Qt-owned client capture was
+  inspected at 1100x700 with the no-document message, menu row, and full-width
+  Open/Library controls visible on a 1920x1080 primary screen (DPR 1.0, 96 DPI);
+  native F1 and teardown remained green. The first desktop-helper capture was
+  discarded as contaminated by the underlying editor. Human assistive
+  technology, contrast, physical-DPI/monitor interpretation, privileged host
+  installation, final release acceptance, and Wayland remain open/deferred.
 - [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
   cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
