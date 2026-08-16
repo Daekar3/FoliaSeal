@@ -197,11 +197,29 @@ Qt surface, focused tests, and observable acceptance.
   by focused tests as an adapter, and `PdfCompatibility` remains production signing policy. No
   additional compatibility or acceptance cruft met a safe retirement condition, so no source
   deletion was made.
-- [ ] (remaining release gate) Complete the final release-matrix rerun of
-  focused/regression, display-backed, and privileged host package-manager validation. The bounded
-  X11 rerun reached the real Cinnamon/X11 frame and cleaned up successfully,
-  but its native-F1 assertion remains an environment-dependent failure, so it
-  does not close this gate; clean processes and artifacts after each attempt.
+- [x] (2026-08-16) Re-ran the bounded Cinnamon/X11 accessibility audit after the prior native-F1
+  friction. The same source-tree frame, two-monitor metadata, direct Help action, native XTest F1,
+  modeless Help viewer, and owned-resource teardown all passed on the follow-up run. The earlier
+  failure is therefore retained as intermittent desktop focus/input friction rather than treated
+  as an AppFrame defect; product code and Qt shortcut wiring remain unchanged. The temporary
+  report root was removed during closeout and no FoliaSeal-owned processes or windows remained.
+- [x] (2026-08-16) Re-ran the automated release gates from a fresh build: full suite `1574 passed,
+  20 skipped, 1 warning`, Ruff/compile checks clean, PyInstaller bundle successful, and fresh
+  Debian extraction plus private `dpkg --unpack` smoke passed with five offline Help topics,
+  eighteen fonts, two runtime icons, Poppler conversion, and complete private-root cleanup. The
+  isolated packaged GUI probe remains explicitly `limited` by the known `SingleInstanceUnavailable`
+  endpoint boundary; this does not claim display-backed packaged acceptance or privileged host
+  installation.
+- [x] (2026-08-16) The full validation run left 104 FoliaSeal-owned
+  `foliaseal-canonical-preview-*` temporary image roots from direct preview-render consumers;
+  all were verified idle, removed as exact owned cleanup targets, and recorded as cleanup
+  friction for future preview-lifecycle hardening. No unrelated `/tmp` entries were removed.
+- [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
+  focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
+  remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor
+  interpretation, human GUI acceptance, and privileged host package installation. Keep the
+  packaged GUI probe explicitly limited by its isolated `SingleInstanceUnavailable` boundary,
+  retain the Mint 22.3 Wayland deferral, and clean processes and artifacts after each attempt.
 - [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
   corpus after the remaining children close.
 
