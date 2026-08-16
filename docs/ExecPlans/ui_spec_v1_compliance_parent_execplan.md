@@ -589,7 +589,8 @@ Release tranche:
 - [x] (2026-08-16) Closed the command-model child after a fresh source/spec audit confirmed that
   every UI_SPEC §7 File/Edit/View/Signing/Settings/Help command is already registered, routed, and
   covered by focused/offscreen evidence. Stale deferred-command wording was reconciled in the child
-  and architecture records; display-backed and final release gates remain separate.
+  and architecture records; documentation closeout is committed as `4a0fd494d`; display-backed and
+  final release gates remain separate.
 - [x] (2026-08-16) Re-ran the current signed-evidence harness audit through
   `docs/ExecPlans/manual_harness_current_audit_execplan.md`: the strict headless gates pass with
   18/18 parity signings and 3/3 matched fit rejections, and the four tracer artifacts are coherent.

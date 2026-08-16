@@ -557,3 +557,8 @@ Revision note: 2026-08-10 / Codex
 Selected the next dependency-ready command increment: typed View → Pan over the existing public
 viewer-interaction mode boundary. The frame owns only registry metadata/action enablement; runtime
 owns mode transitions and text-mode clearing, and no shortcut or duplicate mode state is introduced.
+Revision note: 2026-08-16 / Codex
+Audited the live command registry and found all UI_SPEC command families implemented and covered by
+focused/offscreen evidence. Reconciled stale deferred-command wording and closed this child as a
+complete command-model plan; display-backed and final release acceptance remain parent gates. The
+documentation and architecture reconciliation were committed as `4a0fd494d`.

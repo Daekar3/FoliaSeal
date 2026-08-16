@@ -33,6 +33,8 @@ documentation/status change only; no new command behavior belongs in this slice.
   is ready for the documentation/compliance commit. Focused command/AppFrame/session/launch coverage
   passed `81`; the full suite passed `1535 passed, 20 skipped, 1 warning`; Ruff, compileall, and
   `git diff --check` passed.
+- [x] (2026-08-16) Committed the four-file documentation/status closeout as `4a0fd494d`; the
+  worktree is clean and no FoliaSeal, PySide6, or pytest process remains.
 
 ## Surprises & Discoveries
 
@@ -112,9 +114,9 @@ plan-link checks.
 
 ## Artifacts and Notes
 
-Record the focused command test count, full-suite count, and final commit hash in the child plan,
-parent plan, and architecture history. Do not commit ignored QA PDFs, certificates, screenshots, or
-temporary package roots.
+Record the focused command test count, full-suite count, and final commit hash (`4a0fd494d`) in the
+child plan, parent plan, and architecture history. Do not commit ignored QA PDFs, certificates,
+screenshots, or temporary package roots.
 
 ## Interfaces and Dependencies
 
