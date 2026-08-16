@@ -734,6 +734,11 @@ Release tranche:
   cleanup, direct-renderer test cleanup, and explicit renderer-failure/adapter
   success-and-exception ownership tests are complete; display-backed, privileged-host, final
   release, and Mint 22.3 Wayland gates remain as previously recorded.
+- [x] (2026-08-16) Revalidated the clean checkout after the X11 evidence slice: the full suite
+  passed (`1585 passed, 20 skipped, 1 warning`), Ruff, bytecode compilation, `pip check`, and
+  `git diff --check` passed, and no FoliaSeal-owned processes or `/tmp/foliaseal-*` roots remained.
+  This closes the AFK regression check only; display-backed human acceptance, privileged host
+  installation, final release signoff, and deferred Mint 22.3 Wayland remain open.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -845,13 +850,14 @@ window-manager activation and is recorded in the accessibility/release children;
 human assistive-technology, physical-DPI, packaged, privileged-install, final-release, or Wayland
 gates.
 
-The parent is not complete. Several child checkboxes remain open because the remaining requirements
-include full document lifecycle/recovery, remaining nested Library transactions and editors,
-certificate flows, pointer/keyboard placement, preview fidelity, atomic sign/write/verification/
-recovery, complete Edit/View/Signing/Help command surfaces, remaining Library editor/mutation flows,
-monitor/DPI/toolbar persistence, accessibility and packaged-release acceptance. The remembered rail
-divider and Library layout are now complete; the bounded slices deliberately recorded the remaining
-gaps instead of claiming compliance from narrow tests.
+The current AFK implementation and evidence corpus is complete for the available environment:
+the latest full suite is `1585 passed, 20 skipped, 1 warning`, Ruff/compilation/`pip check` are
+clean, and source-tree X11, packaged-X11 startup, offline package payload, and isolated package-
+manager smoke evidence are recorded. The parent remains open only for display-backed human
+screen-reader/high-contrast/physical-DPI/monitor observations, human GUI/release acceptance,
+privileged host package installation, and the final release-matrix signoff. Mint 22.3 Wayland is
+explicitly deferred until the OS treats it as a first-class supported session; no evidence claim
+is inferred from skipped Wayland work.
 
 ## Context and Orientation
 

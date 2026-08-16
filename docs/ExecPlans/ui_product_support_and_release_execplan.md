@@ -45,7 +45,8 @@ Qt surface, focused tests, and observable acceptance.
 - [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md — authoritative preview/signing
   parity, glyph and exact-fit readiness guidance, frozen-time refresh stability, and deterministic
   public-panel walkthrough are complete; display-backed accessibility/DPI/monitor, privileged host package installation,
-  and legacy acceptance compatibility/nomenclature gates remain open.
+  and final human release gates remain open; the compatibility/nomenclature audit found no safe
+  additional retirement.
 - [x] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
 - [x] docs/ExecPlans/ui_sign_confirmation_output_policy_execplan.md
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md
@@ -94,8 +95,9 @@ Qt surface, focused tests, and observable acceptance.
   Ruff, `pip check`, and `git diff --check` are clean. The deterministic walkthrough covers the
   public placement, unsupported `Common name`/`U+2603`, exact-fit blocking, ready, repeated-refresh
   frozen-time, request-timestamp equality, and cleanup states. This release plan remains open for display-backed
-  screen-reader/high-contrast/DPI/monitor, privileged host package installation, diagnostics, and legacy
-  acceptance compatibility/nomenclature retirement; no full release-compliance claim is made.
+  screen-reader/high-contrast/DPI/monitor, privileged host package installation, diagnostics, and final
+  human release acceptance; the later compatibility/nomenclature audit found no safe additional
+  retirement, and no full release-compliance claim is made.
 - [x] (2026-08-16) Reconciled completed child markers and accessibility status. Help, privacy-safe
   diagnostics, offscreen accessibility, and isolated package-manager installation are complete;
   display-backed accessibility/GUI, privileged host installation, and final release matrix remain
@@ -234,6 +236,11 @@ Qt surface, focused tests, and observable acceptance.
   cleanup, test-scoped direct-renderer cleanup, and explicit renderer-failure/adapter
   success-and-exception ownership tests are complete; display-backed accessibility, privileged
   host installation, final release acceptance, and Mint 22.3 Wayland deferral remain unchanged.
+- [x] (2026-08-16) Revalidated the current clean checkout after the X11 evidence slice: the full
+  suite passed (`1585 passed, 20 skipped, 1 warning`), Ruff, bytecode compilation, `pip check`,
+  and `git diff --check` all passed, and no FoliaSeal-owned processes or `/tmp/foliaseal-*` roots
+  remained. This closes the AFK regression check only; it does not promote the display-backed,
+  human, privileged-host, or deferred Wayland gates to complete.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor
