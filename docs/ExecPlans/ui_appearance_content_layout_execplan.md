@@ -75,8 +75,11 @@ unsafe image inputs produce an actionable error and leave the catalog unchanged.
   persistence/runtime resolution and explicit production Primary allocation. Focused validation is
   `151 passed`; full regression is `1384 passed, 20 skipped, 1 warning`; the bounded audit exits
   at `SingleInstanceUnavailable` and removes its isolated root with no process residue.
-- [ ] Obtain the final post-correction compliance review, stage this correction set, and commit it
-  before starting the open authoritative preview-fidelity child.
+- [x] (2026-08-16) Obtained the final post-correction compliance review; focused appearance/image/
+  layout validation passed 131 tests, Ruff/compileall/diff checks passed, and the implementation
+  commits `e1e60a9bc`, `ff8e41111`, and `e4c45d614` are recorded. This child is closed by
+  `ui_appearance_content_layout_status_reconciliation_execplan.md`; the authoritative preview-
+  fidelity child remains separate.
 
 ## Surprises & Discoveries
 
