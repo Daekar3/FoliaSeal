@@ -50,7 +50,6 @@ from foliaseal.application.signing_backend import (
     _resolve_visible_signature_semantics,
     _single_line_text_fits_reservation,
     _visible_signature_fit_issues,
-    _visible_signature_fit_issues_for_stamp_text,
     build_backend_reservation_evidence,
     build_signing_executor,
     prepare_signing_plan,
@@ -1156,7 +1155,7 @@ def test_horizontal_single_line_backend_validation_uses_ink_reference_for_compac
         ),
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=3,
             left_pt=36.7,
@@ -1208,7 +1207,7 @@ def test_horizontal_single_line_backend_validation_falls_back_without_ink_refere
         lambda *_args, **_kwargs: None,
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=3,
             left_pt=36.7,
@@ -1250,7 +1249,7 @@ def test_horizontal_single_line_cap10_geometry_passes_after_text_first_reservati
         )
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=3,
             left_pt=34.82,
@@ -1292,7 +1291,7 @@ def test_horizontal_single_line_still_rejects_when_text_cannot_fit(
         )
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=3,
             left_pt=34.82,
@@ -1335,7 +1334,7 @@ def test_horizontal_single_line_short_height_accepts_preserved_rendered_ink(
         )
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=3,
             left_pt=34.3,
@@ -1382,7 +1381,7 @@ def test_manual_caps_4_to_8_replay_backend_validation_ladder(
                 ),
             )
         )
-        issues = _visible_signature_fit_issues_for_stamp_text(
+        issues = validate_visible_signature_fit(
             signature_rect=build_signature_rect(
                 page_index=3,
                 left_pt=36.7,
@@ -1845,7 +1844,7 @@ def test_multi_line_bottom_allows_one_point_width_rounding_overflow(tmp_path: Pa
         height_pt=78.336,
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=signature_rect,
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text="Adam Smith\nLawson Heirs Inc.\n2026-04-06 18:11",
@@ -1917,7 +1916,7 @@ def test_multi_line_bottom_rejects_zero_height_stamp_band(tmp_path: Path) -> Non
         height_pt=32.768,
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=signature_rect,
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text="Adam Smith\nLawson Heirs Inc.\n2026-04-06 18:11",
@@ -1973,7 +1972,7 @@ def test_multi_line_horizontal_accepts_small_structural_height_overflow_when_ren
         ),
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=3,
             left_pt=36.86,
@@ -2205,7 +2204,7 @@ def test_multi_line_top_accepts_real_world_half_point_width_case(tmp_path: Path)
         height_pt=90.112,
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=signature_rect,
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text=(
@@ -2282,7 +2281,7 @@ def test_single_line_top_rejects_large_horizontal_overflow_even_with_vertical_co
         height_pt=24.06,
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=signature_rect,
         signature_appearance=SigningBackendAppearance.from_signature_appearance(appearance),
         stamp_text=(
@@ -2894,7 +2893,7 @@ def test_visible_signature_fit_issues_use_semantics_stamp_text(
         return ()
 
     monkeypatch.setattr(
-        "foliaseal.application.signing_backend._visible_signature_fit_issues_for_stamp_text",
+        "foliaseal.application.signing_backend.validate_visible_signature_fit",
         _capture_fit_issues,
     )
 
@@ -4002,7 +4001,7 @@ def test_visible_signature_fit_issues_use_rendered_ink_fallback_for_manual_singl
         "Digitally signed by\nMorgan Ellery | Board Secretary | FoliaSeal | 2026-04-24 21:26"
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=0,
             left_pt=35.0,
@@ -4096,7 +4095,7 @@ def test_visible_signature_fit_issues_use_rendered_ink_for_manual_vertical_singl
         )
     )
 
-    issues = _visible_signature_fit_issues_for_stamp_text(
+    issues = validate_visible_signature_fit(
         signature_rect=build_signature_rect(
             page_index=0,
             left_pt=35.0,

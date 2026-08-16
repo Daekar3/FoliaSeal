@@ -30,8 +30,8 @@ from foliaseal.application.signing_preview_renderer import (
     render_canonical_signature_preview,
 )
 from foliaseal.application.visible_signature_layout import (
-    LayoutRequest,
     VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutInput,
     VisibleSignatureLayoutPolicy,
 )
 from foliaseal.domain.models import (
@@ -761,7 +761,7 @@ def _reconstruct_text_box_bounds_px(
     except ValueError:
         image_prominence = SignatureImageProminence.PRIMARY
     layout_plan = VisibleSignatureLayoutEngine().plan(
-        LayoutRequest(
+        VisibleSignatureLayoutInput(
             signature_rect=signature_rect,
             layout_template=layout_template,
             stamp_position=stamp_position,

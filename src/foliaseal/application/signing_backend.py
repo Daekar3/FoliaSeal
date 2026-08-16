@@ -768,7 +768,7 @@ def _visible_signature_fit_issues(
             signature_rect=signature_rect,
         )
         stamp_background = _neutral_stamp_background_for_path(signature_appearance.image_stamp_path)
-        return _visible_signature_fit_issues_for_stamp_text(
+        return validate_visible_signature_fit(
             signature_rect=signature_rect,
             signature_appearance=signature_appearance,
             stamp_text=resolved_semantics.text.stamp_text,
@@ -783,23 +783,6 @@ def _visible_signature_fit_issues(
                 severity=SigningDraftValidationSeverity.ERROR,
             ),
         )
-
-
-def _visible_signature_fit_issues_for_stamp_text(
-    *,
-    signature_rect: SignatureRect,
-    signature_appearance: SigningBackendAppearance,
-    stamp_text: str,
-    stamp_background: PdfImage | None,
-) -> tuple[SigningDraftValidationIssue, ...]:
-    """Compatibility wrapper for public visible-signature fit validation."""
-
-    return validate_visible_signature_fit(
-        signature_rect=signature_rect,
-        signature_appearance=signature_appearance,
-        stamp_text=stamp_text,
-        stamp_background=stamp_background,
-    )
 
 
 def validate_visible_signature_fit(

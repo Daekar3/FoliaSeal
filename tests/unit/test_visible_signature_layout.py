@@ -12,13 +12,13 @@ from foliaseal.application.visible_signature_layout import (
     HorizontalInkMeasurement,
     HorizontalInkMeasurementRequest,
     ImageMetrics,
-    LayoutRequest,
     RectBounds,
     SignatureLayoutPlan,
     SignatureLayoutReservation,
     SigningVisibleSignatureStyle,
     TextMetrics,
     VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutInput,
     VisibleSignatureLayoutOptions,
     VisibleSignatureLayoutPolicy,
     VisibleSignatureLayoutRequest,
@@ -175,8 +175,8 @@ def _request(
     image_stamp_path: str | None = "stamp.png",
     show_border: bool = True,
     border_width_pt: float = 1.0,
-) -> LayoutRequest:
-    return LayoutRequest(
+) -> VisibleSignatureLayoutInput:
+    return VisibleSignatureLayoutInput(
         signature_rect=rect
         or SignatureRect(
             page_index=0,
@@ -242,7 +242,7 @@ def test_layout_request_allocates_explicit_image_prominence(
     expected_fraction: float,
 ) -> None:
     plan = _engine(text_width=40, text_height=12).plan(
-        LayoutRequest(
+        VisibleSignatureLayoutInput(
             signature_rect=SignatureRect(
                 page_index=0,
                 left_pt=0,
@@ -267,7 +267,7 @@ def test_layout_request_allocates_explicit_image_prominence(
 
 def test_layout_request_image_only_uses_the_available_content_area() -> None:
     plan = _engine().plan(
-        LayoutRequest(
+        VisibleSignatureLayoutInput(
             signature_rect=SignatureRect(
                 page_index=0,
                 left_pt=0,
@@ -1236,8 +1236,8 @@ def _layout_request(
     signature_rect: SignatureRect,
     appearance: SigningBackendAppearance,
     stamp_text: str,
-) -> LayoutRequest:
-    return LayoutRequest(
+) -> VisibleSignatureLayoutInput:
+    return VisibleSignatureLayoutInput(
         signature_rect=signature_rect,
         layout_template=appearance.layout_template,
         stamp_position=appearance.stamp_position,

@@ -427,7 +427,8 @@ def test_production_consumers_use_public_layout_adapter_names() -> None:
 
     assert "signing_backend import (\n    RoundedBorderTextStampStyle" not in preview_source
     assert "_stamp_background_for_path" not in preview_source
-    assert "_visible_signature_fit_issues_for_stamp_text" not in workflow_source
+    retired_fit_helper = "_" + "visible_signature_fit_issues_for_stamp_text"
+    assert retired_fit_helper not in workflow_source
     assert "_stamp_background_for_path" not in workflow_source
     assert "signing_backend" not in qt_source
 

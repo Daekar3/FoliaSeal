@@ -11,7 +11,7 @@ from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_backend import (
     _BackendHorizontalInkMeasurer,
     _prepare_backend_layout,
-    _visible_signature_fit_issues_for_stamp_text,
+    validate_visible_signature_fit,
 )
 from foliaseal.application.signing_draft_contracts import (
     SignaturePlacementContext,
@@ -358,7 +358,7 @@ def test_canonical_preview_rendered_ink_matrix_documents_all_layout_positions(
         preview,
         output_path=tmp_path / f"{layout_template.value}_{stamp_position.value}_stamp.png",
     )
-    backend_issues = _visible_signature_fit_issues_for_stamp_text(
+    backend_issues = validate_visible_signature_fit(
         signature_rect=preview.signature_rect,
         signature_appearance=appearance,
         stamp_text=stamp_text,

@@ -14,9 +14,9 @@ from foliaseal.application.signature_font_registry import (
 from foliaseal.application.signing_draft_contracts import SigningDraftPreview
 from foliaseal.application.visible_signature_layout import (
     ImageMetrics,
-    LayoutRequest,
     SignatureLayoutPlan,
     VisibleSignatureLayoutEngine,
+    VisibleSignatureLayoutInput,
     single_line_horizontal_stamp_vertical_inset,
     single_line_stamp_content_inset,
     single_line_vertical_stamp_border_gap,
@@ -464,7 +464,7 @@ def _preview_layout_plan(
     return VisibleSignatureLayoutEngine(
         image_probe=_PreviewStampImageProbe(stamp_aspect_ratio),
     ).plan(
-        LayoutRequest(
+        VisibleSignatureLayoutInput(
             signature_rect=preview.signature_rect,
             layout_template=preview.layout_template,
             stamp_position=preview.stamp_position,

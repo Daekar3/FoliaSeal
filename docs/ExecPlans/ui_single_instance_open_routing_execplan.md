@@ -26,7 +26,10 @@ tests, and observable acceptance; it is not a generic refactor.
 - [x] (2026-08-09) Implement the bounded single-owner and initial/second-invocation forwarding path.
 - [x] (2026-08-10) Route forwarded requests through the existing frame and defer the newest request during active signing.
 - [x] (2026-08-10) Add the condition-only queued-filename surface and keyboard-accessible Cancel pending open action.
-- [ ] (2026-08-10) Remove migrated compatibility or acceptance product cruft whose retirement condition is met.
+- [x] (2026-08-16) Shared compatibility-retirement audit completed. No
+  single-instance child adapter was consumerless; the proven layout aliases
+  were retired by `ui_compatibility_retirement_execplan.md`, while the live
+  owner/transport seams and Acceptance evidence names remain required.
 - [x] (2026-08-16) Run the real X11 two-process owner/secondary smoke with direct PID tracking; the
   primary stayed alive with one FoliaSeal window, the secondary exited `0`, and the focused
   integration test passed `1 passed` without the prior QLocalServer skip.
@@ -91,7 +94,8 @@ the full suite is `1447 passed, 20 skipped, 1 warning`; the real offscreen pendi
 passes. QLocalServer cannot bind a Unix endpoint in the isolated/offscreen test environment
 (`Unknown error 1`), so that test remains explicitly skipped; a dedicated Cinnamon/X11 smoke now
 proves the real two-process route. Compatibility/acceptance retirement and the broader
-display-backed/accessibility/release gates remain open.
+  display-backed/accessibility/release gates remain open. Wayland is deferred
+  until Mint provides a first-class supported session.
 
 ## Context and Orientation
 

@@ -620,6 +620,11 @@ Release tranche:
   and two signatures. The run also corrected a reproducible selected-preset loss during confirmation
   synchronization and hardened owned-draft teardown. This closes the source-tree X11 semantic gate,
   not human accessibility, packaged/privileged release, or Wayland acceptance.
+- [x] (2026-08-16) Retired the proven internal visible-signature compatibility aliases through
+  `ui_compatibility_retirement_execplan.md`. The audit retained active dialog/testing seams and
+  observable Acceptance evidence names with explicit consumers; no broad nomenclature deletion was
+  claimed. Wayland remains intentionally deferred for Mint 22.3 until the OS supports it as a
+  first-class session.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

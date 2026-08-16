@@ -24,10 +24,15 @@ generic refactor.
   draft, or recent file.
 - [x] (2026-08-09) Changed the direct Library entry point to reuse one modeless dialog instance;
   the deeper three-column Library/editor topology remains owned by the next tranche.
-- [ ] (2026-08-09) Remove migrated compatibility or acceptance product cruft whose retirement condition is met.
+- [x] (2026-08-16) Shared compatibility-retirement audit completed. No
+  no-document child adapter was consumerless; the proven layout aliases were
+  retired by `ui_compatibility_retirement_execplan.md` and active frame/test
+  seams remain documented.
 - [x] (2026-08-09) Ran focused Qt tests, Ruff, and the bounded no-document launch cleanup check.
 - [x] (2026-08-09) Ran the full regression suite: `1153 passed, 19 skipped, 1 warning`.
-- [ ] (2026-08-09) Update this plan and relevant architecture/status documentation, then commit the implementation slice.
+- [x] (2026-08-16) Reconciled this child with the shared retirement plan and
+  current X11/release status; the bounded retirement commit records the docs
+  update. Wayland remains deferred pending first-class Mint support.
 
 ## Surprises & Discoveries
 

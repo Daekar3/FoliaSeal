@@ -112,8 +112,11 @@ Qt surface, focused tests, and observable acceptance.
   verified signature. This closes the source-tree X11 workflow gate; human accessibility, packaged
   GUI, privileged host installation, and final release gates remain open. Wayland is deferred until
   Mint treats it as a first-class supported session.
-- [ ] (remaining release gate) Retire migrated compatibility or acceptance product cruft whose
-  consumers are gone; this is intentionally separate from the preview behavior closure.
+- [x] (2026-08-16) Completed the bounded compatibility-retirement audit. Removed only the
+  consumerless `LayoutRequest` and private fit-validation aliases; AppFrame dialog/test seams and
+  Acceptance evidence contracts remain because current consumers still exercise them.
+- [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
+  cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
   validation; clean processes and artifacts.
 - [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release

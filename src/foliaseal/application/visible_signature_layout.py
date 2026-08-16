@@ -665,11 +665,6 @@ class VisibleSignatureLayoutInput:
 
 
 @dataclass(frozen=True)
-class LayoutRequest(VisibleSignatureLayoutInput):
-    """Compatibility name for visible-signature layout planning inputs."""
-
-
-@dataclass(frozen=True)
 class VisibleSignatureLayoutOptions:
     """Optional layout facade switches for signing and preview adapters."""
 
@@ -971,7 +966,7 @@ class VisibleSignatureLayoutEngine:
     image_probe: StampImageProbe | None = None
     ink_measurer: HorizontalInkMeasurer | None = None
 
-    def plan(self, request: LayoutRequest) -> SignatureLayoutPlan:
+    def plan(self, request: VisibleSignatureLayoutInput) -> SignatureLayoutPlan:
         """Return the visible-signature layout plan for one request."""
 
         text_measurer = _text_measurer_or_default(self.text_measurer)
@@ -1049,7 +1044,9 @@ class VisibleSignatureLayoutEngine:
             stamp_image=stamp_image,
         )
 
-    def validate(self, request: LayoutRequest) -> tuple[VisibleSignatureFitIssue, ...]:
+    def validate(
+        self, request: VisibleSignatureLayoutInput
+    ) -> tuple[VisibleSignatureFitIssue, ...]:
         """Return only visible-signature layout fit issues."""
 
         return self.plan(request).fit_issues
@@ -1057,7 +1054,7 @@ class VisibleSignatureLayoutEngine:
     def _horizontal_ink_reservation(
         self,
         *,
-        request: LayoutRequest,
+        request: VisibleSignatureLayoutInput,
         text_box: TextMetrics,
         has_visible_stamp_image: bool,
         edge_margin: int,
@@ -1400,7 +1397,7 @@ class VisibleSignatureLayoutService:
             image_probe=self.image_probe,
             ink_measurer=ink_measurer or self.ink_measurer,
         ).plan(
-            LayoutRequest(
+            VisibleSignatureLayoutInput(
                 signature_rect=signature_rect,
                 layout_template=appearance.layout_template,
                 stamp_position=appearance.stamp_position,

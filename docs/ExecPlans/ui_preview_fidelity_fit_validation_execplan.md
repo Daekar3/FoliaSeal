@@ -50,13 +50,17 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   panel through placement, unsupported-glyph field/character guidance, exact-fit blocking, and a
   ready preview/request. The first run exposed repeated preview refreshes regenerating signing time;
   `SigningDraftWorkflow.preview()` now reuses the frozen time while the draft fingerprint is unchanged.
-- [ ] (2026-08-09) Retire migrated compatibility or acceptance product cruft whose consumers are gone.
+- [x] (2026-08-16) Retired the proven internal `LayoutRequest` alias and
+  `_visible_signature_fit_issues_for_stamp_text` wrapper after migrating all
+  in-repository callers. Active Qt test seams and Acceptance evidence contracts
+  remain intentionally retained under the release plan.
 - [x] (2026-08-10) Implementation and adapter validation are complete: the focused parity/fit/
   renderer/readiness set is `104 passed`. The bounded real launch still stops at
   `SingleInstanceUnavailable` before window creation, so display-backed evidence remains open.
 - [x] (2026-08-10) Closed the documentation and validation gates: the full suite is `1482 passed,
-  20 skipped, 1 warning`; Ruff, `pip check`, and `git diff --check` are clean. No commit is made
-  by this slice. Compatibility/nomenclature retirement remains open.
+  20 skipped, 1 warning`; Ruff, `pip check`, and `git diff --check` are clean. That preview slice
+  did not make a commit; remaining compatibility work is tracked by the release plan and the
+  bounded retirement child.
 
 ## Surprises & Discoveries
 
