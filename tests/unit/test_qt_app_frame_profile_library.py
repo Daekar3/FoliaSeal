@@ -979,6 +979,22 @@ def test_library_delete_requires_confirmation_before_mutating_reusable_object() 
     assert service.view().appearance_names == ()
 
 
+def test_library_delete_cancellation_from_active_placement_is_silent() -> None:
+    repository = InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    seed_service = ReusableSigningObjects(repository)
+    seed_service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    service = ReusableSigningObjects(repository, before_mutation=lambda _mutation: False)
+    bindings = _fake_bindings()
+    dialog = ReusableObjectLibraryDialog(bindings=bindings, parent=None, library=service)
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+
+    bindings.q_message_box.next_result = bindings.q_message_box.Yes
+    assert dialog.delete_selected() is False
+    assert service.view().appearance_names == ("Approval",)
+    assert len(bindings.q_message_box.calls) == 1
+
+
 def test_library_delete_confirmation_gates_certificate_callback() -> None:
     service = ReusableSigningObjects(
         InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))

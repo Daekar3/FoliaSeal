@@ -8,6 +8,7 @@ from typing import Any
 
 from foliaseal.application.placement_editor import PlacementEditorSession, PlacementEditorState
 from foliaseal.application.reusable_signing_models import PlacementProfile, PlacementProfileRect
+from foliaseal.application.reusable_signing_objects import ReusableObjectMutationRejected
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,8 @@ class PlacementProfileEditorDialog:
                 )
                 profile = self._session.save()
                 self._on_save(profile)
+            except ReusableObjectMutationRejected:
+                return
             except (RuntimeError, ValueError) as exc:
                 self._on_error(str(exc))
                 return

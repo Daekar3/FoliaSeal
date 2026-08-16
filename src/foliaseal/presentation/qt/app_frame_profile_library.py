@@ -13,6 +13,7 @@ from foliaseal.application.reusable_signing_objects import (
     DuplicateObject,
     RenameObject,
     ReusableObjectKind,
+    ReusableObjectMutationRejected,
     ReusableObjectRef,
     ReusableSigningObjects,
     SetPinned,
@@ -421,6 +422,8 @@ class ReusableObjectLibraryDialog:
             return True
         try:
             self._library.execute(DeleteObject(ref=ref))
+        except ReusableObjectMutationRejected:
+            return False
         except (ConfigValidationError, KeyError) as exc:
             self._show_error(str(exc))
             return False

@@ -9,6 +9,7 @@ from typing import Any
 from foliaseal.application.reusable_signing_models import AppearanceProfile
 from foliaseal.application.reusable_signing_objects import (
     ReusableObjectKind,
+    ReusableObjectMutationRejected,
     ReusableObjectRef,
     ReusableSigningObjects,
     SaveAppearance,
@@ -154,6 +155,8 @@ class AppearanceProfileEditorWidget:
                     overwrite=overwrite,
                 )
             )
+        except ReusableObjectMutationRejected:
+            return False
         except (ConfigValidationError, KeyError, ValueError) as exc:
             self._on_error(str(exc))
             return False

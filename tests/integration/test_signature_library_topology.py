@@ -1,19 +1,44 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from foliaseal.application.reusable_signing_objects import SaveAppearance, SavePlacement
+from foliaseal.application.reusable_signing_objects import (
+    ReusableObjectMutationRejected,
+    SaveAppearance,
+    SavePlacement,
+)
+from foliaseal.domain.models import SignatureRect
+from foliaseal.infra.render.base import PdfPageGeometry, RenderPageRequest, RenderPageResult
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
     build_managed_certificate,
     build_placement_profile,
     build_signature_appearance,
+    write_test_pdf,
 )
+
+
+class _StaticRenderBackend:
+    def get_page_geometry(self, document_path: str, page_index: int) -> PdfPageGeometry:
+        del document_path, page_index
+        return PdfPageGeometry(
+            media_box=(0.0, 0.0, 612.0, 792.0),
+            crop_box=(0.0, 0.0, 612.0, 792.0),
+            rotation=0,
+        )
+
+    def render_page(self, request: RenderPageRequest) -> RenderPageResult:
+        del request
+        return RenderPageResult(width_px=612, height_px=792, rgba_bytes=b"\xff" * (612 * 792 * 4))
+
+    def diagnostics(self):
+        return None
 
 
 def test_library_is_modeless_three_column_and_document_independent(tmp_path: Path) -> None:
@@ -185,6 +210,134 @@ def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None
     frame.window.close()
     app.processEvents()
 
+
+def test_real_offscreen_library_mutation_protects_active_placed_signature(
+    tmp_path: Path,
+) -> None:
+    """Exercise production AppFrame → Library → service invalidation wiring."""
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import FoliaSealAppFrame, QtAppFrameAdapter
+
+    class QuestionBox:
+        Yes = 1
+        Cancel = 2
+        No = Cancel
+        prompts: list[tuple[object, object, object, object, object]] = []
+        result = Cancel
+
+        @classmethod
+        def question(cls, parent, title, text, buttons, default_button):
+            cls.prompts.append((parent, title, text, buttons, default_button))
+            return cls.result
+
+    app = QApplication.instance()
+    created_app = app is None
+    if app is None:
+        app = QApplication(["foliaseal-placement-invalidation"])
+
+    source = tmp_path / "source.pdf"
+    write_test_pdf(source)
+    adapter = QtAppFrameAdapter()
+    frame = FoliaSealAppFrame(
+        bindings=adapter._bindings,  # noqa: SLF001 - real adapter bindings for integration evidence
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "signed"),
+            default_open_directory=str(tmp_path),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+        render_backend_factory=lambda: _StaticRenderBackend(),
+    )
+    frame._bindings = replace(frame._bindings, q_message_box=QuestionBox)  # noqa: SLF001
+    frame.window.show()
+    app.processEvents()
+
+    try:
+        frame._reusable_objects.execute(  # noqa: SLF001 - seed the production catalog boundary
+            SaveAppearance("Approval", build_signature_appearance())
+        )
+        appearance_ref = frame._reusable_objects.view().appearances[0].ref  # noqa: SLF001
+        assert frame.open_pdf_path(source) is not None
+        workflow = frame.current_signing_workflow
+        assert workflow is not None
+        workflow.selected_appearance_profile_id = appearance_ref.object_id
+        original_rect = SignatureRect(
+            page_index=0,
+            left_pt=20.0,
+            bottom_pt=30.0,
+            width_pt=180.0,
+            height_pt=60.0,
+        )
+        workflow.set_signature_rect(original_rect)
+        active_session = frame._workspace_host.active().session  # noqa: SLF001
+        assert active_session.signature_rect() == original_rect
+        assert active_session.selected_appearance_profile_id() == appearance_ref.object_id
+
+        library = frame.show_reusable_object_library(initial_catalog="appearances")
+        library.controls.catalog_selector.setCurrentRow(
+            list(LibraryCatalog).index(LibraryCatalog.APPEARANCES)
+        )
+        library.controls.object_selector.setCurrentRow(0)
+        library.controls.edit_button.click()
+        app.processEvents()
+        editor = library.controls.appearance_editor
+        assert editor is not None
+        assert editor.initial_ref == appearance_ref
+        assert editor.controls.name_input.text() == "Approval"
+        editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Changed")
+        changed_appearance = editor.controls.setup_form.build_draft().appearance
+        assert changed_appearance.signer_label_prefix == "Changed"
+        assert any(
+            binding.show_in_visible_appearance
+            for _field_key, binding in changed_appearance.iter_field_bindings()
+        )
+        command = SaveAppearance(
+            "Approval",
+            changed_appearance,
+            appearance_profile_id=appearance_ref.object_id,
+            overwrite=True,
+        )
+
+        QuestionBox.result = QuestionBox.Cancel
+        with pytest.raises(ReusableObjectMutationRejected):
+            frame._reusable_objects.execute(command)  # noqa: SLF001
+        app.processEvents()
+        assert workflow.signature_rect == original_rect
+        assert (
+            frame._reusable_objects.resolve(appearance_ref).appearance.signer_label_prefix
+            != "Changed"
+        )  # noqa: SLF001
+        assert QuestionBox.prompts[-1][2] == "Remove the placed signature and continue?"
+        assert QuestionBox.prompts[-1][4] == QuestionBox.Cancel
+
+        QuestionBox.result = QuestionBox.Yes
+        frame._reusable_objects.execute(command)  # noqa: SLF001
+        app.processEvents()
+        assert workflow.signature_rect is None
+        assert (
+            frame._reusable_objects.resolve(appearance_ref).appearance.signer_label_prefix
+            == "Changed"
+        )  # noqa: SLF001
+    finally:
+        frame._workspace_host.close()  # noqa: SLF001 - bypass draft prompt during teardown
+        frame.window.close()
+        app.processEvents()
+        if created_app:
+            app.quit()
 
 def test_library_real_qt_returns_from_appearance_child_to_preset_editor(tmp_path: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")

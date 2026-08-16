@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -8,6 +9,9 @@ from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
+    ReusableObjectKind,
+    ReusableObjectMutation,
+    ReusableObjectRef,
     ReusableSigningObjects,
     SavePlacement,
 )
@@ -673,6 +677,7 @@ class _FakeMessageBox:
         self.warning_calls = []
         self.information_calls = []
         self.question_calls = []
+        self.question_button_calls = []
         self.next_question_result = self.No
 
     def warning(self, parent, title, text):
@@ -681,8 +686,9 @@ class _FakeMessageBox:
     def information(self, parent, title, text):
         self.information_calls.append((parent, title, text))
 
-    def question(self, parent, title, text):
+    def question(self, parent, title, text, buttons=None, default_button=None):
         self.question_calls.append((parent, title, text))
+        self.question_button_calls.append((buttons, default_button))
         return self.next_question_result
 
 
@@ -780,6 +786,9 @@ class _FakeShell:
         self.clear_session_secrets_calls = 0
         self.current_placement_context_value = None
         self.signature_rect_value = None
+        self.selected_signature_preset_id_value = None
+        self.selected_appearance_profile_id_value = None
+        self.selected_placement_profile_id_value = None
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -798,6 +807,15 @@ class _FakeShell:
 
     def signature_rect(self):
         return self.signature_rect_value
+
+    def selected_signature_preset_id(self):
+        return self.selected_signature_preset_id_value
+
+    def selected_appearance_profile_id(self):
+        return self.selected_appearance_profile_id_value
+
+    def selected_placement_profile_id(self):
+        return self.selected_placement_profile_id_value
 
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
@@ -1213,11 +1231,17 @@ def test_qt_signing_workspace_session_port_forwards_current_placement_reads() ->
     )
     shell.current_placement_context_value = context
     shell.signature_rect_value = rect
+    shell.selected_signature_preset_id_value = "preset-1"
+    shell.selected_appearance_profile_id_value = "appearance-1"
+    shell.selected_placement_profile_id_value = "placement-1"
 
     port = QtSigningWorkspaceSessionPort(shell)
 
     assert port.current_placement_context() == context
     assert port.signature_rect() == rect
+    assert port.selected_signature_preset_id() == "preset-1"
+    assert port.selected_appearance_profile_id() == "appearance-1"
+    assert port.selected_placement_profile_id() == "placement-1"
 
 
 def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(
@@ -1947,6 +1971,130 @@ def test_app_frame_current_placement_capture_uses_active_context_without_mutatio
     assert captured[0].source_page.rotation_degrees == 90
     assert captured[0].rect.width_pt == 54.0
     assert captured[0].rect.height_pt == 180.0
+
+
+def test_app_frame_prompts_before_removing_placement_for_material_mutation(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    rect = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=20.0,
+        width_pt=100.0,
+        height_pt=30.0,
+    )
+    remove_calls: list[bool] = []
+    session = SimpleNamespace(
+        signature_rect=lambda: rect,
+        selected_signature_preset_id=lambda: None,
+        selected_appearance_profile_id=lambda: "appearance-1",
+        selected_placement_profile_id=lambda: None,
+        remove_signature_placement=lambda: remove_calls.append(True) or True,
+    )
+    frame._workspace_host.active = lambda: SimpleNamespace(session=session)
+    mutation = ReusableObjectMutation(
+        ref=ReusableObjectRef(ReusableObjectKind.APPEARANCE, "appearance-1"),
+        operation="SaveAppearance",
+        materially_changed=True,
+    )
+
+    bindings.q_message_box.next_question_result = bindings.q_message_box.No
+    assert frame._confirm_reusable_object_mutation(mutation) is False
+    assert remove_calls == []
+    assert bindings.q_message_box.question_calls[-1][2] == (
+        "Remove the placed signature and continue?"
+    )
+    assert bindings.q_message_box.question_button_calls[-1][1] == bindings.q_message_box.Cancel
+
+    bindings.q_message_box.next_question_result = bindings.q_message_box.Yes
+    assert frame._confirm_reusable_object_mutation(mutation) is True
+    assert remove_calls == [True]
+
+    assert frame._confirm_reusable_object_mutation(
+        ReusableObjectMutation(
+            ref=mutation.ref,
+            operation="RenameObject",
+            materially_changed=False,
+        )
+    ) is True
+    assert len(bindings.q_message_box.question_calls) == 2
+
+    session.remove_signature_placement = lambda: False
+    bindings.q_message_box.next_question_result = bindings.q_message_box.Yes
+    assert frame._confirm_reusable_object_mutation(mutation) is False
+    assert len(remove_calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("kind", "object_id", "operation", "selected_attribute"),
+    [
+        (
+            ReusableObjectKind.PLACEMENT,
+            "placement-1",
+            "SavePlacement",
+            "selected_placement_profile_id",
+        ),
+        (
+            ReusableObjectKind.PRESET,
+            "preset-1",
+            "SavePreset",
+            "selected_signature_preset_id",
+        ),
+        (
+            ReusableObjectKind.APPEARANCE,
+            "appearance-1",
+            "DeleteObject",
+            "selected_appearance_profile_id",
+        ),
+    ],
+)
+def test_app_frame_invalidates_each_material_dependency_kind(
+    tmp_path: Path,
+    kind: ReusableObjectKind,
+    object_id: str,
+    operation: str,
+    selected_attribute: str,
+) -> None:
+    bindings = _fake_bindings()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    rect = SignatureRect(page_index=0, left_pt=10.0, bottom_pt=10.0, width_pt=80.0, height_pt=24.0)
+    selected = {
+        "selected_signature_preset_id": None,
+        "selected_appearance_profile_id": None,
+        "selected_placement_profile_id": None,
+    }
+    selected[selected_attribute] = object_id
+    remove_calls: list[bool] = []
+    session = SimpleNamespace(
+        signature_rect=lambda: rect,
+        selected_signature_preset_id=lambda: selected["selected_signature_preset_id"],
+        selected_appearance_profile_id=lambda: selected["selected_appearance_profile_id"],
+        selected_placement_profile_id=lambda: selected["selected_placement_profile_id"],
+        remove_signature_placement=lambda: remove_calls.append(True) or True,
+    )
+    frame._workspace_host.active = lambda: SimpleNamespace(session=session)
+    bindings.q_message_box.next_question_result = bindings.q_message_box.Yes
+
+    assert frame._confirm_reusable_object_mutation(
+        ReusableObjectMutation(
+            ref=ReusableObjectRef(kind, object_id),
+            operation=operation,
+            materially_changed=True,
+        )
+    ) is True
+    assert remove_calls == [True]
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:

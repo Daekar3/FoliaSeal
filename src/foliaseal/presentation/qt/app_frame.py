@@ -25,7 +25,11 @@ from foliaseal.application.document_safety import (
     classify_link_destination,
 )
 from foliaseal.application.reusable_signing_models import PlacementProfile
-from foliaseal.application.reusable_signing_objects import SavePlacement
+from foliaseal.application.reusable_signing_objects import (
+    ReusableObjectKind,
+    ReusableObjectMutation,
+    SavePlacement,
+)
 from foliaseal.application.signature_image_import import ManagedSignatureImageStore
 from foliaseal.application.signature_library_session import (
     CertificateLibraryRef,
@@ -406,6 +410,7 @@ class FoliaSealAppFrame:
             self._preset_catalog_store,
             certificate_configuration_exists=self._certificate_configuration_exists,
             image_store=self._signature_image_store,
+            before_mutation=self._confirm_reusable_object_mutation,
         )
         self._sign_executor = (
             sign_executor if sign_executor is not None else build_default_signing_executor()
@@ -2806,6 +2811,60 @@ class FoliaSealAppFrame:
 
     def _refresh_shell_signature_profiles(self) -> None:
         self._with_current_shell_port(lambda shell_port: shell_port.refresh_signature_profiles())
+
+    def _confirm_reusable_object_mutation(self, mutation: ReusableObjectMutation) -> bool:
+        """Protect a placed draft from a material change to its reusable source."""
+
+        if not mutation.materially_changed:
+            return True
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            return True
+        session = workspace.session
+        try:
+            if session.signature_rect() is None:
+                return True
+        except Exception:
+            return True
+        selected_getters = {
+            ReusableObjectKind.PRESET: "selected_signature_preset_id",
+            ReusableObjectKind.APPEARANCE: "selected_appearance_profile_id",
+            ReusableObjectKind.PLACEMENT: "selected_placement_profile_id",
+        }
+        getter = getattr(session, selected_getters[mutation.ref.kind], None)
+        if not callable(getter):
+            return True
+        try:
+            selected_id = getter()
+        except Exception:
+            return True
+        if selected_id != mutation.ref.object_id:
+            return True
+        if not self._confirm_remove_placed_signature():
+            return False
+        if not session.remove_signature_placement():
+            return False
+        self._sync_signing_placement_actions()
+        return True
+
+    def _confirm_remove_placed_signature(self) -> bool:
+        """Ask before removing a placed signature whose reusable source changed."""
+
+        message_box = self._bindings.q_message_box
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return False
+        yes = self._message_box_button(message_box, "Yes", "Yes")
+        cancel = self._message_box_button(message_box, "Cancel", "No")
+        result = self._question_with_buttons(
+            question,
+            parent=self.window,
+            title="Remove placed signature?",
+            text="Remove the placed signature and continue?",
+            buttons=[yes, cancel],
+            default_button=cancel,
+        )
+        return result == yes
 
     def _with_current_shell_port(
         self,

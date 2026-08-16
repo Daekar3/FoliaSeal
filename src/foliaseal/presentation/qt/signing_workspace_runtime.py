@@ -603,6 +603,15 @@ class SigningWorkspaceRuntime:
     def selected_certificate_configuration_id(self) -> str | None:
         return self._draft_workflow.selected_certificate_configuration_id
 
+    def selected_signature_preset_id(self) -> str | None:
+        return self._draft_workflow.selected_signature_preset_id
+
+    def selected_appearance_profile_id(self) -> str | None:
+        return self._draft_workflow.selected_appearance_profile_id
+
+    def selected_placement_profile_id(self) -> str | None:
+        return self._draft_workflow.selected_placement_profile_id
+
     def signature_appearance(self) -> SignatureAppearance | None:
         return self._draft_workflow.signature_appearance
 

@@ -557,6 +557,15 @@ class SigningWorkspaceWidget:
     def signature_rect(self) -> SignatureRect | None:
         return self._runtime.signature_rect()
 
+    def selected_signature_preset_id(self) -> str | None:
+        return self._runtime.selected_signature_preset_id()
+
+    def selected_appearance_profile_id(self) -> str | None:
+        return self._runtime.selected_appearance_profile_id()
+
+    def selected_placement_profile_id(self) -> str | None:
+        return self._runtime.selected_placement_profile_id()
+
     def current_placement_context(self) -> SignaturePlacementContext | None:
         return self._runtime.current_placement_context()
 

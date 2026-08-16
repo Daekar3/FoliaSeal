@@ -123,6 +123,9 @@ Reusable-object and certificate tranche:
 - [x] docs/ExecPlans/ui_first_use_preset_setup_execplan.md — empty-preset entry is Presets-first
   without changing navigation preference; nested saves refresh the live rail while selection stays
   explicit.
+- [x] docs/ExecPlans/ui_active_reusable_object_placement_invalidation_execplan.md — typed
+  material-mutation detection and cancel-default removal prompt for placed signatures; focused
+  and real offscreen Library/workspace evidence is complete.
 - [x] docs/ExecPlans/ui_certificate_import_configuration_execplan.md — typed inspection,
   atomic import, and retained-file Configure are committed in `ad712ad7e` and `498d5c791`;
   expiration sorting is completed by the dedicated validity child; the broader certificate
@@ -331,20 +334,23 @@ Release tranche:
   skipped, 1 warning`; bounded GUI launch remains limited by the isolated single-instance endpoint.
 - [x] (2026-08-10) Added the document-independent preset-editor increment: Library Create/Edit now
   open a modal Save/Cancel editor that writes stable appearance, placement, and certificate
-  references without an active PDF; Appearance editing, reason/location defaults, dirty prompts,
-  and active-placement invalidation remain open in the preset/appearance children.
+  references without an active PDF; Appearance editing, reason/location defaults, and dirty prompts
+  remained open in the preset/appearance children at this historical checkpoint. Active-placement
+  invalidation is completed by the 2026-08-16 child below.
 - [x] (2026-08-10) Added the bounded document-independent Appearance editor increment: Library
   Create/Edit now expose a modal Save/Cancel editor backed by the existing visible-signature
   controls, with stable-id-aware `SaveAppearance` persistence and no active-document mutation.
   Nested breadcrumb/detail-pane navigation, labeled sample preview, suspended preset return,
-  reason/location defaults, dirty prompts, and active-placement invalidation remain open.
+  reason/location defaults and dirty prompts remained open at this historical checkpoint; active-
+  placement invalidation is completed by the 2026-08-16 child below.
 - [x] (2026-08-10) Completed the production nested Appearance detail-pane increment in
   `3f571f9d2`: `AppearanceProfileEditorWidget` replaces the Library detail column with a breadcrumb,
   sticky labeled synthetic preview, content-only controls, stable-id Save, and typed
   Save/Discard/Continue resolution; `ReusableObjectLibraryDialog` suspends/restores the parent
   catalog selection/name draft and removes child widgets on exit. The modal dialog is now only a
-  compatibility/test wrapper. Preset-child return, reason/location defaults, active-placement
-  invalidation, and final preview fidelity remain open in their owning children. Full validation is
+  compatibility/test wrapper. Preset-child return, reason/location defaults, and final preview
+  fidelity remain open in their owning children; active-placement invalidation was open at this
+  historical checkpoint and is completed by the 2026-08-16 child below. Full validation is
   1357 passed and 20 skipped; the bounded launch audit's isolated single-instance error is recorded
   as an environment limitation with cleanup confirmed.
 - [x] (2026-08-10) Completed the production nested Signature Preset transaction increment:
@@ -355,6 +361,12 @@ Release tranche:
   regression is `1363 passed, 20 skipped, 1 warning`, and the bounded launch audit left no process
   or temporary-config debris. Reason/location, placement/certificate creation, active-placement
   invalidation, and final preview-fidelity work stays in owning children.
+- [x] (2026-08-16) Completed active reusable-object placement invalidation: material Appearance,
+  Placement, Preset, and Delete mutations now identify stable dependencies before persistence;
+  AppFrame shows the exact Cancel-default removal prompt, rejects cancellation without catalog
+  or placement mutation, and removes placement only after Yes. Rename, pin, duplicate, and
+  unselected-object changes remain nonmaterial. Full validation and independent review are
+  recorded in `ui_active_reusable_object_placement_invalidation_execplan.md`.
 - [x] (2026-08-10) Added the bounded first-use preset entry increment: an empty preset catalog now
   gives explicit no-preset guidance in the signing rail and routes `Create or manage presets…`
   through typed workspace composition to the existing modeless Presets-first Library. Opening the

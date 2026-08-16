@@ -6,14 +6,18 @@ import pytest
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
     PlacementProfileSourcePage,
+    SignaturePresetCatalog,
     _deserialize_appearance,
     _serialize_appearance,
 )
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
     DuplicateObject,
+    InMemoryCatalogRepository,
     RenameObject,
     ReusableObjectKind,
+    ReusableObjectMutation,
+    ReusableObjectMutationRejected,
     ReusableSigningObjects,
     SaveAppearance,
     SavePlacement,
@@ -67,6 +71,141 @@ def test_typed_boundary_lists_and_renames_objects_without_prefix_parsing(tmp_pat
 
     with pytest.raises(ConfigValidationError, match="referenced"):
         service.execute(DeleteObject(ref=appearance_ref))
+
+
+def test_mutation_callback_distinguishes_material_changes_from_catalog_cosmetics() -> None:
+    events: list[ReusableObjectMutation] = []
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1)),
+        on_mutation=events.append,
+    )
+
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    appearance_ref = service.view().appearances[0].ref
+    service.execute(RenameObject(ref=appearance_ref, new_name="Approved"))
+    service.execute(SetPinned(ref=appearance_ref, pinned=True))
+
+    assert [(event.ref, event.materially_changed) for event in events] == [
+        (appearance_ref, True),
+        (appearance_ref, False),
+        (appearance_ref, False),
+    ]
+
+
+def test_mutation_classification_covers_each_reusable_object_kind() -> None:
+    events: list[ReusableObjectMutation] = []
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1)),
+        on_mutation=events.append,
+    )
+    appearance = build_signature_appearance()
+    changed_appearance = build_signature_appearance(signer_label_prefix="Changed")
+    service.execute(SaveAppearance("Approval", appearance))
+    appearance_ref = service.view().appearances[0].ref
+    service.execute(
+        SaveAppearance(
+            "Approval", appearance, appearance_profile_id=appearance_ref.object_id, overwrite=True
+        )
+    )
+    service.execute(
+        SaveAppearance(
+            "Approval",
+            changed_appearance,
+            appearance_profile_id=appearance_ref.object_id,
+            overwrite=True,
+        )
+    )
+    service.execute(
+        SavePlacement(
+            "Bottom right",
+            PlacementProfileRect(left_pt=10.0, top_pt=744.0, width_pt=120.0, height_pt=36.0),
+            source_page=PlacementProfileSourcePage(612.0, 792.0, 0),
+            page_number=1,
+        )
+    )
+    placement_ref = service.view().placements[0].ref
+    placement = service.resolve(placement_ref)
+    service.execute(
+        SavePlacement(
+            "Bottom right",
+            placement.rect,
+            source_page=placement.source_page,
+            page_number=placement.page_number,
+            pinned=True,
+            placement_profile_id=placement_ref.object_id,
+            overwrite=True,
+        )
+    )
+    service.execute(
+        SavePlacement(
+            "Bottom right",
+            PlacementProfileRect(left_pt=10.0, top_pt=744.0, width_pt=121.0, height_pt=36.0),
+            source_page=placement.source_page,
+            page_number=placement.page_number,
+            placement_profile_id=placement_ref.object_id,
+            overwrite=True,
+        )
+    )
+    service.execute(
+        SavePreset(
+            "Contract",
+            appearance_profile_id=appearance_ref.object_id,
+            placement_profile_id=placement_ref.object_id,
+        )
+    )
+    preset_ref = service.view().presets[0].ref
+    service.execute(
+        SavePreset(
+            "Contract",
+            appearance_profile_id=appearance_ref.object_id,
+            placement_profile_id=placement_ref.object_id,
+            signature_preset_id=preset_ref.object_id,
+            overwrite=True,
+        )
+    )
+    service.execute(
+        SavePreset(
+            "Contract",
+            appearance_profile_id=appearance_ref.object_id,
+            placement_profile_id=placement_ref.object_id,
+            certificate_configuration_id="certificate-1",
+            signature_preset_id=preset_ref.object_id,
+            overwrite=True,
+        )
+    )
+    service.execute(DuplicateObject(ref=appearance_ref, new_name="Approval copy"))
+    duplicate_ref = service.view().appearances[-1].ref
+    service.execute(SetPinned(ref=appearance_ref, pinned=True))
+    service.execute(DeleteObject(ref=duplicate_ref))
+
+    assert [(event.operation, event.materially_changed) for event in events] == [
+        ("SaveAppearance", True),
+        ("SaveAppearance", False),
+        ("SaveAppearance", True),
+        ("SavePlacement", True),
+        ("SavePlacement", False),
+        ("SavePlacement", True),
+        ("SavePreset", True),
+        ("SavePreset", False),
+        ("SavePreset", True),
+        ("DuplicateObject", False),
+        ("SetPinned", False),
+        ("DeleteObject", True),
+    ]
+
+
+def test_material_mutation_can_be_rejected_before_catalog_commit() -> None:
+    decisions: list[ReusableObjectMutation] = []
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1)),
+        before_mutation=lambda mutation: decisions.append(mutation) or False,
+    )
+
+    with pytest.raises(ReusableObjectMutationRejected):
+        service.execute(SaveAppearance("Approval", build_signature_appearance()))
+
+    assert decisions[0].materially_changed is True
+    assert service.view().appearance_names == ()
 
 
 def test_save_placement_round_trips_v2_geometry_across_store_reload(tmp_path: Path) -> None:

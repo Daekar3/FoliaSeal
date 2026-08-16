@@ -10,6 +10,7 @@ from foliaseal.application.certificate_models import CertificateCatalog, Certifi
 from foliaseal.application.reusable_signing_models import PlacementProfile, ResolvedSignaturePreset
 from foliaseal.application.reusable_signing_objects import (
     ReusableObjectKind,
+    ReusableObjectMutationRejected,
     ReusableObjectRef,
     ReusableSigningObjects,
     SavePreset,
@@ -167,6 +168,8 @@ class SignaturePresetEditorWidget:
                     overwrite=overwrite,
                 )
             )
+        except ReusableObjectMutationRejected:
+            return False
         except (ConfigValidationError, KeyError, ValueError) as exc:
             self._on_error(str(exc))
             return False

@@ -225,6 +225,19 @@ ReusableObjectCommand = (
     | DuplicateObject
     | SetPinned
 )
+
+
+@dataclass(frozen=True)
+class ReusableObjectMutation:
+    """Describe one committed catalog mutation for dependent live drafts."""
+
+    ref: ReusableObjectRef
+    operation: str
+    materially_changed: bool
+
+
+class ReusableObjectMutationRejected(ConfigValidationError):
+    """Signal that a dependent live draft declined a material catalog mutation."""
 ResolvedReusableObject = AppearanceProfile | PlacementProfile | ResolvedSignaturePreset
 
 
@@ -269,10 +282,14 @@ class ReusableSigningObjects:
         *,
         certificate_configuration_exists: Callable[[str], bool] | None = None,
         image_store: ManagedSignatureImageStore | None = None,
+        on_mutation: Callable[[ReusableObjectMutation], None] | None = None,
+        before_mutation: Callable[[ReusableObjectMutation], bool] | None = None,
     ) -> None:
         self._repository = repository
         self._certificate_configuration_exists = certificate_configuration_exists
         self._image_store = image_store
+        self._on_mutation = on_mutation
+        self._before_mutation = before_mutation
         self._snapshot: ReusableCatalogSnapshot | None = None
 
     def snapshot(self) -> ReusableCatalogSnapshot:
@@ -340,10 +357,132 @@ class ReusableSigningObjects:
     def execute(self, command: ReusableObjectCommand) -> ReusableCatalogSnapshot:
         catalog = self._repository.load_catalog()
         updated = self._apply(catalog, command)
+        mutation = (
+            self._mutation_for(command, catalog, updated)
+            if updated is not catalog
+            else None
+        )
+        if (
+            mutation is not None
+            and self._before_mutation is not None
+            and not self._before_mutation(mutation)
+        ):
+            raise ReusableObjectMutationRejected(
+                "The placed signature was kept; reusable-object changes were canceled."
+            )
         if updated is not catalog:
             self._repository.save_catalog(updated)
         self._snapshot = self._snapshot_for(updated)
+        if mutation is not None and self._on_mutation is not None:
+            self._on_mutation(mutation)
         return self._snapshot
+
+    def _mutation_for(
+        self,
+        command: ReusableObjectCommand,
+        before: SignaturePresetCatalog,
+        after: SignaturePresetCatalog,
+    ) -> ReusableObjectMutation | None:
+        operation = type(command).__name__
+        if isinstance(command, (RenameObject, DuplicateObject, SetPinned)):
+            return ReusableObjectMutation(
+                ref=command.ref,
+                operation=operation,
+                materially_changed=False,
+            )
+        if isinstance(command, DeleteObject):
+            return ReusableObjectMutation(
+                ref=command.ref,
+                operation=operation,
+                materially_changed=True,
+            )
+        if isinstance(command, SaveAppearance):
+            ref = self._ref_for_saved_object(
+                ReusableObjectKind.APPEARANCE,
+                command.appearance_profile_id,
+                command.name,
+                before,
+                after,
+            )
+            if ref is None:
+                return None
+            before_profile = _catalog_object(before, ref)
+            after_profile = _catalog_object(after, ref)
+            return ReusableObjectMutation(
+                ref=ref,
+                operation=operation,
+                materially_changed=(
+                    before_profile is None
+                    or after_profile is None
+                    or before_profile.appearance != after_profile.appearance
+                ),
+            )
+        if isinstance(command, SavePlacement):
+            ref = self._ref_for_saved_object(
+                ReusableObjectKind.PLACEMENT,
+                command.placement_profile_id,
+                command.name,
+                before,
+                after,
+            )
+            if ref is None:
+                return None
+            before_profile = _catalog_object(before, ref)
+            after_profile = _catalog_object(after, ref)
+            return ReusableObjectMutation(
+                ref=ref,
+                operation=operation,
+                materially_changed=(
+                    before_profile is None
+                    or after_profile is None
+                    or before_profile.rect != after_profile.rect
+                    or before_profile.page_number != after_profile.page_number
+                    or before_profile.source_page != after_profile.source_page
+                ),
+            )
+        if isinstance(command, SavePreset):
+            ref = self._ref_for_saved_object(
+                ReusableObjectKind.PRESET,
+                command.signature_preset_id,
+                command.name,
+                before,
+                after,
+            )
+            if ref is None:
+                return None
+            before_preset = _catalog_object(before, ref)
+            after_preset = _catalog_object(after, ref)
+            return ReusableObjectMutation(
+                ref=ref,
+                operation=operation,
+                materially_changed=(
+                    before_preset is None
+                    or after_preset is None
+                    or before_preset.appearance_profile_id
+                    != after_preset.appearance_profile_id
+                    or before_preset.placement_profile_id
+                    != after_preset.placement_profile_id
+                    or before_preset.certificate_configuration_id
+                    != after_preset.certificate_configuration_id
+                ),
+            )
+        return None
+
+    @staticmethod
+    def _ref_for_saved_object(
+        kind: ReusableObjectKind,
+        object_id: str | None,
+        name: str,
+        before: SignaturePresetCatalog,
+        after: SignaturePresetCatalog,
+    ) -> ReusableObjectRef | None:
+        if object_id:
+            return ReusableObjectRef(kind, object_id)
+        for catalog in (before, after):
+            item = _catalog_object_named(catalog, kind, name)
+            if item is not None:
+                return ReusableObjectRef(kind, _object_id(item, kind))
+        return None
 
     def _snapshot_for(self, catalog: SignaturePresetCatalog) -> ReusableCatalogSnapshot:
         view = self._view(catalog)
@@ -767,6 +906,47 @@ class ReusableSigningObjects:
                 for preset in catalog.signature_presets
             ),
         )
+
+def _catalog_object(
+    catalog: SignaturePresetCatalog,
+    ref: ReusableObjectRef,
+) -> AppearanceProfile | PlacementProfile | SignaturePreset | None:
+    entries = {
+        ReusableObjectKind.APPEARANCE: catalog.appearance_profiles,
+        ReusableObjectKind.PLACEMENT: catalog.placement_profiles,
+        ReusableObjectKind.PRESET: catalog.signature_presets,
+    }[ref.kind]
+    return next(
+        (entry for entry in entries if _object_id(entry, ref.kind) == ref.object_id),
+        None,
+    )
+
+
+def _catalog_object_named(
+    catalog: SignaturePresetCatalog,
+    kind: ReusableObjectKind,
+    name: str,
+) -> AppearanceProfile | PlacementProfile | SignaturePreset | None:
+    entries = {
+        ReusableObjectKind.APPEARANCE: catalog.appearance_profiles,
+        ReusableObjectKind.PLACEMENT: catalog.placement_profiles,
+        ReusableObjectKind.PRESET: catalog.signature_presets,
+    }[kind]
+    return next(
+        (entry for entry in entries if entry.display_name.casefold() == name.casefold()),
+        None,
+    )
+
+
+def _object_id(
+    entry: AppearanceProfile | PlacementProfile | SignaturePreset,
+    kind: ReusableObjectKind,
+) -> str:
+    if kind is ReusableObjectKind.APPEARANCE:
+        return entry.appearance_profile_id  # type: ignore[union-attr]
+    if kind is ReusableObjectKind.PLACEMENT:
+        return entry.placement_profile_id  # type: ignore[union-attr]
+    return entry.signature_preset_id  # type: ignore[union-attr]
 
 
 def _require_name(value: str, message: str) -> str:

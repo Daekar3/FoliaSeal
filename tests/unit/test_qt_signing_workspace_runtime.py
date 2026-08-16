@@ -164,6 +164,9 @@ class _FakeDraftWorkflow:
         self.current_signature_appearance = None
         self.placement_context = None
         self.selected_certificate_configuration_id = None
+        self.selected_signature_preset_id = None
+        self.selected_appearance_profile_id = None
+        self.selected_placement_profile_id = None
         self.timestamp_required = False
         self.input_pdf_path = "/tmp/input.pdf"
         self.output_pdf_path = "/tmp/output.pdf"
@@ -597,6 +600,9 @@ def test_signing_workspace_runtime_snapshot_is_complete_and_immutable() -> None:
     bound.draft_workflow.current_signature_appearance = appearance
     bound.draft_workflow.signature_appearance = appearance
     bound.draft_workflow.selected_certificate_configuration_id = "cert-1"
+    bound.draft_workflow.selected_signature_preset_id = "preset-1"
+    bound.draft_workflow.selected_appearance_profile_id = "appearance-1"
+    bound.draft_workflow.selected_placement_profile_id = "placement-1"
     bound.draft_workflow.timestamp_required = True
     result = SigningResult(success=True, failure_code=None, message="ok")
 
@@ -617,6 +623,9 @@ def test_signing_workspace_runtime_snapshot_is_complete_and_immutable() -> None:
 
 def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_state() -> None:
     bound = _bind_runtime()
+    bound.draft_workflow.selected_signature_preset_id = "preset-1"
+    bound.draft_workflow.selected_appearance_profile_id = "appearance-1"
+    bound.draft_workflow.selected_placement_profile_id = "placement-1"
     rect = SignatureRect(
         page_index=3,
         left_pt=24.0,
@@ -642,6 +651,9 @@ def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_
     assert bound.draft_workflow.timestamp_required is True
     assert bound.properties_panel.load_from_workflow_calls == 2
     assert bound.runtime.selected_certificate_configuration_id() == "cert-1"
+    assert bound.runtime.selected_signature_preset_id() == "preset-1"
+    assert bound.runtime.selected_appearance_profile_id() == "appearance-1"
+    assert bound.runtime.selected_placement_profile_id() == "placement-1"
     assert (
         bound.runtime.current_placement_context()
         == bound.viewer_interaction_session.current_placement
