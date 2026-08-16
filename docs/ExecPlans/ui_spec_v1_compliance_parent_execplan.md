@@ -47,8 +47,9 @@ Foundation tranche:
 - [x] docs/ExecPlans/ui_launch_no_document_execplan.md
 - [ ] docs/ExecPlans/ui_command_model_shortcuts_execplan.md — typed File/View/Signing and Edit
   commands now route through public seams or focused-editor behavior with capability-driven enablement;
-  viewer Select All now uses the public document-text fallback, while final parent scenario evidence
-  remains open; packaged Help is complete in its release child.
+  viewer Select All now uses the public document-text fallback, and View Pan is complete over the
+  published session port with focused and production offscreen evidence. Final parent scenario
+  evidence and unrelated command/release gates remain open; packaged Help is complete in its release child.
 - [x] docs/ExecPlans/ui_zoom_command_surface_execplan.md — typed View Zoom In/Out/Reset actions
   route through the public workspace session port; broader View Back/Forward and remaining command
   families remain open with their owning children.
@@ -552,6 +553,12 @@ Release tranche:
   evidence proves bare Home/End are not consumed or rendered as page jumps, while Ctrl+Home/End
   perform exactly one first/last-page transition. The combined viewer/navigation validation is
   `47 passed`; unrelated display-backed, package-install, and phase3 nomenclature gates remain open.
+- [x] (2026-08-15) Completed the typed View → Pan increment: `AppFrameCommandId.PAN` is registered
+  without a shortcut, disabled until a workspace is open, and routed exactly once through the
+  public session port. Focused tests prove Pan exits text mode without mutating placement; a real
+  offscreen production AppFrame test proves the same postconditions. Architecture and child-plan
+  evidence are reconciled; the command-model child remains open for final scenario evidence and
+  other release gates.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

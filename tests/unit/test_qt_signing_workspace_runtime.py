@@ -77,6 +77,7 @@ class _FakeViewerWidget:
     def __init__(self, order=None) -> None:
         self.overlays = []
         self.refresh_calls = []
+        self.interaction_modes = []
         self._order = order
         self.undo_available = False
         self.redo_available = False
@@ -90,6 +91,9 @@ class _FakeViewerWidget:
         if self._order is not None:
             self._order.append(("refresh", navigation))
         self.refresh_calls.append(navigation)
+
+    def set_interaction_mode(self, mode: str) -> None:
+        self.interaction_modes.append(mode)
 
     def can_undo_signature_placement(self) -> bool:
         return self.undo_available
@@ -222,6 +226,9 @@ class _FakeDocumentReviewWorkspace:
                 selection_state="selection-state",
             )
         )
+
+    def current_state(self):
+        return self.selection_state
 
     def refresh_review(self):
         return self.review_state
@@ -476,6 +483,18 @@ def test_signing_workspace_runtime_applies_review_and_document_text_verbs() -> N
     assert copied == ["selected", "match"]
     assert len(bound.review_bridge.states) == 1
     assert len(bound.review_bridge.transitions) == 6
+
+
+def test_signing_workspace_runtime_pan_clears_text_mode_and_preserves_placement() -> None:
+    bound = _bind_runtime()
+    original_placement = bound.draft_workflow.signature_rect
+
+    bound.runtime.set_document_text_selection_mode(True)
+    assert bound.runtime.set_viewer_interaction_mode("pan") == "pan"
+
+    assert bound.viewer_widget.interaction_modes == ["pan"]
+    assert bound.document_review_workspace.selection_mode_calls == [True, False]
+    assert bound.draft_workflow.signature_rect is original_placement
 
 
 def test_signing_workspace_runtime_applies_placement_context_and_overlay() -> None:

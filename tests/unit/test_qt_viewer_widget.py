@@ -903,6 +903,26 @@ def test_set_interaction_mode_changes_cursor(monkeypatch):
     assert preview.cursor == _FakeQt.OpenHandCursor
 
 
+def test_pan_mode_exits_text_mode_without_mutating_completed_placement(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    preview = PdfViewerWidgetAdapter().create(workflow=_build_workflow())
+    placement = SignatureRect(
+        page_index=0,
+        left_pt=20.0,
+        bottom_pt=30.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+
+    preview.set_signature_overlay(placement)
+    preview.set_interaction_mode("text")
+    preview.set_interaction_mode("pan")
+
+    assert preview._interaction_mode == "pan"
+    assert preview._overlay_signature_rect == placement
+
+
 def test_keyboard_place_enter_and_shift_arrow_are_only_active_in_place_mode(monkeypatch):
     monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
 

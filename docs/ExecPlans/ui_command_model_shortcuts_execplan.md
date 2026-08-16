@@ -119,9 +119,11 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   bare Home/End pass through to the focused widget hierarchy. The navigation child owns the
   implementation and its fake/real Qt evidence; this parent remains open for unrelated deferred
   command families and release gates.
-- [ ] (2026-08-10) Implement the missing typed View → Pan command over the existing public
-  `set_viewer_interaction_mode("pan")` seam; prove no-document disablement, one mode transition,
-  text-mode exit, and unchanged placement geometry in focused and real offscreen tests.
+- [x] (2026-08-15) Implemented the typed View → Pan command over the existing public
+  `set_viewer_interaction_mode("pan")` seam. The frame owns registry metadata and open-workspace
+  enablement; the runtime clears text-selection mode and preserves placement state. Focused red→green
+  tests prove one exact `"pan"` transition, and the production offscreen AppFrame test proves text-mode
+  exit and unchanged placement through the published workspace ports.
 
 ## Surprises & Discoveries
 
@@ -146,11 +148,18 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   migrated without inventing behavior; Help, Signing, and the full Edit menu do not yet have
   complete truthful seams.
   Evidence: Loop 8 explorer review and the resulting `SETTINGS_COMMAND_DEFINITIONS` registry.
-- Observation: UI_SPEC §7/§8 lists View → Pan, but the current typed registry and frame expose every
-  neighboring View command except Pan; the public session port and runtime already implement the
-  mode transition.
-  Evidence: fresh explorer audit on 2026-08-10 of `docs/UI_SPEC.md`,
-  `app_frame_command_model.py`, and `set_viewer_interaction_mode()`.
+- Observation (pre-implementation, 2026-08-10): UI_SPEC §7/§8 listed View → Pan, but the typed
+  registry and frame exposed every neighboring View command except Pan; the public session port and
+  runtime already implemented the mode transition.
+  Evidence: explorer audit of `docs/UI_SPEC.md`, `app_frame_command_model.py`, and
+  `set_viewer_interaction_mode()`.
+- Observation: the existing viewer already owns Pan/Place interaction state, so the missing command
+  is an AppFrame registry/action gap rather than a new viewer behavior. Routing it through the
+  session port also lets the runtime clear text-selection mode without duplicating mode state in the
+  frame.
+  Evidence: `SigningWorkspaceSessionPort.set_viewer_interaction_mode()`,
+  `SigningWorkspaceRuntime.set_viewer_interaction_mode()`, and the real viewer interaction-mode
+  tests reviewed for this slice.
 - Observation: Select Text and Copy are concrete, tested frame callbacks but bypass the typed
   registry and are mounted under the wrong menus relative to UI_SPEC §7.
   Evidence: `FoliaSealAppFrame._install_menus()` and explorer review dated 2026-08-09.
@@ -243,6 +252,14 @@ bounded increment toward UI_SPEC section 7 and acceptance scenario 8.
   while viewer Select All requires a new current-page extraction/highlight capability. Keeping the
   commands disabled outside native text editors is more truthful than exposing a no-op or partial
   viewer command.
+  Date/Author: 2026-08-10 / Codex
+- Decision: add View → Pan as a typed, no-shortcut command immediately before Select Text, route it
+  through `SigningWorkspaceSessionPort.set_viewer_interaction_mode("pan")`, and enable it only when
+  a workspace is open. Do not make it checkable or maintain a second frame-side interaction-mode
+  value.
+  Rationale: UI_SPEC requires Pan, the public runtime seam already owns the transition and text-mode
+  exit, and the frame has no truthful current-mode query. A non-checkable action avoids stale state
+  while preserving completed placement geometry across mode changes.
   Date/Author: 2026-08-10 / Codex
 
 ## Outcomes & Retrospective
@@ -340,6 +357,14 @@ disabled/no-editor state, enablement, menu dispatch, signal-driven transitions, 
 plus a real offscreen Qt test that drives menu actions and native keyboard shortcuts against a
 `QLineEdit` and verifies observable text/clipboard behavior without touching placement history.
 
+For the current Pan increment, add `PAN` to `AppFrameCommandId` and insert its View definition
+before Select Text with the accessible name `Pan the PDF document`, mnemonic `Pa&n` (unique within
+View), and no
+invented shortcut. Add the corresponding `_pan_action` field and View-menu action in
+`src/foliaseal/presentation/qt/app_frame.py`, route `_pan_view()` through the public session port
+with the literal mode `"pan"`, and enable it from `WorkspaceActionState.workspace_open`. Do not
+touch viewer geometry or add a duplicate interaction-mode model at the frame edge.
+
 ## Milestones
 
 Milestone 1 inventories frame actions and writes red command-state tests. Milestone 2 centralizes
@@ -358,6 +383,11 @@ real offscreen menu/action test that creates, mutates, undoes, and redoes a plac
 Milestone 8 adds native-editor Cut, Paste, and Select All, proves focus-sensitive enablement and
   shortcut dispatch against a real `QLineEdit`, and records packaged Help as a separate completed
 remaining dependency gaps.
+Milestone 9 adds the missing typed View → Pan action, proves that no-document frames disable it and
+open workspaces dispatch exactly one public mode transition, and uses a real offscreen viewer to
+prove text mode exits while an existing placement rectangle remains unchanged. The milestone is
+complete only after the command registry, frame action state, focused tests, real offscreen test,
+documentation, and cleanup all pass.
 
 ## Concrete Steps
 
@@ -374,6 +404,7 @@ fall back to a system Python or system Qt installation.
     .venv/bin/pytest -q tests/unit/test_qt_app_frame.py -k 'cut or paste or select_all'
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py -k 'edit or text'
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py tests/integration/test_view_navigation_shortcuts.py
+    QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/integration/test_gui_launch_no_document.py tests/integration/test_view_navigation_shortcuts.py -k 'pan or view_command or text_selection'
     QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/integration/test_gui_launch_no_document.py
     .venv/bin/ruff check src tests
     .venv/bin/pytest -q
@@ -427,6 +458,13 @@ dispatch through the menu while native keyboard shortcuts retain Qt's built-in e
 With the viewer, a button, or no native editor focused, Cut/Paste/Select All remain disabled and do not mutate placement or
 document-selection state. Viewer Select All is explicitly not claimed by this increment.
 
+For the Pan increment, a no-document frame must expose a disabled `AppFrameCommandId.PAN` action.
+After opening a real workspace, triggering that action must call the session port exactly once with
+`"pan"`; the runtime must leave any completed placement rectangle unchanged and must turn off
+document text-selection mode. The focused test must be red before the registry/action exists and
+green afterward, and the real offscreen test must observe the viewer's Pan mode and unchanged
+placement geometry without relying on a display-backed GUI.
+
 ## Evidence Record
 
 Before checking this child in the parent, record the governing UI_SPEC requirement, exact focused
@@ -459,6 +497,12 @@ app-frame/state/offscreen set passed (`65 passed`), and the full suite passed (`
 skipped, 1 warning`). The real test covers Edit menu Cut/Copy/Paste/Select All, clipboard empty/nonempty
 transitions, and Ctrl+A/C/X/V observable selection, clipboard, and text behavior; keyboard Select All
 is validated by the resulting Qt selection rather than an overridden `selectAll()` call count.
+
+Pan evidence for this increment records the focused AppFrame registry/action result (`2 passed`),
+focused runtime transition/retention result (`2 passed`), and production offscreen AppFrame result
+(`1 passed`). Together they cover the no-document disabled state, exact one-call `"pan"` transition,
+text-mode exit, and unchanged placement rectangle; the cleanup audit passed. No new SVG is needed;
+the existing View topology artifact remains the governing visual reference.
 
 ## Idempotence and Recovery
 
@@ -525,3 +569,7 @@ dispatch and observable native keyboard behavior. Viewer Select All was subseque
 `ui_document_select_all_execplan.md` over the public document-selection contract, preserving native
 editor precedence; final release scenario evidence remains explicitly deferred, while packaged Help
 is implemented and validated by `ui_help_support_execplan.md`.
+Revision note: 2026-08-10 / Codex
+Selected the next dependency-ready command increment: typed View → Pan over the existing public
+viewer-interaction mode boundary. The frame owns only registry metadata/action enablement; runtime
+owns mode transitions and text-mode clearing, and no shortcut or duplicate mode state is introduced.

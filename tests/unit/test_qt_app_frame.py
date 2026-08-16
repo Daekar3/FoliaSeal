@@ -71,6 +71,7 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
         AppFrameCommandId.NEXT_PAGE,
         AppFrameCommandId.BACK,
         AppFrameCommandId.FORWARD,
+        AppFrameCommandId.PAN,
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.ZOOM_IN,
         AppFrameCommandId.ZOOM_OUT,
@@ -98,6 +99,7 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         AppFrameCommandId.NEXT_PAGE,
         AppFrameCommandId.BACK,
         AppFrameCommandId.FORWARD,
+        AppFrameCommandId.PAN,
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.ZOOM_IN,
         AppFrameCommandId.ZOOM_OUT,
@@ -112,7 +114,7 @@ def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
         "Ctrl+F",
         None,
     ]
-    assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[5:8]] == [
+    assert [definition.shortcut for definition in VIEW_COMMAND_DEFINITIONS[6:9]] == [
         "Ctrl++",
         "Ctrl+-",
         None,
@@ -816,6 +818,8 @@ class _FakeShell:
 
     def set_viewer_interaction_mode(self, mode: str) -> str:
         self.set_viewer_interaction_mode_calls.append(mode)
+        if mode != "text" and self.document_text_selection_mode:
+            self.set_document_text_selection_mode(False)
         return mode
 
     def remove_signature_placement(self) -> bool:
@@ -1771,6 +1775,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Next P&age",
         "&Back",
         "&Forward",
+        "Pa&n",
         "&Select Text",
         "Zoom &In",
         "Zoom &Out",
@@ -1785,6 +1790,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         "Page Down",
         "Alt+Left",
         "Alt+Right",
+        None,
         None,
         "Ctrl++",
         "Ctrl+-",
@@ -1807,9 +1813,10 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
         False,
         False,
         False,
+        False,
     ]
-    assert frame.window.menu_bar.menus[2].actions[4].checkable is True
-    assert frame.window.menu_bar.menus[2].actions[4].icon.path.endswith("text-select.svg")
+    assert frame.window.menu_bar.menus[2].actions[5].checkable is True
+    assert frame.window.menu_bar.menus[2].actions[5].icon.path.endswith("text-select.svg")
     assert [action.text for action in frame.window.menu_bar.menus[3].actions] == [
         definition.mnemonic_text for definition in SIGNING_COMMAND_DEFINITIONS
     ]
@@ -1909,7 +1916,7 @@ def test_app_frame_save_as_action_enables_after_open_and_routes_to_current_shell
     close_action = frame.window.menu_bar.menus[0].actions[3]
     copy_selection_action = frame.window.menu_bar.menus[1].actions[3]
     select_all_action = frame.window.menu_bar.menus[1].actions[5]
-    text_selection_action = frame.window.menu_bar.menus[2].actions[4]
+    text_selection_action = frame.window.menu_bar.menus[2].actions[5]
 
     assert save_action.enabled is False
     assert save_as_action.enabled is False
@@ -2110,6 +2117,7 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         AppFrameCommandId.NEXT_PAGE,
         AppFrameCommandId.BACK,
         AppFrameCommandId.FORWARD,
+        AppFrameCommandId.PAN,
         AppFrameCommandId.SELECT_TEXT,
         AppFrameCommandId.ZOOM_IN,
         AppFrameCommandId.ZOOM_OUT,
@@ -2124,6 +2132,7 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         "Next Page",
         "Back",
         "Forward",
+        "Pan",
         "Select Text",
         "Zoom In",
         "Zoom Out",
@@ -2138,6 +2147,7 @@ def test_view_command_registry_is_typed_and_normative() -> None:
         "Page Down",
         "Alt+Left",
         "Alt+Right",
+        None,
         None,
         "Ctrl++",
         "Ctrl+-",
@@ -2162,37 +2172,37 @@ def test_view_page_commands_route_through_the_session_port(tmp_path: Path) -> No
     )
 
     view_actions = frame.window.menu_bar.menus[2].actions
-    assert [action.enabled for action in view_actions] == [False] * 12
+    assert [action.enabled for action in view_actions] == [False] * 13
     frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
-    assert [action.enabled for action in view_actions] == [False, True, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [False, True, False, False] + [True] * 9
 
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 9
     view_actions[1].trigger()
-    assert [action.enabled for action in view_actions] == [True, False, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, False, False, False] + [True] * 9
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 9
     view_actions[0].trigger()
-    assert [action.enabled for action in view_actions] == [False, True, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [False, True, False, False] + [True] * 9
 
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 9
     shell.go_to_next_page()
-    assert [action.enabled for action in view_actions] == [True, False, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, False, False, False] + [True] * 9
     shell.go_to_previous_page()
-    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 8
+    assert [action.enabled for action in view_actions] == [True, True, False, False] + [True] * 9
 
-    view_actions[5].trigger()
     view_actions[6].trigger()
     view_actions[7].trigger()
+    view_actions[8].trigger()
     assert shell.zoom_in_view_calls == 1
     assert shell.zoom_out_view_calls == 1
     assert shell.reset_zoom_view_calls == 1
-    view_actions[8].trigger()
     view_actions[9].trigger()
+    view_actions[10].trigger()
     assert shell.fit_page_view_calls == 1
     assert shell.fit_width_view_calls == 1
-    view_actions[10].trigger()
+    view_actions[11].trigger()
     assert shell.focus_document_search_calls == 1
 
     assert shell.go_to_previous_page_calls == 3
@@ -2216,7 +2226,6 @@ def test_view_internal_link_history_commands_route_and_follow_capabilities(tmp_p
     forward_action = actions[AppFrameCommandId.FORWARD]
     assert back_action.enabled is False
     assert forward_action.enabled is False
-
     shell.back_link_available = True
     shell.status_callback("link_internal_navigation")
     assert back_action.enabled is True
@@ -2237,6 +2246,29 @@ def test_view_internal_link_history_commands_route_and_follow_capabilities(tmp_p
     shell.status_callback("link_internal_navigation")
     assert back_action.enabled is True
     assert forward_action.enabled is False
+
+
+def test_pan_command_routes_through_public_session_mode_boundary(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+
+    pan_action = frame.command_actions()[AppFrameCommandId.PAN]
+    assert pan_action.enabled is False
+
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    assert pan_action.enabled is True
+    shell.document_text_selection_mode = True
+    pan_action.trigger()
+
+    assert shell.set_viewer_interaction_mode_calls == ["pan"]
+    assert shell.set_document_text_selection_mode_calls == [False]
 
 
 def test_app_frame_certificate_creation_routes_to_dialog_port(

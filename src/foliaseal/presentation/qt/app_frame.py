@@ -437,6 +437,7 @@ class FoliaSealAppFrame:
         self._next_page_action: Any | None = None
         self._back_link_action: Any | None = None
         self._forward_link_action: Any | None = None
+        self._pan_action: Any | None = None
         self._signature_library_action: Any | None = None
         self._sign_and_save_action: Any | None = None
         self._place_signature_action: Any | None = None
@@ -1093,6 +1094,12 @@ class FoliaSealAppFrame:
     def _go_forward_link(self) -> None:
         self._with_current_session_port(lambda session: session.go_forward_link())
         self._sync_page_navigation_actions()
+
+    def _pan_view(self) -> None:
+        self._with_current_session_port(
+            lambda session: session.set_viewer_interaction_mode("pan")
+        )
+        self._sync_document_text_actions()
 
     def _focused_text_editor(self) -> Any | None:
         """Return the focused native text editor, if one owns the current focus."""
@@ -1797,6 +1804,12 @@ class FoliaSealAppFrame:
             self._go_forward_link,
             enabled=False,
         )
+        self._pan_action = self._command_action(
+            view_menu,
+            AppFrameCommandId.PAN,
+            self._pan_view,
+            enabled=False,
+        )
         self._text_selection_mode_action = self._command_action(
             view_menu,
             AppFrameCommandId.SELECT_TEXT,
@@ -2028,6 +2041,7 @@ class FoliaSealAppFrame:
         self._set_action_enabled(self._next_page_action, state.next_page_enabled)
         self._set_action_enabled(self._back_link_action, state.back_link_enabled)
         self._set_action_enabled(self._forward_link_action, state.forward_link_enabled)
+        self._set_action_enabled(self._pan_action, state.workspace_open)
         self._set_action_enabled(self._text_selection_mode_action, state.text_selection_enabled)
         self._set_action_checked(self._text_selection_mode_action, state.text_selection_checked)
         self._set_action_enabled(self._copy_selected_text_action, state.copy_enabled)

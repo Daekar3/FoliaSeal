@@ -24,6 +24,7 @@ class AppFrameCommandId(StrEnum):
     NEXT_PAGE = "view.next_page"
     BACK = "view.back"
     FORWARD = "view.forward"
+    PAN = "view.pan"
     SELECT_TEXT = "view.select_text"
     ZOOM_IN = "view.zoom_in"
     ZOOM_OUT = "view.zoom_out"
@@ -189,6 +190,14 @@ VIEW_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="Alt+Right",
         accessible_name="Go forward to the next internal document destination",
         mnemonic_text="&Forward",
+    ),
+    AppFrameCommandDefinition(
+        command_id=AppFrameCommandId.PAN,
+        menu="View",
+        text="Pan",
+        shortcut=None,
+        accessible_name="Pan the PDF document",
+        mnemonic_text="Pa&n",
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.SELECT_TEXT,
