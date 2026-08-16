@@ -27,6 +27,9 @@ tests, and observable acceptance; it is not a generic refactor.
 - [x] (2026-08-10) Route forwarded requests through the existing frame and defer the newest request during active signing.
 - [x] (2026-08-10) Add the condition-only queued-filename surface and keyboard-accessible Cancel pending open action.
 - [ ] (2026-08-10) Remove migrated compatibility or acceptance product cruft whose retirement condition is met.
+- [x] (2026-08-16) Run the real X11 two-process owner/secondary smoke with direct PID tracking; the
+  primary stayed alive with one FoliaSeal window, the secondary exited `0`, and the focused
+  integration test passed `1 passed` without the prior QLocalServer skip.
 - [x] (2026-08-09) Run focused, regression, and bounded Qt validation; record evidence and clean up.
 - [x] (2026-08-10) Run focused production-widget and regression validation, then reconcile architecture/status documentation; commit remains an explicit parent handoff step.
 
@@ -85,9 +88,10 @@ shown by the AppFrame-owned condition-only status surface. Cancel leaves the cur
 untouched; after a terminal signing/recovery state, the existing open/dirty policy decides whether to
 replace it, and terminal/close paths clear the surface. Focused validation is `62 passed, 1 skipped`;
 the full suite is `1447 passed, 20 skipped, 1 warning`; the real offscreen pending-open widget test
-passes. QLocalServer cannot bind a Unix endpoint in this sandbox (`Unknown error 1`), so the
-production transport test remains explicitly skipped; compatibility/acceptance retirement and
-display-backed two-process smoke evidence remain open.
+passes. QLocalServer cannot bind a Unix endpoint in the isolated/offscreen test environment
+(`Unknown error 1`), so that test remains explicitly skipped; a dedicated Cinnamon/X11 smoke now
+proves the real two-process route. Compatibility/acceptance retirement and the broader
+display-backed/accessibility/release gates remain open.
 
 ## Context and Orientation
 
@@ -170,8 +174,10 @@ Evidence is the focused protocol/launcher/widget result, the real offscreen pend
 and two-process routing logs where the endpoint is available. The current run records `62 passed, 1
 skipped` for the focused app-frame/open-routing set, `1447 passed, 20 skipped, 1 warning` for the
 full suite, and a passing real offscreen test for queued filename visibility and Cancel activation.
-QLocalServer remains unavailable here (`Unknown error 1`), so the transport skip is retained rather
-than treated as two-process acceptance.
+QLocalServer remains unavailable in the isolated/offscreen test environment (`Unknown error 1`), so
+that test skip is retained. A dedicated unsandboxed Cinnamon/X11 run proved the real two-process
+acceptance instead: the primary PID stayed alive, the secondary returned `0`, one primary window
+remained, and the owned endpoint/window/root cleanup was empty afterward.
 
 ## Validation and Acceptance
 
@@ -196,8 +202,9 @@ window or tab is created.
 
 Before completion, record the exact protocol/launcher test and available Qt transport result,
 primary/secondary input sequence, evidence path, cleanup of owned processes/socket roots, and
-compatibility grep proof. The current QLocalServer bind limitation must remain recorded rather than
-silently treated as a passing two-process audit.
+compatibility grep proof. The isolated/offscreen `QLocalServer` bind limitation must remain
+recorded rather than silently treated as a passing transport test; the bounded unsandboxed
+Cinnamon/X11 smoke is the separate source-tree two-process acceptance evidence.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
@@ -243,9 +250,15 @@ narrows the remaining child work to that condition-only app-frame status surface
 offscreen coverage, documentation reconciliation, and evidence; it does not reopen the completed IPC
 transport.
 
-Revision note: 2026-08-10 / Codex
+Revision note: 2026-08-10 / Codex (historical status before the X11 smoke)
 The condition-only AppFrame status surface, replacement/cancel/terminal cleanup behavior, focused
 production-widget coverage, and architecture reconciliation are complete. Focused validation is
 `62 passed, 1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`. QLocalServer bind
 failure (`Unknown error 1`) remains an environment limitation; compatibility retirement and
-display-backed two-process smoke acceptance remain open.
+display-backed two-process smoke acceptance remained open at that point.
+
+Revision note: 2026-08-16 / Codex
+Recorded successful unsandboxed Cinnamon/X11 two-process routing (`secondary_rc=0`, primary window
+retained, no second owner) and the focused integration result (`1 passed`). The offscreen QLocalServer
+skip remains an isolated-test limitation; compatibility retirement and broader release acceptance
+remain open. Wayland is intentionally deferred until Mint supports it as a first-class session.

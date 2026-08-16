@@ -542,11 +542,13 @@ The canonical repository document split is:
   is retained. Active signing leaves the current workspace mounted; after `sign_success`,
   `sign_failure`, `verify_failure`, or `recovery_return_to_draft`, AppFrame offers the request through
   the existing open/dirty decision policy. Cancel, rejection, acceptance, workspace close, and frame
-  teardown clear the surface. The production offscreen widget path is covered, but this sandbox's
-  `QLocalServer` cannot bind its Unix endpoint (`Unknown error 1`), so real two-process transport
-  acceptance remains environment-limited.
-- Status: Implemented and confirmed by focused fake-Qt and real offscreen tests; transport limitation
-  and compatibility/acceptance retirement remain open.
+  teardown clear the surface. The production offscreen widget path is covered, but this isolated
+  test environment's `QLocalServer` cannot bind its Unix endpoint (`Unknown error 1`). A separate
+  unsandboxed Cinnamon/X11 source-tree smoke proves the real two-process route; packaged GUI and
+  Wayland transport remain outside that evidence.
+- Status: Implemented and confirmed by focused fake-Qt/offscreen tests plus the bounded Cinnamon/X11
+  source-tree smoke; packaged/display-accessibility acceptance and compatibility/acceptance retirement
+  remain open.
 
 ### Document source monitor
 
@@ -1314,8 +1316,9 @@ boundary fakeable while preserving native Qt shortcuts.
   cleanup succeeded; no generated package or signing-audit/hash claim is retained here. The isolated
   package-manager smoke now also passes a fresh `.deb` through private `dpkg --unpack` (`dpkg` code
   `0`) and cleans its dedicated install root; its `pdftoppm` dependency probe is explicitly
-  `scope=host-runtime`. Display-backed GUI/accessibility and privileged host package installation
-  remain open gates.
+  `scope=host-runtime`. A separate unsandboxed source-tree Cinnamon/X11 smoke now proves the
+  checkout GUI can launch and route a second invocation; this does not certify the packaged GUI or
+  Wayland. Display-backed accessibility and privileged host package installation remain open gates.
 
 ## 5. Object model / domain model
 
@@ -1930,7 +1933,8 @@ Default local validation from README:
 | 2026-08-10 | Reconciled the packaged-release boundary with fresh temporary audit evidence. | Focused audit helpers passed (`12 passed`), including offline-environment and complete-font-set checks, and the audit script executable bit was restored. A fresh extracted Debian package reported `status=passed`, with `offline_environment.proxy_environment_removed=true`, `network_requests_required=false`, and `dependency.help_output_present=true`; wrapper/executable, desktop entry/icon, `Depends: poppler-utils`, five offline Help topics, the complete canonical 18-font set, the PyInstaller 6 `_internal/foliaseal/resources` root, and a true `pdftoppm` fixture conversion passed. The isolated/offscreen GUI probe remains explicitly limited (return code `1`, `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:`); build warnings and cleanup are recorded in the owning ExecPlan, no generated artifact was committed, and display-backed/privileged-host package gates remain open. |
 | 2026-08-10 | Added the offline packaged Help boundary. | `HelpCatalog` owns validated Markdown/index resources shared by `foliaseal help` and the modeless `HelpViewerDialog`; typed Help/F1 routing, local `help:` navigation, and setuptools/PyInstaller resource parity are implemented and covered by focused tests. Diagnostics, final packaging acceptance, and broader release gates remain open in their owning plans. |
 | 2026-08-10 | Added the bounded real-Qt accessibility acceptance boundary. | `tests/integration/test_accessibility_acceptance.py` now covers offscreen minimum geometry, no-document Open/Library accessible names, typed menu metadata and unique top-level/action mnemonics, shortcuts, disabled state, F1 Help, modeless support surfaces, Settings Restore defaults, diagnostic-folder routing, and Unicode XDG paths; the follow-up focused acceptance plus AppFrame regression tests pass (`64 passed`). Offscreen evidence does not claim screen-reader, high-contrast, physical DPI/monitor, or package-install behavior; those display-backed/release gates remain open. |
-| 2026-08-10 | Added single-instance open routing and AppFrame pending-open safety surface. | `QtAppFrameAdapter.launch()` now claims a per-user local owner endpoint and forwards secondary absolute-path requests into the existing frame. `FoliaSealAppFrame` retains only the newest request during active signing; `PendingOpenRequestSurface` exposes the queued basename and keyboard-accessible Cancel pending open action, and terminal/cancel/close paths clear it. Focused validation is `62 passed, 1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`; real offscreen widget evidence passes. QLocalServer bind failure (`Unknown error 1`) remains an environment limitation for two-process acceptance. |
+| 2026-08-10 | Added single-instance open routing and AppFrame pending-open safety surface. | `QtAppFrameAdapter.launch()` now claims a per-user local owner endpoint and forwards secondary absolute-path requests into the existing frame. `FoliaSealAppFrame` retains only the newest request during active signing; `PendingOpenRequestSurface` exposes the queued basename and keyboard-accessible Cancel pending open action, and terminal/cancel/close paths clear it. Focused validation is `62 passed, 1 skipped`; full regression is `1447 passed, 20 skipped, 1 warning`; real offscreen widget evidence passes. QLocalServer bind failure (`Unknown error 1`) remains an isolated-test limitation for two-process acceptance. |
+| 2026-08-16 | Added bounded Cinnamon/X11 live acceptance evidence. | A direct two-process source-tree smoke kept one primary FoliaSeal owner/window while a secondary invocation returned `0`; the focused QLocalServer integration test passed under X11. The interactive harness opened on X11, produced a visual checkpoint, and closed with `0` after an explicit available checklist template; no owned process, window, or temporary root remained. This closes only the X11 transport/launch checkpoint; Wayland, four-case human walkthrough, screen-reader/high-contrast/DPI/multi-monitor, packaged, privileged-install, and final release gates remain open. |
 | 2026-08-10 | Added current-page viewer Select All behind the typed Edit command. | `FoliaSealAppFrame` keeps native editor precedence and routes the no-native-editor path through `SigningWorkspaceSessionPort`; the application selection engine uses Qt PDF extraction and current-page highlight effects, with truthful unavailable-text status and Copy enablement. Help is now covered by the packaged Help slice; broad PDF-editing features outside the UI_SPEC command surface remain intentionally out of scope. |
 | 2026-08-10 | Added typed native Edit Cut/Copy/Paste/Select All over the focused-editor seam. | Historical increment: `AppFrameCommandId.CUT`/`COPY`/`PASTE`/`SELECT_ALL` expose `Ctrl+X`/`Ctrl+C`/`Ctrl+V`/`Ctrl+A`; AppFrame routes menu callbacks to native editor methods, derives enablement from selection/clipboard capabilities, and refreshes on focus, selection, and clipboard changes. The subsequent document-selection child added the current-page viewer fallback, and the later Help child completed Help; the current command registry is complete. |
 | 2026-08-10 | Added typed Edit Undo/Redo over native text-editor and visible-signature placement histories. | `AppFrameCommandId.UNDO`/`REDO` expose `Ctrl+Z`/`Ctrl+Shift+Z`; the frame routes to a focused native editor when present and otherwise crosses `SigningWorkspaceSessionPort` to the viewer-owned `PlacementHistory`. `WorkspaceActionState` projects the selected history capability, while placement undo/redo restores exact `SignatureRect | None` states and clears at lifecycle/external-sync boundaries. |

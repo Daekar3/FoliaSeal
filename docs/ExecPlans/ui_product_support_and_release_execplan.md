@@ -103,6 +103,10 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-16) Re-audited the previously unchecked child set and found no remaining
   dependency-ready model/application/Qt path in this release plan; the remaining gates are
   environment-dependent acceptance or deliberate compatibility/nomenclature work.
+- [x] (2026-08-16) Added the bounded X11 acceptance evidence: the source-tree GUI now has a real
+  Cinnamon/X11 two-process routing smoke and interactive-harness launch/close checkpoint with clean
+  owned-process cleanup. This does not substitute for packaged GUI, screen-reader/high-contrast,
+  physical-DPI/multi-monitor, privileged-install, or final release-matrix acceptance.
 - [ ] (remaining release gate) Retire migrated compatibility or acceptance product cruft whose
   consumers are gone; this is intentionally separate from the preview behavior closure.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager

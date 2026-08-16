@@ -144,6 +144,10 @@ foliaseal interactive-harness \
   --artifacts-dir artifacts/acceptance_preview_debug
 ```
 
+On Linux Mint 22.3, the supported live-review session for this project is the normal Cinnamon/X11
+desktop session. Wayland review is intentionally deferred until the OS treats Wayland as a
+first-class supported session.
+
 Do not put production passphrases in shell history or checked-in manifests. Use test identities
 for local QA. Harness completion is not a release gate by itself; review the generated evidence,
 the applicable checklist, and representative signed output.

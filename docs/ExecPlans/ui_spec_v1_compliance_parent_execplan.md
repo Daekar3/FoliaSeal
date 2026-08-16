@@ -601,11 +601,17 @@ Release tranche:
   downstream plans. Dirty/source-change/recovery lifecycle and ordered readiness/caveat projection
   are complete; unsaved-session autosave/restoration, display-backed HITL, and privileged release
   acceptance remain explicit independent gates.
-- [x] (2026-08-16) Re-ran the current signed-evidence harness audit through
+- [x] (historical sandboxed attempt, 2026-08-16) Re-ran the signed-evidence harness audit through
   `docs/ExecPlans/manual_harness_current_audit_execplan.md`: the strict headless gates pass with
   18/18 parity signings and 3/3 matched fit rejections, and the four tracer artifacts are coherent.
-  The live HITL attempt is still open because the current environment cannot open `DISPLAY=:0` and
-  the xcb Qt plugin aborts before window creation; no full GUI acceptance claim is made.
+  The sandboxed live HITL attempt could not open `DISPLAY=:0` and the xcb Qt plugin aborted before
+  window creation; no full GUI acceptance claim was made from that attempt.
+- [x] (2026-08-16) Closed the newly unblocked source-tree X11 transport/launch checkpoint: a direct
+  two-process smoke kept one primary FoliaSeal owner/window while the secondary exited `0`, the
+  focused transport test passed under X11, and `interactive-harness` opened, rendered, and closed
+  cleanly with an explicit checklist template. This is not four-case human acceptance and does not
+  close screen-reader/high-contrast, physical-DPI/multi-monitor, packaged, privileged-install, or
+  final release gates; Wayland is intentionally deferred for Mint 22.3.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -624,7 +630,7 @@ Release tranche:
   Their product-facing labels must not leak into the V1 UI; migrations must preserve evidence meaning
   while removing obsolete nomenclature where safe.
 - Observation: the first live implementation loop completed with real-Qt offscreen evidence, while
-  the display-backed audit was blocked by the current xcb session.
+  the display-backed audit was blocked by the then-current sandboxed xcb session.
   Evidence: `tests/integration/test_gui_launch_no_document.py` passed under
   `QT_QPA_PLATFORM=offscreen`, while `DISPLAY=:0 ... scripts/live_gui_parent_audit.py` exited 134
   because xcb could not connect; cleanup found no FoliaSeal processes.
@@ -647,8 +653,9 @@ Release tranche:
   discarding the active dirty draft.
   Evidence: `SigningWorkspaceLifecycle.prepare()` / `replace_prepared()` and the lifecycle-focused
   failed-candidate test.
-- Observation: the current environment has no usable xcb display and cannot claim the local-instance
-  socket under the sandbox, but real offscreen Qt tests provide deterministic close-event evidence.
+- Observation: the earlier sandboxed execution environment had no usable xcb display and could not
+  claim the local-instance socket, while real offscreen Qt tests provided deterministic close-event
+  evidence. The later unsandboxed Cinnamon/X11 run is recorded above.
   Evidence: bounded CLI audit exited `1` with `SingleInstanceUnavailable`; display audit exited `134`
   with xcb `DISPLAY=:0`; exact temporary roots and owned processes were cleaned; real offscreen
   lifecycle integration passed.

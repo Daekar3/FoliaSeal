@@ -26,8 +26,8 @@ implementation plan.
   18 successful preview-parity signings and 3 matched fit rejections.
 - [x] `docs/SPEC.md` and `docs/UI_SPEC.md` are the governing behavior documents for preview fidelity,
   validation honesty, signing state, and user-facing error reporting.
-- [ ] A display-enabled environment is available for the live Qt/HITL portion. Offscreen Qt is
-  sufficient for deterministic evidence but cannot prove what a human sees.
+- [x] A display-enabled Cinnamon/X11 environment is now available for the bounded live Qt portion.
+  Offscreen Qt remains sufficient for deterministic evidence but cannot prove what a human sees.
 
 ## Progress
 
@@ -43,13 +43,19 @@ implementation plan.
 - [x] (2026-08-16) Ran the current strict gates: parity passed with 18 successful signings and fit
   rejection passed with 3 matched intentional rejections. Inspected the four selected tracer rows'
   preview/analysis/comparison artifacts and structured summaries.
-- [ ] (2026-08-16) Live `interactive-harness` HITL remains open: `DISPLAY=:0` cannot be opened and
-  the xcb Qt plugin aborts before the shell starts. The headless evidence is complete, but it cannot
-  be represented as human display acceptance.
+- [x] (historical sandboxed attempt, 2026-08-16) The sandboxed `interactive-harness` HITL attempt
+  could not open `DISPLAY=:0` and the xcb Qt plugin aborted before the shell started. That historical
+  limitation did not describe the later unsandboxed Cinnamon/X11 session below.
+- [x] (2026-08-16) Re-ran the current `interactive-harness` on the real Cinnamon/X11 session with
+  an explicit available checklist template. The harness window was observed and closed normally;
+  it returned `0`, wrote a valid summary/results pair, and left no owned FoliaSeal process, dialog,
+  or temporary root. This closes the bounded X11 launch/visual-checkpoint/cleanup gate, but not the
+  four-tracer-case human walkthrough or the separate accessibility/package gates.
 - [x] (2026-08-16) Reconciled the historical plan/status references, completed explorer compliance
   review, updated the current architecture/README evidence-mode wording, removed the temporary
-  evidence root and generated caches, and confirmed no GUI/process debris remains. The display-
-  dependent HITL checkbox remains open; commit of this documentation/evidence-status slice remains.
+  evidence root and generated caches, and confirmed no GUI/process debris remains. The four-case
+  display-dependent HITL walkthrough checkbox remains open; the bounded X11 launch/visual-checkpoint
+  gate is complete, and commit of this documentation/evidence-status slice remains.
 
 ## Surprises & Discoveries
 
@@ -114,13 +120,17 @@ The deterministic portion completed on 2026-08-16. The strict command wrote
 The four selected rows have preview/analysis images and structured evidence. The three successful
 rows also have signed PDFs, normalized crops, and side-by-side comparisons; direct inspection found
 coherent border, stamp, and text placement. The rejection row reports the expected fit message and
-`output_file_exists=false`. The live display attempt remains incomplete because xcb cannot open the
-available `DISPLAY=:0`; no production defect was discovered in the headless review.
+`output_file_exists=false`. The earlier live display attempt was incomplete because the sandboxed xcb
+process could not open the available `DISPLAY=:0`; a later bounded unsandboxed Cinnamon/X11 run
+reached the harness and closed cleanly. No production defect was discovered in either review. The
+four-case human walkthrough remains open because the bounded run intentionally stopped at a
+representative visual checkpoint.
 
 Documentation/compliance review and cleanup are complete. Current architecture and README wording
 now distinguish deterministic headless/offscreen evidence from display-backed human acceptance;
-`docs/SPEC.md` remains unchanged because it is frozen. The remaining work for this slice is its
-intentional commit. Full human GUI acceptance remains the next display-enabled slice.
+`docs/SPEC.md` remains unchanged because it is frozen. The bounded X11 launch gate is complete,
+while the four-case human GUI walkthrough, accessibility, package, and final release gates remain
+open.
 
 ## Context and Orientation
 
@@ -231,10 +241,16 @@ absent, and the current display unavailable. This plan separates headless eviden
 now from the genuinely display-dependent HITL claim.
 
 Revision note: 2026-08-16 / Codex
-Recorded the regenerated two-gate evidence, four-row artifact inspection, failed display-backed
-attempt, and clean process result. The deterministic audit is complete; live HITL remains explicitly
-open for a display-enabled environment.
+Recorded the regenerated two-gate evidence, four-row artifact inspection, failed sandboxed
+display-backed attempt, and clean process result. The deterministic audit is complete; live HITL
+remained explicitly open until the later unsandboxed X11 checkpoint below.
 
 Revision note: 2026-08-16 / Codex
 Recorded compliance findings, supersession-reference cleanup, temporary-root removal, and the final
 process audit. No production behavior changed in this evidence/status slice.
+
+Revision note: 2026-08-16 / Codex
+Recorded the newly available unsandboxed Cinnamon/X11 session, the successful interactive-harness
+visual checkpoint and clean close, the explicit checklist-template friction, and the remaining
+four-case/accessibility/package gates. Wayland is intentionally deferred until Mint provides a
+first-class supported session.
