@@ -48,7 +48,7 @@ only the journal and artifact proven to belong to that transaction.
   no generated journals or staged PDFs were retained. Full validation is `1519 passed, 20 skipped,
   1 warning`; display-backed and privileged gates remain open. The subsequent GUI recovery child
   raises the current full-suite evidence to `1535 passed, 20 skipped, 1 warning`.
-- [ ] Commit the complete slice and record the final revision.
+- [x] Commit the complete journal plus GUI recovery slice and record revision `3e5a3913f`.
 
 ## Surprises & Discoveries
 
@@ -226,5 +226,6 @@ existing `execute()` and `verify_preserved_artifact()` behavior. The verifier ad
 must map the existing `VerificationSummary` to `True` only when signatures are present and
 cryptographically valid, with no unexpected certification or timestamp failure.
 
-Revision note: 2026-08-16 / Codex. Created after a fresh governing-document audit identified durable
+Revision note: 2026-08-16 / Codex. GUI recovery follow-up committed as `3e5a3913f`; the durable
+foundation and its explicit GUI actions are complete for headless/offscreen behavior. Created after a fresh governing-document audit identified durable
 signing-transaction recovery as the next headless-capable SPEC/UI_SPEC compliance gap.

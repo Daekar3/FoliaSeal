@@ -46,7 +46,7 @@ Cancel or dialog dismissal leaves the candidate and its journal intact for the n
 - [x] (2026-08-16) Added focused/offscreen coverage for verified-only discovery, cancellation,
   copy, replace, discard ownership, cleanup, and launch integration.
 - [x] (2026-08-16) Reconciled architecture, parent/recovery plans, ran validation, and cleaned
-  generated resources. Commit/handoff remains with the parent workstream.
+  generated resources. Committed as `3e5a3913f`.
 
 ## Change Slice
 
@@ -111,5 +111,5 @@ and the full suite is `1535 passed, 20 skipped, 1 warning`. The production path 
 candidate digest at resolution, and the explicit Replace and copy-overwrite confirmations remain
 separate from candidate discovery.
 
-Revision note: 2026-08-16 / Codex. Created after the durable journal slice exposed the remaining
+Revision note: 2026-08-16 / Codex. Completed and committed as `3e5a3913f`. Created after the durable journal slice exposed the remaining
 UI_SPEC WF01 restart-recovery surface gap.
