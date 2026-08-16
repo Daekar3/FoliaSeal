@@ -26,7 +26,8 @@ No source, schema, CLI, or UI behavior changes are in scope for this status slic
   and diff checks passed.
 - [x] (2026-08-16) Compliance and architecture review found no discrepancy; the child marker is
   ready for documentation commit without changing the deliberate legacy-read boundary.
-- [ ] (2026-08-16) Record the focused status-closure commit and final clean-worktree audit.
+- [x] (2026-08-16) Commit `0a8280e06` recorded the focused status closure; the final worktree,
+  diff, and process audit is clean.
 
 ## Acceptance boundary
 
