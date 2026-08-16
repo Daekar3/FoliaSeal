@@ -139,11 +139,13 @@ an unbounded compatibility layer.
   passes; the full suite reports `1496 passed, 20 skipped, 1 warning`; the focused migration/
   evidence suite reports `255 passed, 9 skipped, 1 warning`; and `python -m compileall -q src tests
   scripts` passes.
-- [ ] Release-matrix acceptance gate remains open: the migrated and clean baseline both reproduce
-  one pre-existing `wrapped_block_top_plain_success` preview/output text-bound mismatch in the
-  10-scenario signed evidence workflow (`preview_output_comparison_failure_count=1`). This is
-  outside a nomenclature-only migration and must be resolved by the existing signed-parity/render
-  fidelity work before the broader release gate can be closed.
+- [x] (2026-08-16) Release-matrix acceptance gate closed by the signed-evidence fidelity slice:
+  `signed-acceptance-evidence` now runs the success-only parity and rejection-only fit gates, and
+  the offscreen command passes with `18/18` parity signings, `0` preview/output comparison
+  failures, and `3/3` matched intentional fit rejections. The previously observed
+  `single_line_top_stamp_sparse_relaxed` reconstruction drift was fixed by preserving primary-image
+  prominence in the Qt harness. The mixed ten-scenario manifest remains standalone diagnostic
+  coverage and is not a strict release gate.
 - [x] (2026-08-16) Architecture/README/active ExecPlans reconciled. Historical completed plans
   remain archival provenance by design; the migration plan is the only active plan retaining the
   old label.

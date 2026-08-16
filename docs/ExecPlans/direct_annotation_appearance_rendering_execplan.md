@@ -1032,3 +1032,28 @@ The slice is complete when:
 - Do not expand the automated matrices again in this slice.
 - Do not make speculative rendering changes without a concrete manual artifact.
 - Keep the manual pass short and tracer-bullet oriented.
+
+### Latest execution result: strict two-gate evidence closure (2026-08-16)
+
+The release-facing `signed-acceptance-evidence` workflow now executes the two contracts this plan
+defines independently: the success-only `signed_preview_parity_matrix` and the intentional
+rejection-only `signed_fit_rejection_matrix`. The mixed `signed_acceptance_matrix` remains available
+as standalone diagnostic coverage but is not a required release gate, so expected rejections cannot
+make a strict parity report red.
+
+The real offscreen run passed:
+
+- parity: 18 scenarios, 18 successful signings, zero preview/output comparison failures;
+- fit rejection: 3 scenarios, zero successful signings, 3 matched intentional rejections;
+- both gates: zero expected-outcome mismatches, cryptographic failures, annotation-rectangle
+  mismatches, and scenario errors.
+
+During that run, the signed reconstruction path exposed a concrete GUI/rendering parity defect:
+`interactive_harness.py` was not carrying the preview snapshot's primary-image prominence into
+text-bound reconstruction. The implementation now serializes `image_prominence` in the preview
+snapshot and passes it through reconstruction; a focused regression test locks the corrected
+`single_line_top_stamp_sparse_relaxed` geometry. This is a completed automated fidelity correction,
+not a reason to weaken the comparison contract.
+
+The remaining next step for this plan is the separately tracked live Qt/manual harness sanity pass;
+the automated strict parity and fit-rejection gates are now green.

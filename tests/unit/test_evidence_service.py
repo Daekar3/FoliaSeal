@@ -274,25 +274,52 @@ def test_evidence_service_signed_acceptance_evidence_writes_summary(
             artifacts_root=tmp_path,
             summary_markdown_path=tmp_path / "artifacts/summary.md",
             passphrase="secret",
-            required_manifests=("a.json", "b.json", "c.json"),
+            required_manifests=("parity.json", "rejection.json"),
         )
     )
 
     assert [Path(call.scenario_manifest_path).name for call in matrix_calls] == [
-        "signed_acceptance_matrix.json",
         "signed_preview_parity_matrix.json",
         "signed_fit_rejection_matrix.json",
     ]
     assert context_names == [
-        "signed_acceptance_matrix",
         "signed_preview_parity_matrix",
         "signed_fit_rejection_matrix",
     ]
     assert result.passed is True
-    assert result.required_manifests == ("a.json", "b.json", "c.json")
+    assert result.required_manifests == ("parity.json", "rejection.json")
     summary_text = Path(result.summary_markdown_path).read_text(encoding="utf-8")
     assert "Overall result: PASS" in summary_text
+    assert "signed_acceptance_matrix" not in summary_text
     assert "signed_fit_rejection_matrix" in summary_text
+
+
+def test_evidence_service_strict_gate_never_runs_mixed_diagnostic_manifest(
+    tmp_path: Path,
+) -> None:
+    matrix_calls: list[EvidenceMatrixRequest] = []
+
+    def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
+        matrix_calls.append(request)
+        if Path(request.scenario_manifest_path).name == "signed_acceptance_matrix.json":
+            raise AssertionError("mixed diagnostic manifest must not run in strict evidence")
+        return _passing_summary(artifacts_dir=request.artifacts_dir)
+
+    result = _service(
+        signed_acceptance_matrix_runner=fake_matrix_runner
+    ).signed_acceptance_evidence(
+        SignedAcceptanceEvidenceRequest(
+            artifacts_root=tmp_path,
+            summary_markdown_path=tmp_path / "artifacts/summary.md",
+            passphrase="secret",
+        )
+    )
+
+    assert result.passed is True
+    assert [Path(call.scenario_manifest_path).name for call in matrix_calls] == [
+        "signed_preview_parity_matrix.json",
+        "signed_fit_rejection_matrix.json",
+    ]
 
 
 def test_evidence_service_aggregate_preserves_runner_summary_path(
@@ -328,7 +355,7 @@ def test_evidence_service_writes_failure_summary_before_raising(
         nonlocal call_count
         call_count += 1
         summary = _passing_summary(artifacts_dir=request.artifacts_dir)
-        if call_count == 2:
+        if call_count == 1:
             summary["preview_output_comparison_failure_count"] = 1
             summary["acceptance_expectations_passed"] = False
             summary["acceptance_expectation_errors"] = [

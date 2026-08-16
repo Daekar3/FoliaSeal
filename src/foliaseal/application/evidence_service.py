@@ -222,12 +222,11 @@ def _matrix_specs(
     assets: GeneratedSignedAcceptanceAssets,
 ) -> tuple[dict[str, str], ...]:
     base_dir = root / "artifacts" / "signed_acceptance_evidence"
+    # The mixed signed_acceptance manifest remains available to the standalone matrix command,
+    # but strict release evidence must keep successful parity and intentional rejection coverage
+    # as independent gates.  A mixed manifest can contain expected rejections and therefore must
+    # not be allowed to turn the strict parity/rejection summary red.
     return (
-        {
-            "name": "signed_acceptance_matrix",
-            "manifest_path": str(assets.signed_acceptance_manifest),
-            "artifacts_dir": str(base_dir / "signed_acceptance_matrix"),
-        },
         {
             "name": "signed_preview_parity_matrix",
             "manifest_path": str(assets.signed_preview_parity_manifest),

@@ -45,6 +45,7 @@ from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
     SignatureFieldSource,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -78,6 +79,7 @@ from foliaseal.presentation.qt.interactive_harness import (
     _load_preview_matrix_manifest,
     _preview_padding_for_capture,
     _preview_padding_for_capture_from_snapshot,
+    _reconstruct_text_box_bounds_px,
     _render_signed_annotation_appearance_direct,
     _snapshot_preview,
     _widget_application,
@@ -122,6 +124,47 @@ LOCAL_PREVIEW_STRESS_MANIFESTS = (
     LOCAL_PREVIEW_SWEEP_ASSETS_DIR / "multi_line_full_matrix_stress.json",
     LOCAL_PREVIEW_SWEEP_ASSETS_DIR / "wrapped_block_full_matrix_stress.json",
 )
+
+
+def test_reconstruct_text_box_bounds_preserves_primary_image_prominence(
+    tmp_path: Path,
+) -> None:
+    stamp_path = tmp_path / "stamp.png"
+    Image.new("RGBA", (640, 160), (47, 79, 111, 255)).save(stamp_path)
+    preview_snapshot = {
+        "layout_template": "single_line",
+        "stamp_position": "top",
+        "image_stamp_path": str(stamp_path),
+        "image_prominence": SignatureImageProminence.PRIMARY.value,
+        "text_style": {
+            "font_family": "Sans Serif",
+            "font_size_pt": 8.5,
+            "text_color_hex": "#000000",
+            "bold": False,
+            "italic": False,
+        },
+        "box_style": {
+            "show_border": True,
+            "border_color_hex": "#2F4F6F",
+            "border_width_pt": 1.0,
+            "background_color_hex": "#FFFFFF",
+        },
+        "signature_rect": {
+            "page_index": 0,
+            "left_pt": 76.0,
+            "bottom_pt": 500.0,
+            "width_pt": 460.0,
+            "height_pt": 118.0,
+        },
+    }
+
+    bounds = _reconstruct_text_box_bounds_px(
+        preview_snapshot=preview_snapshot,
+        text_fragments=("Digitally signed by", "Morgan Ellery | 2026-08-16 04:32:32 UTC"),
+        container_bounds_px={"width": 460, "height": 118},
+    )
+
+    assert bounds == {"x": 4, "y": 88, "width": 163, "height": 18}
 
 
 def _require_local_artifact_paths(*paths: Path) -> None:
@@ -1624,6 +1667,8 @@ def test_snapshot_preview_includes_render_capture_payload() -> None:
     )
 
     assert snapshot["render_capture"] == {"preview_image_path": "artifacts/preview.png"}
+    assert snapshot["image_prominence"] is None
+    assert snapshot["preserve_image_alpha"] is None
 
 
 def test_analyze_stamp_source_image_reports_alpha_bounds(tmp_path: Path) -> None:

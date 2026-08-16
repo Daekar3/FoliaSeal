@@ -11,7 +11,6 @@ from foliaseal.application.evidence_service import (
     SignedAcceptanceEvidenceRequest,
 )
 from foliaseal.application.qa_signed_acceptance_assets import (
-    SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
     SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
     SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
 )
@@ -80,7 +79,6 @@ def _signed_acceptance_evidence(
             passphrase=SIGNED_ACCEPTANCE_IDENTITY_PASSPHRASE.decode("utf-8"),
             suppress_known_runtime_chatter=suppress_known_runtime_chatter,
             required_manifests=(
-                SIGNED_ACCEPTANCE_SCENARIO_MANIFEST,
                 SIGNED_PREVIEW_PARITY_SCENARIO_MANIFEST,
                 SIGNED_FIT_REJECTION_SCENARIO_MANIFEST,
             ),
@@ -89,7 +87,7 @@ def _signed_acceptance_evidence(
     )
 
 
-def test_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_writes_summary(
+def test_signed_acceptance_evidence_generates_assets_runs_two_strict_gates_and_writes_summary(
     tmp_path: Path,
 ) -> None:
     generated_roots: list[Path] = []
@@ -111,7 +109,6 @@ def test_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_wri
 
     assert generated_roots == [tmp_path]
     assert [Path(call.scenario_manifest_path).name for call in matrix_calls] == [
-        "signed_acceptance_matrix.json",
         "signed_preview_parity_matrix.json",
         "signed_fit_rejection_matrix.json",
     ]
@@ -120,7 +117,7 @@ def test_signed_acceptance_evidence_generates_assets_runs_three_matrices_and_wri
     assert summary_path == tmp_path / "artifacts/signed_acceptance_evidence_summary.md"
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "Overall result: PASS" in summary_text
-    assert "signed_acceptance_matrix" in summary_text
+    assert "signed_acceptance_matrix" not in summary_text
     assert "signed_preview_parity_matrix" in summary_text
     assert "signed_fit_rejection_matrix" in summary_text
 
@@ -137,7 +134,7 @@ def test_signed_acceptance_evidence_writes_failure_summary_and_raises(
         nonlocal call_count
         call_count += 1
         summary = _passing_summary(artifacts_dir=request.artifacts_dir)
-        if call_count == 2:
+        if call_count == 1:
             summary["preview_output_comparison_failure_count"] = 1
             summary["acceptance_expectations_passed"] = False
             summary["acceptance_expectation_errors"] = [
@@ -277,7 +274,7 @@ def test_signed_acceptance_evidence_keeps_layout_warning_outside_rejection_matri
         return _assets(root)
 
     def fake_matrix_runner(request: EvidenceMatrixRequest) -> dict[str, object]:
-        if Path(request.scenario_manifest_path).name == "signed_acceptance_matrix.json":
+        if Path(request.scenario_manifest_path).name == "signed_preview_parity_matrix.json":
             logger.warning(
                 "Content box width/height 397 is too wide for container size 170 "
                 "with margins (4, 4); post_margin will be ignored"

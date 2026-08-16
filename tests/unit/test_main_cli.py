@@ -550,16 +550,20 @@ def test_main_signed_acceptance_evidence_dispatches_to_service(
     captured = {}
 
     class _FakeCounters:
-        scenario_count = 10
-        successful_signing_run_count = 7
+        scenario_count = 18
+        successful_signing_run_count = 18
 
     class _FakeMatrixResult:
-        name = "signed_acceptance_matrix"
+        name = "signed_preview_parity_matrix"
         counters = _FakeCounters()
+
+    class _FakeRejectionResult:
+        name = "signed_fit_rejection_matrix"
+        counters = SimpleNamespace(scenario_count=3, successful_signing_run_count=0)
 
     class _FakeEvidence:
         summary_markdown_path = "/tmp/foliaseal-evidence/summary.md"
-        matrix_results = (_FakeMatrixResult(),)
+        matrix_results = (_FakeMatrixResult(), _FakeRejectionResult())
 
     class _FakeService:
         def signed_acceptance_evidence(self, request):
@@ -590,7 +594,8 @@ def test_main_signed_acceptance_evidence_dispatches_to_service(
     }
     output = capsys.readouterr().out
     assert "Signed acceptance evidence" in output
-    assert "signed_acceptance_matrix: PASS (10 scenarios, 7 successful signings)" in output
+    assert "signed_preview_parity_matrix: PASS (18 scenarios, 18 successful signings)" in output
+    assert "signed_fit_rejection_matrix: PASS (3 scenarios, 0 successful signings)" in output
 
 
 def test_main_acceptance_signing_harness_validate_dispatches_to_service(

@@ -37,6 +37,7 @@ from foliaseal.application.visible_signature_layout import (
 from foliaseal.domain.models import (
     SignatureAppearance,
     SignatureBoxStyle,
+    SignatureImageProminence,
     SignatureLayoutTemplate,
     SignatureRect,
     SignatureStampPosition,
@@ -748,6 +749,15 @@ def _reconstruct_text_box_bounds_px(
         if isinstance(image_stamp_path_value, str) and image_stamp_path_value
         else None
     )
+    image_prominence_value = preview_snapshot.get("image_prominence")
+    try:
+        image_prominence = (
+            SignatureImageProminence(image_prominence_value)
+            if isinstance(image_prominence_value, str)
+            else SignatureImageProminence.PRIMARY
+        )
+    except ValueError:
+        image_prominence = SignatureImageProminence.PRIMARY
     layout_plan = VisibleSignatureLayoutEngine().plan(
         LayoutRequest(
             signature_rect=signature_rect,
@@ -757,6 +767,7 @@ def _reconstruct_text_box_bounds_px(
             box_style=box_style,
             stamp_text=stamp_text,
             image_stamp_path=image_stamp_path,
+            image_prominence=image_prominence,
         )
     )
     return _layout_rule_bounds_px(
@@ -788,6 +799,12 @@ def _snapshot_preview(
         "show_field_names": preview.show_field_names,
         "datetime_format": preview.datetime_format,
         "image_stamp_path": preview.image_stamp_path,
+        "image_prominence": (
+            getattr(preview, "image_prominence", None).value
+            if getattr(preview, "image_prominence", None) is not None
+            else None
+        ),
+        "preserve_image_alpha": getattr(preview, "preserve_image_alpha", None),
         "signature_rect": _snapshot_signature_rect(preview.signature_rect),
         "text_style": _snapshot_text_style(preview.text_style),
         "box_style": _snapshot_box_style(preview.box_style),
