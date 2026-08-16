@@ -271,6 +271,10 @@ Qt surface, focused tests, and observable acceptance.
   and the dedicated address before timing out on the owned Qt frame with Qt's
   `GetApplicationBusAddress` warning. This removes the false registry-absent claim but does not
   close accessible-tree, human speech, visual, privileged, final-release, or Wayland gates.
+- [x] (2026-08-16) Added deadline-aware AT-SPI tree traversal and expiry coverage. A minimal Qt
+  registration probe is discoverable by process ID, but the FoliaSeal tree still reaches the
+  bounded host timeout at an individual child call; this remains machine evidence only and does
+  not close human screen-reader or final release acceptance.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor

@@ -763,6 +763,10 @@ Release tranche:
   and diff checks clean. The real X11 run reaches the dedicated bridge but times out discovering
   the Qt frame with `GetApplicationBusAddress` warning; this removes a false negative but closes
   no human, privileged-host, final-release, or deferred Wayland gate.
+- [x] (2026-08-16) Made AT-SPI frame/child traversal deadline-aware and added expiry coverage. A
+  minimal Qt registration is discoverable by process ID, while FoliaSeal's larger tree still hits
+  the bounded host timeout at an individual child call; no complete accessibility-tree or human
+  screen-reader claim is inferred.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

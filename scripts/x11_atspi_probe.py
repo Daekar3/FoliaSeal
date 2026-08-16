@@ -52,10 +52,19 @@ def _extents(accessible: Any, pyatspi: Any) -> dict[str, int] | None:
         return None
 
 
-def _children(accessible: Any, pyatspi: Any, limit: int = 256) -> list[dict[str, Any]]:
+def _children(
+    accessible: Any,
+    pyatspi: Any,
+    limit: int = 256,
+    deadline: float | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
     result: list[dict[str, Any]] = []
     queue: deque[Any] = deque([accessible])
+    truncated = False
     while queue and len(result) < limit:
+        if deadline is not None and time.monotonic() >= deadline:
+            truncated = True
+            break
         current = queue.popleft()
         try:
             child_count = int(current.childCount)
@@ -77,13 +86,22 @@ def _children(accessible: Any, pyatspi: Any, limit: int = 256) -> list[dict[str,
                 queue.append(child)
             except Exception:
                 continue
-    return result
+    if queue or len(result) >= limit:
+        truncated = True
+    return result, truncated
 
 
-def _find_frame(application: Any, title: str, pyatspi: Any) -> Any | None:
+def _find_frame(
+    application: Any,
+    title: str,
+    pyatspi: Any,
+    deadline: float | None = None,
+) -> Any | None:
     queue: deque[Any] = deque([application])
     seen: set[int] = set()
     while queue:
+        if deadline is not None and time.monotonic() >= deadline:
+            return None
         current = queue.popleft()
         identity = id(current)
         if identity in seen:
@@ -185,9 +203,10 @@ def inspect(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]:
                         continue
                 except Exception:
                     continue
-                frame = _find_frame(application, title, pyatspi)
+                frame = _find_frame(application, title, pyatspi, deadline)
                 if frame is None:
                     continue
+                children, children_truncated = _children(frame, pyatspi, deadline=deadline)
                 return {
                     "status": "available",
                     "process_id": pid,
@@ -199,7 +218,8 @@ def inspect(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]:
                         "actions": _actions(frame),
                         "extents": _extents(frame, pyatspi),
                     },
-                    "children": _children(frame, pyatspi),
+                    "children": children,
+                    "children_truncated": children_truncated,
                 }
         except Exception:
             pass

@@ -51,6 +51,12 @@ usability.
   discovering the owned Qt frame and emitted Qt's
   `GetApplicationBusAddress` warning; this supersedes the earlier false
   "registry absent" classification.
+- [x] (2026-08-16) Made frame and child-tree traversal deadline-aware and added
+  focused expiry coverage. A minimal Qt window registers and is discoverable by
+  process ID, while FoliaSeal's larger tree still causes a bounded host probe
+  timeout at an individual AT-SPI child call. The audit therefore remains clean
+  and explicitly limited; it does not claim a complete accessibility tree or
+  human screen-reader behavior.
 
 ## Surprises & Discoveries
 

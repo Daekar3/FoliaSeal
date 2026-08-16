@@ -155,3 +155,13 @@ def test_probe_traverses_only_owned_frame(monkeypatch) -> None:
     assert result["frame"]["role"] == "frame"
     assert result["frame"]["extents"] == {"x": 10, "y": 20, "width": 1100, "height": 700}
     assert result["children"][0]["name"] == "Open a PDF"
+    assert result["children_truncated"] is False
+
+
+def test_children_honors_expired_deadline_without_touching_tree() -> None:
+    module = _probe_module()
+
+    children, truncated = module._children(object(), SimpleNamespace(), deadline=0.0)  # noqa: SLF001
+
+    assert children == []
+    assert truncated is True
