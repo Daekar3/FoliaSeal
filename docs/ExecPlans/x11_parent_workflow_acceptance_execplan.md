@@ -38,6 +38,12 @@ Out of scope:
   then reran focused tests and the full audit successfully.
 - [x] (2026-08-16) Reconciled the parent/manual/release plans and architecture notes, completed the
   post-implementation compliance review, validated the repository, and committed the slice.
+- [x] (2026-08-16) Re-ran the canonical audit from the current checkout on Cinnamon/X11. All 19
+  checkpoints passed through placement, readiness, signing, reopen, and a second locally verified
+  signature (`output_signature_count=2`); representative screenshots were inspected and the exact
+  audit root, generated outputs, windows, and child processes were removed. This refreshes source-
+  tree semantic workflow evidence only and does not close human accessibility, packaged/privileged,
+  final-release, or deferred Wayland gates.
 
 ## Concrete execution
 

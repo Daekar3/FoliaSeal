@@ -254,6 +254,12 @@ Qt surface, focused tests, and observable acceptance.
   high-contrast, physical-DPI, or final-release acceptance. A privileged `sudo dpkg -i` attempt was
   not made because escalation for host package-database mutation was not authorized; that gate
   remains explicitly HITL.
+- [x] (2026-08-16) Re-ran the canonical source-tree semantic workflow audit on Cinnamon/X11. All
+  19 checkpoints passed through two locally verified signatures; representative setup, refinement,
+  ready-to-sign, and reopened-two-signature screenshots were inspected, and the owned audit root,
+  outputs, windows, and processes were removed. This strengthens source-tree workflow evidence only;
+  human accessibility, privileged installation, final release signoff, and deferred Wayland remain
+  open.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor

@@ -750,6 +750,11 @@ Release tranche:
   not attempted without explicit escalation authorization. These results strengthen machine/X11
   evidence but do not close human accessibility, privileged installation, final signoff, or the
   deferred Mint 22.3 Wayland gate.
+- [x] (2026-08-16) Refreshed the canonical source-tree semantic workflow audit on Cinnamon/X11.
+  All 19 checkpoints passed through signing, reopen, and a second locally verified signature;
+  representative screenshots were inspected and the owned audit root/processes/outputs were
+  removed. This closes no additional human, privileged-host, final-release, or deferred Wayland
+  gate, but confirms the current source-tree workflow remains healthy.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
