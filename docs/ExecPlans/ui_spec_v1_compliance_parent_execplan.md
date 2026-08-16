@@ -376,8 +376,14 @@ Release tranche:
   final-release, and deferred Wayland gates remain open.
 - [x] (2026-08-16) Completed the nested blank-page Placement creation child: the suspended Preset
   editor now opens the existing transactional blank-page editor, attaches the saved stable id on
-  return, and preserves the active signing draft. Certificate creation/import and current-document
-  Placement capture remain separate; external display/package/final-release gates are unchanged.
+  return, and preserves the active signing draft. Nested Certificate creation/import and
+  current-document Placement capture remain separate; external display/package/final-release
+  gates are unchanged.
+- [x] (2026-08-16) Completed the nested Certificate Create/Import child: existing certificate
+  dialogs return a stable configuration to the suspended Preset, the provider-backed selector
+  refreshes before attachment, and focused/offscreen, invalid-result, cancel, and active-draft
+  invariance tests are green. Current-document Placement capture and external display/package/
+  final-release gates remain open.
 - [x] (2026-08-10) Added the bounded certificate-readiness increment: the catalog-backed signing
   rail now projects selected PKCS#12 identity, private-key presence, validity, expiry warnings,
   blocking states, password-promptability, and the exact neutral self-signed caveat through a typed

@@ -18,6 +18,7 @@ from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePr
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
+    build_managed_certificate,
     build_placement_profile,
     build_signature_appearance,
 )
@@ -548,6 +549,131 @@ def test_nested_preset_editor_cancelled_placement_creation_does_not_mutate_catal
     assert editor.controls.placement_selector.currentText() == "No placement"
     assert service.view().placement_names == ()
     assert dialog.controls.preset_editor is editor
+
+
+def test_nested_preset_editor_creates_and_imports_certificates_and_attaches_latest() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    initial_catalog = build_certificate_catalog(
+        managed_certificates=(
+            build_managed_certificate(),
+            build_managed_certificate(
+                managed_certificate_id="managed-cert-imported",
+                storage_filename="cert_imported.p12",
+                source_kind="imported",
+                display_name="Imported certificate",
+            ),
+        ),
+        certificate_configurations=(),
+    )
+    catalog = [initial_catalog]
+    created = build_certificate_configuration(
+        display_name="Created identity",
+        certificate_configuration_id="created-identity",
+        managed_certificate_id=initial_catalog.managed_certificates[0].managed_certificate_id,
+    )
+    imported = build_certificate_configuration(
+        display_name="Imported identity",
+        certificate_configuration_id="imported-identity",
+        managed_certificate_id=initial_catalog.managed_certificates[1].managed_certificate_id,
+    )
+
+    def add_configuration(configuration):
+        catalog[0] = build_certificate_catalog(
+            managed_certificates=initial_catalog.managed_certificates,
+            certificate_configurations=(
+                *catalog[0].certificate_configurations,
+                configuration,
+            ),
+        )
+        return configuration
+
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=initial_catalog,
+        certificate_catalog_provider=lambda: catalog[0],
+        on_create_certificate=lambda: add_configuration(created),
+        on_import_certificate=lambda: add_configuration(imported),
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.name_input.setText("Preset with certificate")
+    editor.controls.appearance_selector.setCurrentIndex(0)
+
+    editor.controls.create_certificate_button.click()
+    assert editor.controls.certificate_selector.currentText() == "Created identity"
+    editor.controls.import_certificate_button.click()
+    assert editor.controls.certificate_selector.currentText() == "Imported identity"
+    assert editor.dirty is True
+
+    editor.controls.save_button.click()
+
+    resolved = service.resolve(service.view().presets[0].ref)
+    assert resolved.preset.certificate_configuration_id == imported.certificate_configuration_id
+
+
+def test_nested_preset_editor_cancelled_certificate_actions_leave_draft_unchanged() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    catalog = build_certificate_catalog(certificate_configurations=())
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=catalog,
+        certificate_catalog_provider=lambda: catalog,
+        on_create_certificate=lambda: object(),
+        on_import_certificate=lambda: None,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.create_certificate_button.click()
+    editor.controls.import_certificate_button.click()
+
+    assert editor.controls.certificate_selector.currentText() == "No certificate"
+    assert editor.dirty is False
+    assert dialog.controls.preset_editor is editor
+
+
+def test_nested_preset_editor_refreshes_certificate_catalog_before_opening() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    initial_catalog = build_certificate_catalog(certificate_configurations=())
+    created = build_certificate_configuration(
+        display_name="Added while Library was open",
+        certificate_configuration_id="late-certificate",
+        managed_certificate_id=initial_catalog.managed_certificates[0].managed_certificate_id,
+    )
+    catalog = [initial_catalog]
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=initial_catalog,
+        certificate_catalog_provider=lambda: catalog[0],
+    )
+    catalog[0] = build_certificate_catalog(
+        managed_certificates=initial_catalog.managed_certificates,
+        certificate_configurations=(created,),
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    assert editor.controls.certificate_selector.findText("Added while Library was open") >= 0
 
 
 def test_nested_preset_child_discard_leaves_parent_and_catalog_unchanged() -> None:

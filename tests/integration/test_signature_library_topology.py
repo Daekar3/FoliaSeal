@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 
 from foliaseal.application.reusable_signing_objects import SaveAppearance, SavePlacement
-from tests.support.signing_builders import build_placement_profile, build_signature_appearance
+from tests.support.signing_builders import (
+    build_certificate_catalog,
+    build_certificate_configuration,
+    build_managed_certificate,
+    build_placement_profile,
+    build_signature_appearance,
+)
 
 
 def test_library_is_modeless_three_column_and_document_independent(tmp_path: Path) -> None:
@@ -284,6 +290,7 @@ def test_library_real_qt_nested_preset_attaches_created_blank_placement(tmp_path
         library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
         library.controls.create_button.click()
         app.processEvents()
+
         editor = library.controls.preset_editor
         assert editor is not None
         editor.controls.name_input.setText("Preset with placement")
@@ -299,6 +306,81 @@ def test_library_real_qt_nested_preset_attaches_created_blank_placement(tmp_path
         assert resolved.display_name == "Preset with placement"
         saved = frame._reusable_objects.resolve(resolved.ref)
         assert saved.preset.placement_profile_id == created.placement_profile_id
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_library_real_qt_nested_preset_attaches_created_certificate(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-preset-certificate"])
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "certificates")
+    initial_catalog = build_certificate_catalog(
+        managed_certificates=(build_managed_certificate(),),
+        certificate_configurations=(),
+    )
+    certificate_store.save_catalog(initial_catalog)
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))
+    created = build_certificate_configuration(
+        certificate_configuration_id="nested-certificate",
+        display_name="Nested certificate",
+        managed_certificate_id=initial_catalog.managed_certificates[0].managed_certificate_id,
+    )
+
+    def create_certificate():
+        certificate_store.save_catalog(
+            build_certificate_catalog(
+                managed_certificates=initial_catalog.managed_certificates,
+                certificate_configurations=(created,),
+            )
+        )
+        return created
+
+    frame._create_certificate_for_preset = create_certificate
+    library = frame.show_reusable_object_library()
+    app.processEvents()
+    try:
+        library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
+        library.controls.create_button.click()
+        app.processEvents()
+        editor = library.controls.preset_editor
+        assert editor is not None
+        editor.controls.name_input.setText("Preset with certificate")
+        editor.controls.appearance_selector.setCurrentText("Approval")
+        editor.controls.create_certificate_button.click()
+        app.processEvents()
+
+        assert editor.controls.certificate_selector.currentText() == "Nested certificate"
+        editor.controls.save_button.click()
+        app.processEvents()
+        assert library.controls.preset_editor is None
+        resolved = frame._reusable_objects.view().presets[0]
+        saved = frame._reusable_objects.resolve(resolved.ref)
+        assert saved.preset.certificate_configuration_id == created.certificate_configuration_id
     finally:
         library.controls.dialog.close()
         frame.window.close()

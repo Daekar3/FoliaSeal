@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.certificate_models import CertificateCatalog, CertificateConfiguration
 from foliaseal.application.reusable_signing_models import PlacementProfile
 from foliaseal.application.reusable_signing_objects import (
     DeleteObject,
@@ -144,6 +144,8 @@ class ReusableObjectLibraryDialog:
         on_edit: Callable[[ReusableObjectRef], bool] | None = None,
         on_create_placement: Callable[[], PlacementProfile | None] | None = None,
         on_edit_placement: Callable[[PlacementProfile], bool] | None = None,
+        on_create_certificate: Callable[[], CertificateConfiguration | None] | None = None,
+        on_import_certificate: Callable[[], CertificateConfiguration | None] | None = None,
         image_store: ManagedSignatureImageStore | None = None,
     ) -> None:
         self._bindings = bindings
@@ -155,6 +157,8 @@ class ReusableObjectLibraryDialog:
         self._on_edit_appearance = on_edit_appearance
         self._on_create_placement = on_create_placement
         self._on_edit_placement = on_edit_placement
+        self._on_create_certificate = on_create_certificate
+        self._on_import_certificate = on_import_certificate
         self._certificate_catalog_provider = certificate_catalog_provider
         self._on_preferences_changed = on_preferences_changed
         self._on_reusable_objects_changed = on_reusable_objects_changed
@@ -269,9 +273,7 @@ class ReusableObjectLibraryDialog:
             set_sizes(list(self._library_splitter_sizes))
 
     def refresh(self) -> None:
-        if self._certificate_catalog_provider is not None:
-            self._certificate_catalog = self._certificate_catalog_provider()
-            self._session.set_certificate_catalog(self._certificate_catalog)
+        self._refresh_certificate_catalog()
         self._rows = self._session.refresh()
         self._render_catalog_navigation()
         self._render_master_list()
@@ -686,6 +688,7 @@ class ReusableObjectLibraryDialog:
 
         if self._appearance_editor is not None or self._preset_editor is not None:
             return False
+        self._refresh_certificate_catalog()
         self._appearance_parent_catalog = self._session.catalog
         self._appearance_parent_ref = self._session.selected_ref
         self._appearance_parent_draft_name = self._session.draft_name
@@ -704,6 +707,9 @@ class ReusableObjectLibraryDialog:
             on_cancel_requested=self._preset_editor_cancel_requested,
             on_error=self._show_error,
             on_create_placement=self._on_create_placement,
+            on_create_certificate=self._on_create_certificate,
+            on_import_certificate=self._on_import_certificate,
+            certificate_catalog_provider=self._certificate_catalog_provider,
             image_store=self._image_store,
         )
         self._preset_editor = editor
@@ -712,6 +718,12 @@ class ReusableObjectLibraryDialog:
         self.controls.appearance_editor_host.setVisible(True)
         self._appearance_editor_host_layout.addWidget(editor.controls.container)
         return True
+
+    def _refresh_certificate_catalog(self) -> None:
+        if self._certificate_catalog_provider is None:
+            return
+        self._certificate_catalog = self._certificate_catalog_provider()
+        self._session.set_certificate_catalog(self._certificate_catalog)
 
     def _preset_editor_saved(self) -> None:
         editor = self._preset_editor

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from foliaseal.application.certificate_manager import CertificateOperationResult
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
@@ -38,7 +39,12 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBundle,
 )
 from foliaseal.presentation.qt.single_instance import OpenRequest
-from tests.support.signing_builders import build_placement_profile
+from tests.support.signing_builders import (
+    build_certificate_catalog,
+    build_certificate_configuration,
+    build_managed_certificate,
+    build_placement_profile,
+)
 
 
 def test_app_frame_uses_poppler_raster_backend_by_default() -> None:
@@ -1775,6 +1781,90 @@ def test_nested_placement_creation_preserves_active_signing_draft(tmp_path: Path
         workflow.output_pdf_path,
     )
     assert after == before
+
+
+def test_nested_certificate_creation_preserves_active_signing_draft(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    certificate_store = CertificateCatalogStore(storage_dir=tmp_path / "certificates")
+    initial_catalog = build_certificate_catalog(
+        managed_certificates=(build_managed_certificate(),),
+        certificate_configurations=(),
+    )
+    certificate_store.save_catalog(initial_catalog)
+    shell = _FakeShell()
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=certificate_store,
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    workflow = frame.current_signing_workflow
+    assert workflow is not None
+    workflow.selected_signature_preset_id = "current-preset"
+    workflow.passphrase = "keep-this-secret"
+    workflow.set_signature_rect(
+        SignatureRect(page_index=0, left_pt=20.0, bottom_pt=30.0, width_pt=180.0, height_pt=60.0)
+    )
+    before = (
+        workflow.selected_signature_preset_id,
+        workflow.passphrase,
+        workflow.signature_rect,
+        workflow.output_pdf_path,
+    )
+    created = build_certificate_configuration(
+        certificate_configuration_id="nested-certificate",
+        display_name="Nested certificate",
+        managed_certificate_id=initial_catalog.managed_certificates[0].managed_certificate_id,
+    )
+
+    def create_certificate():
+        certificate_store.save_catalog(
+            build_certificate_catalog(
+                managed_certificates=initial_catalog.managed_certificates,
+                certificate_configurations=(created,),
+            )
+        )
+        return created
+
+    frame._create_certificate_for_preset = create_certificate
+    library = frame.show_first_use_preset_library()
+    library.controls.create_button.click()
+    editor = library.controls.preset_editor
+    assert editor is not None
+    editor.controls.create_certificate_button.click()
+
+    after = (
+        workflow.selected_signature_preset_id,
+        workflow.passphrase,
+        workflow.signature_rect,
+        workflow.output_pdf_path,
+    )
+    assert after == before
+
+
+def test_app_frame_nested_certificate_callback_extracts_only_configuration(tmp_path: Path) -> None:
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    catalog = build_certificate_catalog()
+    configuration = catalog.certificate_configurations[0]
+    result = CertificateOperationResult(
+        catalog=catalog,
+        operation="created",
+        certificate_configuration=configuration,
+    )
+    frame.show_certificate_creation = lambda: result
+
+    assert frame._create_certificate_for_preset() == configuration
+    frame.show_certificate_creation = lambda: None
+    assert frame._create_certificate_for_preset() is None
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:

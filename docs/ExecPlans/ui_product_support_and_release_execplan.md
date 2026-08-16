@@ -101,10 +101,10 @@ Qt surface, focused tests, and observable acceptance.
   display-backed accessibility/GUI, privileged host installation, and final release matrix remain
   open external gates.
 - [x] (2026-08-16) Re-audited the previously unchecked child set and found no remaining
-  dependency-ready model/application/Qt path in the then-published release tranche. The later
-  nested-placement audit identified and completed one additional AFK path; remaining gates are
-  now certificate creation/import, current-document Placement capture, environment-dependent
-  acceptance, or deliberate compatibility/nomenclature work.
+  dependency-ready model/application/Qt path in the then-published release tranche. Later
+  nested-placement and nested-certificate audits identified and completed additional AFK paths;
+  remaining gates are now current-document Placement capture, environment-dependent acceptance,
+  or deliberate compatibility/nomenclature work.
 - [x] (2026-08-16) Added the bounded X11 acceptance evidence: the source-tree GUI now has a real
   Cinnamon/X11 two-process routing smoke and interactive-harness launch/close checkpoint with clean
   owned-process cleanup. This does not substitute for packaged GUI, screen-reader/high-contrast,
@@ -151,8 +151,13 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-16) Implemented nested blank-page Placement creation from the suspended Preset
   editor. The existing transactional editor returns a saved stable id, the Preset selector attaches
   it without applying the Preset to the active document, and focused/offscreen plus active-draft
-  invariance tests are green. Certificate creation/import and current-document capture remain AFK
-  follow-up work; display-backed, privileged, and final-release gates remain open.
+  invariance tests are green. Nested Certificate creation/import remains AFK follow-up work, as
+  does current-document capture; display-backed, privileged, and final-release gates remain open.
+- [x] (2026-08-16) Implemented nested Certificate Create/Import from the suspended Preset. The
+  existing modal certificate lifecycle dialogs return a stable configuration, the provider-backed
+  selector refreshes and attaches it only on explicit Preset Save, and focused/offscreen plus
+  active-draft invariance tests are green. Current-document Placement capture and all external
+  display/package/final-release gates remain open.
 - [x] (2026-08-16) Reconciled active signing/review publication markers with
   current implementation commits and focused evidence. No new AFK product
   implementation gap was found; the remaining unchecked release items are
@@ -364,6 +369,6 @@ Revision note: 2026-08-09 / Codex
 Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
 Revision note: 2026-08-16 / Codex
 Reconciled completed Help, diagnostics, offscreen accessibility, isolated package-install,
-partial-preset guidance, and nested blank-page Placement child markers. The remaining AFK product
-work includes Certificate creation/import and current-document Placement capture; display-backed,
+partial-preset guidance, nested blank-page Placement, and nested Certificate child markers. The
+remaining AFK product work includes current-document Placement capture; display-backed,
 privileged-host, and final cross-surface acceptance remain open external gates.

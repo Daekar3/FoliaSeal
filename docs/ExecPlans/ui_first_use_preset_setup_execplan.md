@@ -9,10 +9,11 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 After this slice, a first-time user can open the Signature Library from the empty preset rail,
 land in the Presets catalog regardless of the last Library catalog used, create a required-
-Appearance preset through the already-live nested editor, return to the active document, and
-explicitly select the newly saved preset. The Library refreshes the live rail without silently
-applying the preset or mutating the active signing draft. This is the remaining first-use slice
-mapped to UI_SPEC WF02/WF03 and acceptance scenario 2.
+Appearance preset through the nested editor, optionally create or import a Certificate and create
+a blank-page Placement, return to the active document, and explicitly select the newly saved
+preset. The Library refreshes the live rail without silently applying the preset or mutating the
+active signing draft. This is the first-use flow mapped to UI_SPEC WF02/WF03 and acceptance
+scenario 2; current-document Placement capture and external acceptance gates remain separate.
 
 ## Child ExecPlan Dependencies
 
@@ -34,6 +35,9 @@ mapped to UI_SPEC WF02/WF03 and acceptance scenario 2.
   visible in the live rail, while leaving selection explicit.
 - [x] (2026-08-10) Add focused/offscreen first-use coverage and reconcile documentation; commit is
   the remaining closeout step.
+- [x] (2026-08-16) Added nested Certificate Create/Import actions. Existing certificate dialogs
+  return a stable configuration to the suspended Preset, which refreshes and selects it without
+  applying anything to the active signing draft.
 
 ## Surprises & Discoveries
 
@@ -57,14 +61,12 @@ mapped to UI_SPEC WF02/WF03 and acceptance scenario 2.
 
 ## Outcomes & Retrospective
 
-The initial first-use increment is implemented: a newly opened document with no saved presets
-renders explicit guidance and a `Create or manage presets…` button through typed workspace
-composition. The remaining gap is observable after the button is used: the modeless Library may
-restore a non-Presets catalog and its successful saves do not yet refresh the live signing rail.
-The nested Preset → Appearance → Preset return path is already complete in
-`ui_signature_preset_transactions_execplan.md`; this slice connects that path to first-use entry
-and explicit rail selection. Certificate creation/configuration, placement capture, and missing
-optional per-document prompts remain separate children.
+The first-use flow is implemented: a newly opened document with no saved presets renders explicit
+guidance and a `Create or manage presets…` button through typed workspace composition. The
+modeless Library focuses Presets, supports nested Appearance, Certificate Create/Import, and
+blank-page Placement return paths, and successful saves refresh the live signing rail without
+auto-selecting the new preset. Current-document Placement capture and external display/package/
+release acceptance remain separate boundaries.
 
 ## Context and Orientation
 
@@ -182,11 +184,10 @@ Bounded evidence (2026-08-10):
 - Final bounded lifecycle audit: exit `1` with the expected isolated `SingleInstanceUnavailable`
   endpoint error; no FoliaSeal/PySide6/pytest processes remained and the temporary root was
   removed.
-- Remaining gaps: optional Certificate creation/import and current-document Placement capture
-  from the nested first-use flow. The nested blank-page Placement child now supplies creation,
-  return, and attachment; the partial-preset child supplies explicit missing per-document
-  certificate/placement guidance. Nested editor suspension/return, Presets-first entry, live rail
-  refresh, and explicit selection behavior are complete in this slice and its dependencies.
+- Remaining gaps: current-document Placement capture from the nested first-use flow plus external
+  display/package/release acceptance. Nested Appearance, Certificate Create/Import, blank-page
+  Placement, editor suspension/return, Presets-first entry, live rail refresh, and explicit
+  selection behavior are complete in this slice and its dependencies.
 
 ## Idempotence and Recovery
 
@@ -206,8 +207,8 @@ or workspace ports. The final behavior must be exercised by tests/unit/test_qt_s
 name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-10 / Codex
-Updated after the nested blank-page Placement child: first-use entry focuses Presets without
-persisting navigation, successful nested saves refresh the active shell, the user explicitly
-selects the new preset, and a new Placement can be created and attached before Preset Save.
-Certificate creation/import and current-document Placement capture remain in their owning
-follow-up children.
+Updated after the nested blank-page Placement and nested Certificate Create/Import children:
+first-use entry focuses Presets without persisting navigation, successful nested saves refresh the
+active shell, the user explicitly selects the new preset, and reusable Certificate/Placement
+objects can be created and attached before Preset Save. Current-document Placement capture remains
+in its owning follow-up child.

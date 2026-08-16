@@ -91,8 +91,9 @@ The prerequisite slice closes the production certificate-reference validation se
 Library detail Save action an explicit application-facing transaction boundary. The follow-up moves
 production Preset Create/Edit into the modeless Library detail pane, adds the concrete
 Library → Preset → Appearance → Preset child return path, and resolves child before parent
-Save/Discard/Continue. Reason/location defaults, Placement/Certificate creation, active-placement
-invalidation, and a single cross-store commit transaction remain separate follow-on work.
+Save/Discard/Continue. Reason/location defaults, active-placement invalidation, and a single
+cross-store commit transaction remain separate follow-on work; Placement and Certificate creation
+are now supplied by their separate nested first-use children.
 
 ## Context and Orientation
 

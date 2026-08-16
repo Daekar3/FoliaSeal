@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from foliaseal.application import (
+    CertificateConfiguration,
     CertificateManager,
+    CertificateOperationResult,
     ConfigureCertificateRequest,
     PlacementEditorState,
     ReusableSigningObjects,
@@ -1553,6 +1555,21 @@ class FoliaSealAppFrame:
         self._apply_certificate_dialog_compatibility(outcome.compatibility)
         return outcome.result
 
+    def _create_certificate_for_preset(self) -> CertificateConfiguration | None:
+        return self._certificate_configuration_from_result(self.show_certificate_creation())
+
+    def _import_certificate_for_preset(self) -> CertificateConfiguration | None:
+        return self._certificate_configuration_from_result(self.show_certificate_import())
+
+    @staticmethod
+    def _certificate_configuration_from_result(
+        result: Any | None,
+    ) -> CertificateConfiguration | None:
+        if not isinstance(result, CertificateOperationResult):
+            return None
+        configuration = result.certificate_configuration
+        return configuration if isinstance(configuration, CertificateConfiguration) else None
+
     def show_reusable_object_library(self, *, initial_catalog: str | None = None) -> Any:
         """Open Settings management for reusable signing profiles and presets."""
         if self._reusable_object_library is not None:
@@ -1581,6 +1598,8 @@ class FoliaSealAppFrame:
             on_configure_certificate=self._configure_certificate,
             on_create_placement=self._open_placement_profile_editor,
             on_edit_placement=self._edit_placement_profile,
+            on_create_certificate=self._create_certificate_for_preset,
+            on_import_certificate=self._import_certificate_for_preset,
             image_store=self._signature_image_store,
         )
         self._dialog_compatibility = AppFrameDialogCompatibilityState(
