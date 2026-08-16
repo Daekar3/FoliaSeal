@@ -178,14 +178,30 @@ Qt surface, focused tests, and observable acceptance.
   against the `1100x700` minimum, so whole-window monitor fit/restoration,
   physical readability, human accessibility, privileged packaging, and final
   release acceptance remain open.
+- [x] (2026-08-16) Re-ran the bounded source-tree X11 accessibility audit with
+  `DISPLAY=:0 ... scripts/live_gui_accessibility_audit.py --capture-screenshot
+  --probe-atspi`. It reached a real two-monitor Cinnamon/X11 frame; metadata
+  capture and owned cleanup passed. Native F1 Help delivery failed with
+  `AssertionError: native X11 F1 did not open the Help viewer`; the captured
+  report was `/tmp/foliaseal-x11-accessibility-audit-current/audit.json`, with
+  `cleanup.passed=true`, no owned process or root remaining, and the exact
+  owned artifact root scheduled for removal during closeout. This is observed
+  environment-dependent friction with cause not isolated, not a completed
+  acceptance gate; prior
+  native-X11, geometry, and AT-SPI boundary evidence remains intact, while
+  human accessibility, privileged packaging, final release acceptance, and
+  Wayland remain open/deferred.
 - [x] (2026-08-16) Completed a fresh compatibility and nomenclature consumer audit. No `phase3`
   references remain in `src/`, `scripts/`, or `tests/`; the remaining `Acceptance*` CLI/DTO/JSON/
   artifact names are active developer/release contracts, `build_qt_signing_shell` remains consumed
   by focused tests as an adapter, and `PdfCompatibility` remains production signing policy. No
   additional compatibility or acceptance cruft met a safe retirement condition, so no source
   deletion was made.
-- [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
-  validation; clean processes and artifacts.
+- [ ] (remaining release gate) Complete the final release-matrix rerun of
+  focused/regression, display-backed, and privileged host package-manager validation. The bounded
+  X11 rerun reached the real Cinnamon/X11 frame and cleaned up successfully,
+  but its native-F1 assertion remains an environment-dependent failure, so it
+  does not close this gate; clean processes and artifacts after each attempt.
 - [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
   corpus after the remaining children close.
 
