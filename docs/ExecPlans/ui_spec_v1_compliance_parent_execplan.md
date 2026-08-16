@@ -199,9 +199,11 @@ Placement, preview, and signing tranche:
 
 Release tranche:
 
-- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — bounded package audit evidence and
-  the isolated package-manager install-root smoke gate are complete, while broader Settings/
-  diagnostics, display-backed accessibility/GUI, and privileged host package-install gates remain open.
+- [ ] docs/ExecPlans/ui_product_support_and_release_execplan.md — Settings/diagnostics, source-tree
+  Cinnamon/X11/native-F1 evidence, packaged payload/startup, and isolated package-manager smoke
+  gates are complete; display-backed screen-reader/high-contrast/physical-DPI/monitor and human
+  GUI acceptance, privileged host installation, and final release-matrix signoff remain external
+  gates. Mint 22.3 Wayland is intentionally deferred.
 - [x] docs/ExecPlans/ui_help_support_execplan.md — packaged
   canonical Markdown, CLI discovery, modeless searchable viewer, F1 routing, and offline/resource
   parity are implemented and validated; diagnostics and final release acceptance remain with the
@@ -708,6 +710,14 @@ Release tranche:
   and the test-only `build_qt_signing_shell` adapter remain intentionally
   retained because their consumers are live. No safe additional retirement was
   identified.
+- [x] (2026-08-16) Reconciled the final release evidence after a successful
+  follow-up native-X11 F1 audit and fresh automated/package rerun. Full validation
+  is `1574 passed, 20 skipped, 1 warning`; PyInstaller, Debian extraction, and
+  private `dpkg --unpack` all pass, while the packaged offscreen probe remains
+  explicitly limited by `SingleInstanceUnavailable`. A full validation run also
+  left 104 idle FoliaSeal-owned canonical-preview roots; they were removed during
+  closeout. Only the external human/display, privileged-host, and final release
+  gates remain, with Wayland deferred for Mint 22.3.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
