@@ -101,6 +101,8 @@ class SignaturePropertiesViewState:
     ready_to_sign: bool
     preview: SigningDraftPreview
     certificate_readiness: CertificateReadiness | None = None
+    selected_preset_missing_certificate: bool = False
+    selected_preset_missing_placement: bool = False
 
 
 @dataclass(frozen=True)
@@ -309,6 +311,7 @@ class DefaultSignaturePropertiesCoordinator:
         if partial_preset_notice is not None:
             validation_text = f"{partial_preset_notice}\n{validation_text}"
         reusable_snapshot = self.reusable_objects.snapshot()
+        missing_certificate, missing_placement = self._selected_preset_missing_inputs()
         return SignaturePropertiesViewState(
             selected_certificate_configuration_name=self._selected_certificate_configuration_name,
             selected_signature_preset_name=self._selected_signature_preset_name,
@@ -328,6 +331,8 @@ class DefaultSignaturePropertiesCoordinator:
             ),
             preview=preview,
             certificate_readiness=certificate_readiness,
+            selected_preset_missing_certificate=missing_certificate,
+            selected_preset_missing_placement=missing_placement,
         )
 
     def reconcile(
@@ -725,6 +730,23 @@ class DefaultSignaturePropertiesCoordinator:
         return (
             f"Selected preset '{preset.name}' does not define a certificate; "
             "choose a certificate configuration before signing."
+        )
+
+    def _selected_preset_missing_inputs(self) -> tuple[bool, bool]:
+        """Return effective missing per-document inputs for the selected preset."""
+        selected_name = self._selected_signature_preset_name
+        if selected_name is None:
+            return False, False
+        ref = self._ref_for_name(ReusableObjectKind.PRESET, selected_name)
+        if ref is None:
+            return False, False
+        try:
+            preset = self.reusable_objects.resolve(ref)
+        except (ConfigValidationError, KeyError):
+            return False, False
+        return (
+            preset.preset.certificate_configuration_id is None,
+            preset.placement_defaults is None,
         )
 
     def _resolve_signing_material(

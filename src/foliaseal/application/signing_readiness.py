@@ -30,6 +30,13 @@ class SigningReadinessAction(StrEnum):
     SIGN = "sign"
 
 
+class SigningReadinessMissingInput(StrEnum):
+    """The effective per-document value a partial preset still needs."""
+
+    CERTIFICATE = "certificate"
+    PLACEMENT = "placement"
+
+
 @dataclass(frozen=True)
 class SigningReadinessInputs:
     """Existing setup facts needed by the pure readiness projection."""
@@ -45,6 +52,8 @@ class SigningReadinessInputs:
     has_saved_presets: bool = False
     document_safety_status: SourceChangeStatus = SourceChangeStatus.UNCHANGED
     document_safety_detail: str = ""
+    selected_preset_missing_certificate: bool = False
+    selected_preset_missing_placement: bool = False
 
 
 @dataclass(frozen=True)
@@ -57,6 +66,7 @@ class SigningReadiness:
     can_sign: bool
     recommended_action: SigningReadinessAction | None
     caveat: str | None = None
+    missing_input: SigningReadinessMissingInput | None = None
 
 
 def project_signing_readiness(inputs: SigningReadinessInputs) -> SigningReadiness:
@@ -92,28 +102,62 @@ def project_signing_readiness(inputs: SigningReadinessInputs) -> SigningReadines
             recommended_action=SigningReadinessAction.CHOOSE_SETUP,
         )
 
-    if not inputs.certificate_selected or inputs.certificate_blocking:
-        detail = inputs.certificate_detail.strip() or inputs.validation_text.strip() or (
-            "Select or configure a certificate before signing this PDF."
-        )
+    if inputs.certificate_blocking or not inputs.certificate_selected:
+        if (
+            not inputs.certificate_blocking
+            and inputs.selected_preset_missing_certificate
+            and inputs.selected_preset_name
+        ):
+            heading = "Choose a certificate for this preset"
+            detail = (
+                f"Selected preset '{inputs.selected_preset_name}' does not include a certificate. "
+                "Choose a certificate configuration for this document before signing."
+            )
+        else:
+            heading = "Setup required"
+            detail = inputs.certificate_detail.strip() or inputs.validation_text.strip() or (
+                "Select or configure a certificate before signing this PDF."
+            )
         return SigningReadiness(
             stage=SigningReadinessStage.SETUP_REQUIRED,
-            heading="Setup required",
+            heading=heading,
             detail=detail,
             can_sign=False,
             recommended_action=SigningReadinessAction.COMPLETE_SETUP,
+            missing_input=(
+                SigningReadinessMissingInput.CERTIFICATE
+                if (
+                    not inputs.certificate_blocking
+                    and inputs.selected_preset_missing_certificate
+                )
+                else None
+            ),
         )
 
     if not inputs.placement_present:
-        return SigningReadiness(
-            stage=SigningReadinessStage.PLACE_SIGNATURE,
-            heading="Place a visible signature",
-            detail=(
+        if inputs.selected_preset_missing_placement and inputs.selected_preset_name:
+            heading = "Place the signature for this preset"
+            detail = (
+                f"Selected preset '{inputs.selected_preset_name}' does not include placement. "
+                "Place the visible signature for this document before signing."
+            )
+        else:
+            heading = "Place a visible signature"
+            detail = (
                 "Place the visible signature on the page before signing. Drag on the page or "
                 "enter placement values."
-            ),
+            )
+        return SigningReadiness(
+            stage=SigningReadinessStage.PLACE_SIGNATURE,
+            heading=heading,
+            detail=detail,
             can_sign=False,
             recommended_action=SigningReadinessAction.PLACE_SIGNATURE,
+            missing_input=(
+                SigningReadinessMissingInput.PLACEMENT
+                if inputs.selected_preset_missing_placement
+                else None
+            ),
         )
 
     validation_text = inputs.validation_text.strip()
@@ -147,6 +191,7 @@ __all__ = [
     "SigningReadiness",
     "SigningReadinessAction",
     "SigningReadinessInputs",
+    "SigningReadinessMissingInput",
     "SigningReadinessStage",
     "project_signing_readiness",
 ]

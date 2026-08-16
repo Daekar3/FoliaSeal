@@ -182,10 +182,10 @@ Bounded evidence (2026-08-10):
 - Final bounded lifecycle audit: exit `1` with the expected isolated `SingleInstanceUnavailable`
   endpoint error; no FoliaSeal/PySide6/pytest processes remained and the temporary root was
   removed.
-- Remaining gaps: optional Certificate/Placement creation from the nested first-use flow and
-  explicit missing per-document input prompts. Nested editor suspension/return, Presets-first
-  entry, live rail refresh, and explicit selection behavior are complete in this slice and its
-  dependencies.
+- Remaining gaps: optional Certificate/Placement creation from the nested first-use flow.
+  The partial-preset child now supplies explicit missing per-document certificate/placement
+  guidance; nested editor suspension/return, Presets-first entry, live rail refresh, and
+  explicit selection behavior are complete in this slice and its dependencies.
 
 ## Idempotence and Recovery
 

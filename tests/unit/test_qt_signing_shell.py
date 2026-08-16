@@ -4413,6 +4413,55 @@ def test_signing_shell_signature_preset_selection_restores_placement_defaults_wi
     assert widget.selected_certificate_configuration_id() == "cert-config-current"
 
 
+def test_partial_preset_readiness_names_missing_document_inputs_without_mutation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    workflow = _workflow(tmp_path)
+    workflow.certificate_path = ""
+    workflow.passphrase = ""
+    compact_base = build_signature_preset(name="Compact")
+    compact = replace(
+        compact_base,
+        preset=replace(compact_base.preset, placement_profile_id=None),
+        placement_profile=None,
+    )
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(
+            profiles=(compact,)
+        ),
+    )
+    panel = widget.properties_panel
+
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+
+    certificate_guidance = panel.readiness()
+    assert certificate_guidance.missing_input.value == "certificate"
+    assert certificate_guidance.heading == "Choose a certificate for this preset"
+    assert widget.signature_rect() is None
+
+    workflow.certificate_path = str(tmp_path / "cert.p12")
+    widget.set_selected_certificate_configuration_id("cert-config-default")
+    placement_guidance = panel.readiness()
+    assert placement_guidance.missing_input.value == "placement"
+    assert placement_guidance.heading == "Place the signature for this preset"
+    assert widget.signature_rect() is None
+
+
 def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entrypoint(
     monkeypatch,
     tmp_path: Path,

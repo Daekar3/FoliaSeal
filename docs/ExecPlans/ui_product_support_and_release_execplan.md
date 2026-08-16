@@ -141,6 +141,11 @@ Qt surface, focused tests, and observable acceptance.
   discarded as contaminated by the underlying editor. Human assistive
   technology, contrast, physical-DPI/monitor interpretation, privileged host
   installation, final release acceptance, and Wayland remain open/deferred.
+- [x] (2026-08-16) Implemented the partial-preset missing-input guidance child. The typed
+  readiness projection and signing rail now distinguish a missing per-document certificate from
+  missing placement, preserve certificate-blocking error precedence, and prove certificate-first
+  progression without automatic placement or signing. Certificate/placement creation flows and
+  all display-backed, privileged, and final-release gates remain open.
 - [x] (2026-08-16) Reconciled active signing/review publication markers with
   current implementation commits and focused evidence. No new AFK product
   implementation gap was found; the remaining unchecked release items are
@@ -351,6 +356,7 @@ text, Reason, Location, or private keys.
 Revision note: 2026-08-09 / Codex
 Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
 Revision note: 2026-08-16 / Codex
-Reconciled completed Help, diagnostics, offscreen accessibility, and isolated package-install child
-markers. No AFK implementation gap remains in this release plan; display-backed, privileged-host,
-and final cross-surface acceptance remain open external gates.
+Reconciled completed Help, diagnostics, offscreen accessibility, isolated package-install, and
+partial-preset guidance child markers. The remaining AFK product work includes optional
+Certificate/Placement creation; display-backed, privileged-host, and final cross-surface acceptance
+remain open external gates.

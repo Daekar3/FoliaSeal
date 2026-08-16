@@ -368,6 +368,11 @@ Release tranche:
   first-use integration is green (`4 passed`); full regression is `1367 passed, 20 skipped, 1
   warning`; optional certificate/placement creation and missing per-document prompts remain in
   their owning children.
+- [x] (2026-08-16) Completed the partial-preset missing-input guidance child: typed readiness
+  facts and rail copy now identify the selected preset's missing certificate or placement, retain
+  blocking certificate precedence, and prove certificate-first progression without mutation.
+  Optional Certificate/Placement creation remains separate; display-backed, privileged-host,
+  final-release, and deferred Wayland gates remain open.
 - [x] (2026-08-10) Added the bounded certificate-readiness increment: the catalog-backed signing
   rail now projects selected PKCS#12 identity, private-key presence, validity, expiry warnings,
   blocking states, password-promptability, and the exact neutral self-signed caveat through a typed

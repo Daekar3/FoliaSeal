@@ -15,6 +15,7 @@ from foliaseal.application import (
 )
 from foliaseal.application.certificate_catalog_repository import CertificateCatalogRepository
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.certificate_readiness import CertificateReadinessStatus
 from foliaseal.application.document_safety import SourceChangeDecision, SourceChangeStatus
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
 from foliaseal.application.signature_properties_coordinator import (
@@ -514,6 +515,12 @@ class SignaturePropertiesPanel:
                 certificate_blocking=(
                     False
                     if direct_certificate_available
+                    or (
+                        state.selected_preset_missing_certificate
+                        and certificate_readiness is not None
+                        and certificate_readiness.status
+                        is CertificateReadinessStatus.NO_CERTIFICATE_SELECTED
+                    )
                     else (
                         certificate_readiness.blocking
                         if certificate_readiness is not None
@@ -529,6 +536,8 @@ class SignaturePropertiesPanel:
                 placement_present=self._coordinator.workflow.signature_rect is not None,
                 validation_text=state.validation_text,
                 ready_to_sign=state.ready_to_sign,
+                selected_preset_missing_certificate=state.selected_preset_missing_certificate,
+                selected_preset_missing_placement=state.selected_preset_missing_placement,
             )
         )
 

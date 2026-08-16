@@ -943,6 +943,31 @@ def test_coordinator_apply_signature_preset_wrapper_preserves_control_issue_fold
     )
 
 
+def test_coordinator_reports_effective_missing_inputs_for_partial_preset(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance())
+    compact_base = build_signature_preset(name="Compact")
+    compact = replace(
+        compact_base,
+        preset=replace(compact_base.preset, placement_profile_id=None),
+        placement_profile=None,
+    )
+    coordinator = DefaultSignaturePropertiesCoordinator(
+        workflow=workflow,
+        certificate_catalog=build_certificate_catalog(),
+        preset_catalog=build_signature_preset_catalog(profiles=(compact,)),
+    )
+
+    state = coordinator.apply_signature_preset("Compact")
+
+    assert state.selected_signature_preset_name == "Compact"
+    assert state.selected_preset_missing_certificate is True
+    assert state.selected_preset_missing_placement is True
+    assert workflow.signature_rect is None
+
+
 def test_coordinator_apply_signature_preset_wrapper_applies_certificate_material(
     tmp_path: Path,
 ) -> None:
