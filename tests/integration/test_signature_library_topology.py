@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -381,6 +382,90 @@ def test_library_real_qt_nested_preset_attaches_created_certificate(tmp_path: Pa
         resolved = frame._reusable_objects.view().presets[0]
         saved = frame._reusable_objects.resolve(resolved.ref)
         assert saved.preset.certificate_configuration_id == created.certificate_configuration_id
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_library_real_qt_nested_preset_captures_current_placement(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-preset-current-placement"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))
+    created = build_placement_profile(display_name="Captured current placement")
+
+    def capture_placement():
+        frame._reusable_objects.execute(
+            SavePlacement(
+                name=created.display_name,
+                rect=created.rect,
+                source_page=created.source_page,
+                page_number=created.page_number,
+                pinned=created.pinned,
+                placement_profile_id=created.placement_profile_id,
+            )
+        )
+        return created
+
+    fake_session = SimpleNamespace(
+        can_undo_placement=lambda: False,
+        can_redo_placement=lambda: False,
+        can_select_all_document_text=lambda: False,
+        can_copy_selected_document_text=lambda: False,
+    )
+    fake_maintenance = SimpleNamespace(
+        has_unsaved_changes=lambda: False,
+        clear_session_secrets=lambda: None,
+        refresh_signature_profiles=lambda: None,
+    )
+    frame._workspace_host.active = lambda: SimpleNamespace(
+        session=fake_session,
+        maintenance=fake_maintenance,
+    )
+    frame._open_current_placement_profile_editor = capture_placement
+    library = frame.show_reusable_object_library()
+    app.processEvents()
+    try:
+        library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
+        library.controls.create_button.click()
+        app.processEvents()
+        editor = library.controls.preset_editor
+        assert editor is not None
+        editor.controls.name_input.setText("Preset with current placement")
+        editor.controls.appearance_selector.setCurrentText("Approval")
+        editor.controls.capture_placement_button.click()
+        app.processEvents()
+
+        assert editor.controls.placement_selector.currentText() == "Captured current placement"
+        editor.controls.save_button.click()
+        app.processEvents()
+        assert library.controls.preset_editor is None
+        resolved = frame._reusable_objects.view().presets[0]
+        saved = frame._reusable_objects.resolve(resolved.ref)
+        assert saved.preset.placement_profile_id == created.placement_profile_id
     finally:
         library.controls.dialog.close()
         frame.window.close()

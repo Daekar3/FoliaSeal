@@ -144,6 +144,7 @@ class ReusableObjectLibraryDialog:
         on_edit: Callable[[ReusableObjectRef], bool] | None = None,
         on_create_placement: Callable[[], PlacementProfile | None] | None = None,
         on_edit_placement: Callable[[PlacementProfile], bool] | None = None,
+        on_capture_placement: Callable[[], PlacementProfile | None] | None = None,
         on_create_certificate: Callable[[], CertificateConfiguration | None] | None = None,
         on_import_certificate: Callable[[], CertificateConfiguration | None] | None = None,
         image_store: ManagedSignatureImageStore | None = None,
@@ -157,6 +158,7 @@ class ReusableObjectLibraryDialog:
         self._on_edit_appearance = on_edit_appearance
         self._on_create_placement = on_create_placement
         self._on_edit_placement = on_edit_placement
+        self._on_capture_placement = on_capture_placement
         self._on_create_certificate = on_create_certificate
         self._on_import_certificate = on_import_certificate
         self._certificate_catalog_provider = certificate_catalog_provider
@@ -707,6 +709,7 @@ class ReusableObjectLibraryDialog:
             on_cancel_requested=self._preset_editor_cancel_requested,
             on_error=self._show_error,
             on_create_placement=self._on_create_placement,
+            on_capture_placement=self._on_capture_placement,
             on_create_certificate=self._on_create_certificate,
             on_import_certificate=self._on_import_certificate,
             certificate_catalog_provider=self._certificate_catalog_provider,

@@ -513,6 +513,7 @@ def test_nested_preset_editor_creates_and_attaches_blank_placement() -> None:
     dialog.controls.create_button.click()
     editor = dialog.controls.preset_editor
     assert editor is not None
+    assert editor.controls.capture_placement_button._enabled is False
     editor.controls.name_input.setText("Preset with placement")
     editor.controls.appearance_selector.setCurrentIndex(0)
 
@@ -525,6 +526,101 @@ def test_nested_preset_editor_creates_and_attaches_blank_placement() -> None:
 
     resolved = service.resolve(service.view().presets[0].ref)
     assert resolved.preset.placement_profile_id == created.placement_profile_id
+
+
+def test_nested_preset_editor_captures_and_attaches_current_placement() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    created = build_placement_profile(display_name="Captured current placement")
+
+    def capture_placement():
+        service.execute(
+            SavePlacement(
+                name=created.display_name,
+                rect=created.rect,
+                source_page=created.source_page,
+                page_number=created.page_number,
+                pinned=created.pinned,
+                placement_profile_id=created.placement_profile_id,
+            )
+        )
+        return created
+
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        on_capture_placement=capture_placement,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.name_input.setText("Preset with captured placement")
+    editor.controls.appearance_selector.setCurrentIndex(0)
+    editor.controls.capture_placement_button.click()
+
+    assert editor.controls.placement_selector.currentText() == "Captured current placement"
+    assert editor.dirty is True
+    editor.controls.save_button.click()
+    resolved = service.resolve(service.view().presets[0].ref)
+    assert resolved.preset.placement_profile_id == created.placement_profile_id
+
+
+def test_nested_preset_editor_cancelled_current_capture_preserves_draft() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        on_capture_placement=lambda: None,
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.appearance_selector.setCurrentIndex(0)
+    dirty_before = editor.dirty
+
+    editor.controls.capture_placement_button.click()
+
+    assert editor.controls.placement_selector.currentText() == "No placement"
+    assert editor.dirty is dirty_before
+    assert service.view().placement_names == ()
+    assert dialog.controls.preset_editor is editor
+
+
+def test_nested_preset_editor_rejects_invalid_current_capture_result() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        certificate_catalog=CertificateCatalog(schema_version=1),
+        on_capture_placement=lambda: object(),
+    )
+    dialog.controls.catalog_selector.setCurrentText("Presets")
+    dialog.controls.create_button.click()
+    editor = dialog.controls.preset_editor
+    assert editor is not None
+    editor.controls.appearance_selector.setCurrentIndex(0)
+    dirty_before = editor.dirty
+
+    editor.controls.capture_placement_button.click()
+
+    assert editor.controls.placement_selector.currentText() == "No placement"
+    assert editor.dirty is dirty_before
+    assert service.view().placement_names == ()
 
 
 def test_nested_preset_editor_cancelled_placement_creation_does_not_mutate_catalog() -> None:

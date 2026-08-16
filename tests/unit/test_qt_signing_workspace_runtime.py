@@ -642,6 +642,10 @@ def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_
     assert bound.draft_workflow.timestamp_required is True
     assert bound.properties_panel.load_from_workflow_calls == 2
     assert bound.runtime.selected_certificate_configuration_id() == "cert-1"
+    assert (
+        bound.runtime.current_placement_context()
+        == bound.viewer_interaction_session.current_placement
+    )
     assert bound.runtime.is_sign_action_enabled() is True
     assert bound.order[:5] == [
         ("set_signature_rect", True),

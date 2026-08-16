@@ -1598,6 +1598,7 @@ class FoliaSealAppFrame:
             on_configure_certificate=self._configure_certificate,
             on_create_placement=self._open_placement_profile_editor,
             on_edit_placement=self._edit_placement_profile,
+            on_capture_placement=self._open_current_placement_profile_editor,
             on_create_certificate=self._create_certificate_for_preset,
             on_import_certificate=self._import_certificate_for_preset,
             image_store=self._signature_image_store,
@@ -1875,6 +1876,23 @@ class FoliaSealAppFrame:
         initial = PlacementEditorState.from_blank_page(
             visible_width_pt=612.0,
             visible_height_pt=792.0,
+        )
+        return self._run_placement_profile_editor(initial)
+
+    def _open_current_placement_profile_editor(self) -> PlacementProfile | None:
+        """Open the Placement editor seeded from the active PDF page and rectangle."""
+
+        workspace = self._workspace_host.active()
+        if workspace is None:
+            self._emit_error("Open a PDF before capturing a placement from the current document.")
+            return None
+        context = workspace.session.current_placement_context()
+        if context is None:
+            self._emit_error("Current PDF page geometry is unavailable for placement capture.")
+            return None
+        initial = PlacementEditorState.from_current_page(
+            context=context,
+            signature_rect=workspace.session.signature_rect(),
         )
         return self._run_placement_profile_editor(initial)
 

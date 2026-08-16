@@ -10,10 +10,10 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 After this slice, a first-time user can open the Signature Library from the empty preset rail,
 land in the Presets catalog regardless of the last Library catalog used, create a required-
 Appearance preset through the nested editor, optionally create or import a Certificate and create
-a blank-page Placement, return to the active document, and explicitly select the newly saved
+or capture a Placement, return to the active document, and explicitly select the newly saved
 preset. The Library refreshes the live rail without silently applying the preset or mutating the
 active signing draft. This is the first-use flow mapped to UI_SPEC WF02/WF03 and acceptance
-scenario 2; current-document Placement capture and external acceptance gates remain separate.
+scenario 2; external acceptance gates remain separate.
 
 ## Child ExecPlan Dependencies
 
@@ -38,6 +38,9 @@ scenario 2; current-document Placement capture and external acceptance gates rem
 - [x] (2026-08-16) Added nested Certificate Create/Import actions. Existing certificate dialogs
   return a stable configuration to the suspended Preset, which refreshes and selects it without
   applying anything to the active signing draft.
+- [x] (2026-08-16) Added nested current-document Placement capture. The explicit action seeds the
+  transactional editor from typed page context/current rectangle, attaches only the saved stable
+  id, and remains available in the retained Library even before a PDF is open.
 
 ## Surprises & Discoveries
 
@@ -184,10 +187,10 @@ Bounded evidence (2026-08-10):
 - Final bounded lifecycle audit: exit `1` with the expected isolated `SingleInstanceUnavailable`
   endpoint error; no FoliaSeal/PySide6/pytest processes remained and the temporary root was
   removed.
-- Remaining gaps: current-document Placement capture from the nested first-use flow plus external
-  display/package/release acceptance. Nested Appearance, Certificate Create/Import, blank-page
-  Placement, editor suspension/return, Presets-first entry, live rail refresh, and explicit
-  selection behavior are complete in this slice and its dependencies.
+- Remaining gaps: external display/package/release acceptance. Nested Appearance, Certificate
+  Create/Import, blank-page/current-document Placement, editor suspension/return, Presets-first
+  entry, live rail refresh, and explicit selection behavior are complete in this slice and its
+  dependencies.
 
 ## Idempotence and Recovery
 
@@ -206,9 +209,9 @@ Use the existing typed application workflows, schema models, persistence stores,
 or workspace ports. The final behavior must be exercised by tests/unit/test_qt_signing_shell.py, reusable-object tests, and a first-use Qt integration test. Any temporary adapter must
 name its remaining consumer and retirement condition in this plan.
 
-Revision note: 2026-08-10 / Codex
-Updated after the nested blank-page Placement and nested Certificate Create/Import children:
-first-use entry focuses Presets without persisting navigation, successful nested saves refresh the
-active shell, the user explicitly selects the new preset, and reusable Certificate/Placement
-objects can be created and attached before Preset Save. Current-document Placement capture remains
-in its owning follow-up child.
+Revision note: 2026-08-16 / Codex
+Updated after the nested blank-page Placement, nested Certificate Create/Import, and current-
+document Placement capture children. First-use entry focuses Presets without persisting navigation,
+successful nested saves refresh the active shell, and reusable objects attach only on explicit
+Preset Save. Display-backed, privileged, final-release, and deferred Mint 22.3 Wayland gates remain
+open.

@@ -587,6 +587,15 @@ class SigningWorkspaceRuntime:
     def signature_rect(self) -> SignatureRect | None:
         return self._draft_workflow.signature_rect
 
+    def current_placement_context(self) -> SignaturePlacementContext | None:
+        """Return the active visible-page context without mutating the draft."""
+
+        return (
+            self._viewer_interaction_session_required()
+            .current_placement_context()
+            .placement_context
+        )
+
     def set_selected_certificate_configuration_id(self, configuration_id: str | None) -> None:
         self._draft_workflow.selected_certificate_configuration_id = configuration_id
         self._properties_panel_required().load_from_workflow()

@@ -85,9 +85,10 @@ results are rejected. Focused Library/frame/placement/offscreen validation is
 `97 passed`; the full suite is `1553 passed, 20 skipped, 1 warning`. Ruff,
 compileall, and `git diff --check` are clean. Independent review required and this
 slice added active-workflow invariance evidence, stronger callback typing, and the
-documentation reconciliation. Certificate creation/import and current-document
-placement capture remain separate work; display-backed, privileged, final-release,
-and deferred Wayland gates remain open.
+documentation reconciliation. Certificate creation/import was completed by its owning child, and
+current-document placement capture was subsequently completed by
+`ui_first_use_nested_current_placement_capture_execplan.md`. Display-backed, privileged,
+final-release, and deferred Mint 22.3 Wayland gates remain open.
 
 ## Context and Orientation
 

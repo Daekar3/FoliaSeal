@@ -35,6 +35,7 @@ from foliaseal.application.reusable_signing_objects import ReusableSigningObject
 from foliaseal.application.signature_properties_coordinator import (
     SignaturePropertiesCoordinatorError as _SignaturePropertiesCoordinatorError,
 )
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialPort,
 )
@@ -555,6 +556,9 @@ class SigningWorkspaceWidget:
 
     def signature_rect(self) -> SignatureRect | None:
         return self._runtime.signature_rect()
+
+    def current_placement_context(self) -> SignaturePlacementContext | None:
+        return self._runtime.current_placement_context()
 
     def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None:
         self._runtime.select_signature_field(field_name, signature_rect)

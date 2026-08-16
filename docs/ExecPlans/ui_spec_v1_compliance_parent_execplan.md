@@ -382,8 +382,12 @@ Release tranche:
 - [x] (2026-08-16) Completed the nested Certificate Create/Import child: existing certificate
   dialogs return a stable configuration to the suspended Preset, the provider-backed selector
   refreshes before attachment, and focused/offscreen, invalid-result, cancel, and active-draft
-  invariance tests are green. Current-document Placement capture and external display/package/
-  final-release gates remain open.
+  invariance tests are green.
+- [x] (2026-08-16) Completed the nested current-document Placement capture child: the explicit
+  nested action crosses typed workspace context/rectangle seams, reuses the transactional editor,
+  attaches only the saved stable id, and reports no-document state without mutating the active
+  draft. Focused/offscreen validation is `123 passed`; external display/package/final-release
+  gates remain open and Mint 22.3 Wayland is intentionally deferred.
 - [x] (2026-08-10) Added the bounded certificate-readiness increment: the catalog-backed signing
   rail now projects selected PKCS#12 identity, private-key presence, validity, expiry warnings,
   blocking states, password-promptability, and the exact neutral self-signed caveat through a typed

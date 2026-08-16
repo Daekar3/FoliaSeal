@@ -4,12 +4,14 @@ import pytest
 
 from foliaseal.application.certificate_manager import CertificateOperationResult
 from foliaseal.application.certificate_models import CertificateCatalog
+from foliaseal.application.coordinate_transform import PageBox
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
     ReusableSigningObjects,
     SavePlacement,
 )
+from foliaseal.application.signing_draft_contracts import SignaturePlacementContext
 from foliaseal.application.signing_executor import LazySigningRequestExecutor
 from foliaseal.domain.models import SignatureRect
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -776,6 +778,8 @@ class _FakeShell:
         self.unsaved_changes = False
         self.discard_draft_calls = 0
         self.clear_session_secrets_calls = 0
+        self.current_placement_context_value = None
+        self.signature_rect_value = None
 
     def apply_app_settings(self, settings) -> None:
         self.app_settings = settings
@@ -788,6 +792,12 @@ class _FakeShell:
 
     def refresh_signature_profiles(self) -> None:
         self.refresh_signature_profiles_calls += 1
+
+    def current_placement_context(self):
+        return self.current_placement_context_value
+
+    def signature_rect(self):
+        return self.signature_rect_value
 
     def choose_output_pdf_path(self):
         self.choose_output_pdf_path_calls += 1
@@ -1185,6 +1195,29 @@ def test_qt_signing_workspace_port_forwards_public_shell_contract(tmp_path: Path
     port.discard_draft()
     assert shell.discard_draft_calls == 1
     assert port.has_unsaved_changes() is False
+
+
+def test_qt_signing_workspace_session_port_forwards_current_placement_reads() -> None:
+    shell = _FakeShell()
+    context = SignaturePlacementContext(
+        page_index=1,
+        page_box=PageBox(left=0.0, bottom=0.0, right=612.0, top=792.0),
+        rotation=90,
+    )
+    rect = SignatureRect(
+        page_index=1,
+        left_pt=30.0,
+        bottom_pt=40.0,
+        width_pt=180.0,
+        height_pt=54.0,
+    )
+    shell.current_placement_context_value = context
+    shell.signature_rect_value = rect
+
+    port = QtSigningWorkspaceSessionPort(shell)
+
+    assert port.current_placement_context() == context
+    assert port.signature_rect() == rect
 
 
 def test_app_frame_open_file_uses_settings_defaults_and_installs_workspace(
@@ -1865,6 +1898,55 @@ def test_app_frame_nested_certificate_callback_extracts_only_configuration(tmp_p
     assert frame._create_certificate_for_preset() == configuration
     frame.show_certificate_creation = lambda: None
     assert frame._create_certificate_for_preset() is None
+
+
+def test_app_frame_current_placement_capture_uses_active_context_without_mutation(
+    tmp_path: Path,
+) -> None:
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+    errors: list[str] = []
+    frame._emit_error = errors.append
+    assert frame._open_current_placement_profile_editor() is None
+    assert errors == ["Open a PDF before capturing a placement from the current document."]
+
+    context = SignaturePlacementContext(
+        page_index=2,
+        page_box=PageBox(left=0.0, bottom=0.0, right=612.0, top=792.0),
+        rotation=90,
+    )
+    signature_rect = SignatureRect(
+        page_index=2,
+        left_pt=30.0,
+        bottom_pt=40.0,
+        width_pt=180.0,
+        height_pt=54.0,
+    )
+
+    class Session:
+        def current_placement_context(self):
+            return context
+
+        def signature_rect(self):
+            return signature_rect
+
+    class Workspace:
+        session = Session()
+
+    captured = []
+    frame._workspace_host.active = lambda: Workspace()
+    frame._run_placement_profile_editor = lambda initial: captured.append(initial) or None
+
+    assert frame._open_current_placement_profile_editor() is None
+    assert captured[0].page_number == 3
+    assert captured[0].source_page.rotation_degrees == 90
+    assert captured[0].rect.width_pt == 54.0
+    assert captured[0].rect.height_pt == 180.0
 
 
 def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> None:

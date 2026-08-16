@@ -34,6 +34,7 @@ class SignaturePresetEditorWidgetControls:
     create_appearance_button: Any
     edit_appearance_button: Any
     create_placement_button: Any
+    capture_placement_button: Any
     create_certificate_button: Any
     import_certificate_button: Any
     save_button: Any
@@ -68,6 +69,7 @@ class SignaturePresetEditorWidget:
         on_cancel_requested: Callable[[], bool] | None = None,
         on_error: Callable[[str], None] | None = None,
         on_create_placement: Callable[[], PlacementProfile | None] | None = None,
+        on_capture_placement: Callable[[], PlacementProfile | None] | None = None,
         on_create_certificate: Callable[[], CertificateConfiguration | None] | None = None,
         on_import_certificate: Callable[[], CertificateConfiguration | None] | None = None,
         certificate_catalog_provider: Callable[[], CertificateCatalog] | None = None,
@@ -83,6 +85,7 @@ class SignaturePresetEditorWidget:
         self._on_cancel_requested = on_cancel_requested or (lambda: True)
         self._on_error = on_error or (lambda _message: None)
         self._on_create_placement = on_create_placement
+        self._on_capture_placement = on_capture_placement
         self._on_create_certificate = on_create_certificate
         self._on_import_certificate = on_import_certificate
         self._certificate_catalog_provider = certificate_catalog_provider
@@ -259,7 +262,10 @@ class SignaturePresetEditorWidget:
         create_placement = bindings.q_push_button("Create placement…")
         if self._on_create_placement is None:
             create_placement.setEnabled(False)
-        layout.addWidget(create_placement)
+        capture_placement = bindings.q_push_button("Capture placement from current PDF…")
+        if self._on_capture_placement is None:
+            capture_placement.setEnabled(False)
+        layout.addWidget(_compose_row(bindings, create_placement, capture_placement))
         layout.addWidget(bindings.q_label("Certificate"))
         layout.addWidget(certificate_selector)
         create_certificate = bindings.q_push_button("Create certificate…")
@@ -296,6 +302,7 @@ class SignaturePresetEditorWidget:
         create_appearance.clicked.connect(self._create_appearance_child)  # type: ignore[attr-defined]
         edit_appearance.clicked.connect(self._edit_appearance_child)  # type: ignore[attr-defined]
         create_placement.clicked.connect(self._create_placement)  # type: ignore[attr-defined]
+        capture_placement.clicked.connect(self._capture_placement)  # type: ignore[attr-defined]
         create_certificate.clicked.connect(self._create_certificate)  # type: ignore[attr-defined]
         import_certificate.clicked.connect(self._import_certificate)  # type: ignore[attr-defined]
         save_button.clicked.connect(self.save)  # type: ignore[attr-defined]
@@ -310,6 +317,7 @@ class SignaturePresetEditorWidget:
             create_appearance_button=create_appearance,
             edit_appearance_button=edit_appearance,
             create_placement_button=create_placement,
+            capture_placement_button=capture_placement,
             create_certificate_button=create_certificate,
             import_certificate_button=import_certificate,
             save_button=save_button,
@@ -351,6 +359,26 @@ class SignaturePresetEditorWidget:
         callback = self._on_create_placement
         if callback is None:
             self._on_error("Placement creation is unavailable.")
+            return False
+        self._set_parent_editor_visible(False)
+        try:
+            created = callback()
+        finally:
+            self._set_parent_editor_visible(True)
+        if not isinstance(created, PlacementProfile):
+            return False
+        placement_id = getattr(created, "placement_profile_id", None)
+        self._populate_placement_selector(self.controls.placement_selector, placement_id)
+        self._dirty = True
+        self._on_reusable_objects_changed()
+        return True
+
+    def _capture_placement(self) -> bool:
+        """Capture a reusable placement from the active PDF context."""
+
+        callback = self._on_capture_placement
+        if callback is None:
+            self._on_error("Current-document placement capture is unavailable.")
             return False
         self._set_parent_editor_visible(False)
         try:

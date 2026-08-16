@@ -15,7 +15,10 @@ from foliaseal.application.document_review_workspace import DocumentReviewWorksp
 from foliaseal.application.document_safety import LinkDecision
 from foliaseal.application.document_text_selection import DocumentTextSelectionState
 from foliaseal.application.reusable_signing_objects import ReusableSigningObjects
-from foliaseal.application.signing_draft_contracts import SigningDraftPreview
+from foliaseal.application.signing_draft_contracts import (
+    SignaturePlacementContext,
+    SigningDraftPreview,
+)
 from foliaseal.application.signing_material_resolver import CertificateSigningMaterialPort
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect, SigningRequest
@@ -133,6 +136,8 @@ class SigningWorkspaceSessionPort(Protocol):
     def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None: ...
 
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None: ...
+    def current_placement_context(self) -> SignaturePlacementContext | None: ...
+    def signature_rect(self) -> SignatureRect | None: ...
     def preview(self) -> SigningDraftPreview: ...
     def snapshot(self) -> SigningWorkspaceSnapshot: ...
     def submit_sign_request(self) -> SigningRequest | None: ...
@@ -343,6 +348,14 @@ class QtSigningWorkspaceSessionPort:
 
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
         self.shell_widget.apply_signature_rect_placement(signature_rect)
+
+    def current_placement_context(self) -> SignaturePlacementContext | None:
+        getter = getattr(self.shell_widget, "current_placement_context", None)
+        return getter() if callable(getter) else None
+
+    def signature_rect(self) -> SignatureRect | None:
+        getter = getattr(self.shell_widget, "signature_rect", None)
+        return getter() if callable(getter) else None
 
     def select_signature_field(self, field_name: str, signature_rect: SignatureRect) -> None:
         self.shell_widget.select_signature_field(field_name, signature_rect)

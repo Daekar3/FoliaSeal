@@ -156,8 +156,12 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-16) Implemented nested Certificate Create/Import from the suspended Preset. The
   existing modal certificate lifecycle dialogs return a stable configuration, the provider-backed
   selector refreshes and attaches it only on explicit Preset Save, and focused/offscreen plus
-  active-draft invariance tests are green. Current-document Placement capture and all external
-  display/package/final-release gates remain open.
+  active-draft invariance tests are green.
+- [x] (2026-08-16) Implemented nested current-document Placement capture from the suspended
+  Preset. Typed page context/current rectangle conversion reuses the transactional editor, only
+  the saved stable id is attached, and the retained no-document Library reports an explicit error
+  rather than disabling the action. Focused validation is `123 passed`; external display/package/
+  final-release gates remain open and Wayland is deferred for Mint 22.3.
 - [x] (2026-08-16) Reconciled active signing/review publication markers with
   current implementation commits and focused evidence. No new AFK product
   implementation gap was found; the remaining unchecked release items are
@@ -369,6 +373,6 @@ Revision note: 2026-08-09 / Codex
 Created as the final dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
 Revision note: 2026-08-16 / Codex
 Reconciled completed Help, diagnostics, offscreen accessibility, isolated package-install,
-partial-preset guidance, nested blank-page Placement, and nested Certificate child markers. The
-remaining AFK product work includes current-document Placement capture; display-backed,
-privileged-host, and final cross-surface acceptance remain open external gates.
+partial-preset guidance, nested blank-page Placement, nested Certificate, and nested current-
+document Placement capture child markers. Display-backed, privileged-host, final cross-surface
+acceptance, and deferred Mint 22.3 Wayland remain open external gates.
