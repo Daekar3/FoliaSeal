@@ -628,6 +628,13 @@ Release tranche:
   observable Acceptance evidence names with explicit consumers; no broad nomenclature deletion was
   claimed. Wayland remains intentionally deferred for Mint 22.3 until the OS supports it as a
   first-class session.
+- [x] (2026-08-16) Added and passed the bounded source-tree Cinnamon/X11 accessibility audit.
+  `scripts/live_gui_accessibility_audit.py` activated only its owned window, verified direct Help
+  QAction wiring, delivered native F1 through XTest, opened the modeless Help viewer, recorded
+  minimum geometry/control/menu metadata and two-monitor/theme/scaling/Orca context, and cleaned
+  its temporary stores and windows. This closes native X11 keyboard/Help evidence only; human
+  assistive-technology, high-contrast, physical-DPI, packaged GUI, privileged-install, and final
+  release gates remain open. Wayland is intentionally deferred for Mint 22.3.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
@@ -734,7 +741,10 @@ main-window geometry/maximized persistence, and typed Settings command metadata/
 Focused and full validation remained green through the final loop (`1492 passed, 20 skipped,
 1 warning`); Ruff and `pip check` were clean, and bounded Qt/CLI audits cleaned up their isolated
 roots and processes while recording the environment's `SingleInstanceUnavailable` local-endpoint
-limitation.
+limitation. The later bounded source-tree X11 accessibility audit also passed native F1 after
+window-manager activation and is recorded in the accessibility/release children; it does not close
+human assistive-technology, physical-DPI, packaged, privileged-install, final-release, or Wayland
+gates.
 
 The parent is not complete. Several child checkboxes remain open because the remaining requirements
 include full document lifecycle/recovery, remaining nested Library transactions and editors,

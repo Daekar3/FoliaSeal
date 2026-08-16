@@ -58,6 +58,14 @@ as environment-dependent rather than being falsely claimed by headless tests.
   owning release plan.
 - [x] (2026-08-10) Committed the compliance correction and recorded the display-backed evidence
   limitation; the acceptance implementation is complete in `4a937ed15`.
+- [x] (2026-08-16) Added and passed the bounded Cinnamon/X11 display audit in
+  `scripts/live_gui_accessibility_audit.py`. With a uniquely titled audit window activated through
+  `wmctrl`, the real XTest F1 event opened the production modeless Help viewer; the report also
+  captured minimum geometry, accessible primary controls, menu/action metadata, two-monitor
+  `xrandr` state, Mint theme/scaling, Orca version, and cleanup. Direct QAction wiring passed before
+  native input. This closes the source-tree native-X11 keyboard/Help evidence slice, not human
+  screen-reader speech, high contrast, physical-DPI interpretation, packaged GUI, privileged
+  installation, final release acceptance, or Wayland.
 
 ## Surprises & Discoveries
 
@@ -124,9 +132,12 @@ production corrections are explicit accessible names for the no-document buttons
 mnemonics for `Fit Page`, `Find`, and `Document Signatures`, and unique top-level menu accelerators.
 The compliance follow-up also asserts shortcuts, disabled state, and diagnostic-folder routing while
 keeping tests on public frame APIs. Focused acceptance plus AppFrame regression validation is now
-`64 passed`; the full suite is `1469 passed, 20 skipped, 1 warning`. A display-backed screen-reader/high-contrast/DPI/monitor run,
-installed-package checks, and the final release matrix remain outstanding and must not be inferred
-from offscreen success.
+`64 passed`; the full suite is `1469 passed, 20 skipped, 1 warning`. The bounded source-tree
+Cinnamon/X11 audit now also passes native F1 delivery after window-manager activation and records
+the current two-monitor/theme/scaling/Orca context. Human screen-reader speech, high contrast,
+physical-DPI interpretation, installed-package GUI, privileged installation, and the final release
+matrix remain outstanding and must not be inferred from this evidence; Wayland is deferred for Mint
+22.3.
 
 ## Context and Orientation
 
@@ -273,4 +284,6 @@ release gates remain open.
 
 Revision note: 2026-08-16 / Codex
 Reconciled the release status: the acceptance module and correction are complete, while only
-display-backed accessibility, package installation, and final release evidence remain external gates.
+human/display-backed assistive-technology and physical-DPI observations, packaged/privileged
+release acceptance, and final release evidence remain external gates. The bounded source-tree X11
+native-input audit is recorded separately and does not claim those human gates.

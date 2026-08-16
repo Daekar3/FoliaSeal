@@ -119,6 +119,13 @@ Qt surface, focused tests, and observable acceptance.
   `release_readiness_reconciliation_execplan.md`; stale completion markers were corrected, while
   display-backed accessibility, physical DPI/monitor, packaged GUI, privileged installation, and
   final human release acceptance remain open.
+- [x] (2026-08-16) Added and passed the bounded source-tree Cinnamon/X11 accessibility audit via
+  `scripts/live_gui_accessibility_audit.py`. The audit activated only its uniquely titled window,
+  verified direct Help QAction wiring, delivered native F1 through XTest, opened the modeless Help
+  viewer, captured menu/control metadata plus two-monitor/theme/scaling/Orca context, and cleaned
+  its owned windows and temporary stores. This closes native X11 keyboard/Help evidence only;
+  human assistive-technology speech, high contrast, physical-DPI interpretation, packaged GUI,
+  privileged installation, final release acceptance, and Wayland remain open/deferred.
 - [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
   cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
@@ -155,11 +162,12 @@ Qt surface, focused tests, and observable acceptance.
 
 The local support/release implementation and evidence are complete for their available environments:
 packaged Help, privacy-safe diagnostics, Restore defaults, real-Qt/offscreen accessibility, package
-payload parity, and private install-root `dpkg --unpack` all have owning children and current evidence.
-This plan remains open only for display-backed screen-reader/high-contrast/physical-DPI/monitor and
-human GUI acceptance, privileged host package installation, final cross-surface release execution,
-and any approved compatibility/nomenclature retirement. The isolated package audit’s GUI result is
-explicitly limited by `SingleInstanceUnavailable`; no full-release claim is made.
+payload parity, private install-root `dpkg --unpack`, and source-tree native-X11 keyboard/Help
+evidence all have owning children and current evidence. This plan remains open only for
+display-backed screen-reader/high-contrast/physical-DPI/monitor and human GUI acceptance,
+privileged host package installation, final cross-surface release execution, and any approved
+compatibility/nomenclature retirement. The isolated package audit’s GUI result is explicitly limited
+by `SingleInstanceUnavailable`; no full-release claim is made. Wayland is deferred for Mint 22.3.
 
 ## Context and Orientation
 
