@@ -17,12 +17,14 @@ signed PDF looks balanced instead of conservative and underfilled.
 
 - [x] (2026-04-01 00:20Z) Created this ExecPlan for the backend horizontal-fit follow-up.
 - [x] (2026-04-01 00:23Z) Inspected the current horizontal reservation and image-fit helpers in
-  `src/foliaseal/application/phase3_signing_backend.py`.
+  `src/foliaseal/application/signing_backend.py`.
 - [x] (2026-04-01 00:26Z) Adjusted the horizontal `single_line` reservation logic to better
   reflect the wrapped/measured text footprint instead of starving the stamp.
 - [x] (2026-04-01 00:27Z) Added focused regression tests in
-  `tests/unit/test_phase3_signing_backend.py`.
-- [ ] Run focused pytest and ruff verification.
+  `tests/unit/test_signing_backend.py`.
+- [x] (2026-08-16) Re-ran the current focused backend validation: the complete
+  `tests/unit/test_signing_backend.py` suite passes (`115 passed`), and Ruff
+  passes for the neutral backend and test paths.
 
 ## Surprises & Discoveries
 
@@ -64,14 +66,14 @@ separate fit-policy decision rather than a stamp-sizing correction.
 
 ## Context and Orientation
 
-The relevant backend lives in `src/foliaseal/application/phase3_signing_backend.py`. The two key
+The relevant backend lives in `src/foliaseal/application/signing_backend.py`. The two key
 helpers are `_layout_reservation_for_template()`, which splits the signature rectangle into text and
 stamp regions, and `_background_layout_for_stamp()`, which applies image-fit margins inside the
 reserved stamp region. For horizontal positions, the code currently reserves text width based on a
 measured text box and gives the remainder to the stamp. That is likely too conservative once the
 final wrapped body footprint is considered.
 
-The regression tests live in `tests/unit/test_phase3_signing_backend.py`.
+The regression tests live in `tests/unit/test_signing_backend.py`.
 
 ## Plan of Work
 
@@ -94,14 +96,14 @@ From `/home/daekar/FoliaSeal`:
 1. Inspect the current helpers:
 
        rg -n "_layout_reservation_for_template|_background_layout_for_stamp|single_line|LEFT|RIGHT" \
-         src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py
+         src/foliaseal/application/signing_backend.py tests/unit/test_signing_backend.py
 
-2. Implement the backend fit change in `src/foliaseal/application/phase3_signing_backend.py`.
-3. Add or update focused tests in `tests/unit/test_phase3_signing_backend.py`.
+2. Implement the backend fit change in `src/foliaseal/application/signing_backend.py`.
+3. Add or update focused tests in `tests/unit/test_signing_backend.py`.
 4. Run:
 
-       ./.venv/bin/python -m pytest -q tests/unit/test_phase3_signing_backend.py
-       ./.venv/bin/ruff check src/foliaseal/application/phase3_signing_backend.py tests/unit/test_phase3_signing_backend.py
+       ./.venv/bin/python -m pytest -q tests/unit/test_signing_backend.py
+       ./.venv/bin/ruff check src/foliaseal/application/signing_backend.py tests/unit/test_signing_backend.py
 
 ## Validation and Acceptance
 
@@ -123,8 +125,8 @@ output, revert that local edit and keep this plan updated rather than broadening
 
 ## Interfaces and Dependencies
 
-Keep the implementation inside `src/foliaseal/application/phase3_signing_backend.py` and
-`tests/unit/test_phase3_signing_backend.py`. Do not introduce new runtime dependencies.
+Keep the implementation inside `src/foliaseal/application/signing_backend.py` and
+`tests/unit/test_signing_backend.py`. Do not introduce new runtime dependencies.
 
 Update note: created on 2026-04-01 after the latest harness run showed that the remaining backend
 issue has narrowed to horizontal `single_line` stamp sizing.

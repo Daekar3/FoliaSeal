@@ -115,6 +115,10 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-16) Completed the bounded compatibility-retirement audit. Removed only the
   consumerless `LayoutRequest` and private fit-validation aliases; AppFrame dialog/test seams and
   Acceptance evidence contracts remain because current consumers still exercise them.
+- [x] (2026-08-16) Reconciled the active-plan corpus through
+  `release_readiness_reconciliation_execplan.md`; stale completion markers were corrected, while
+  display-backed accessibility, physical DPI/monitor, packaged GUI, privileged installation, and
+  final human release acceptance remain open.
 - [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
   cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager

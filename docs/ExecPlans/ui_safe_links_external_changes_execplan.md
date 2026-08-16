@@ -16,7 +16,9 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
 - [x] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md supplies the dirty-draft and
   candidate replacement lifecycle; source-change recovery is implemented in the child listed below.
-- [ ] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md
+- [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md — the current
+  viewer navigation/fit contract is implemented and recorded in the parent
+  ledger; this former unchecked marker was stale publication state.
 - [x] docs/ExecPlans/ui_safe_links_source_safety_contracts_execplan.md provides pure link and
   source-change decisions; renderer/workspace integration remains open.
 - [x] docs/ExecPlans/ui_safe_links_contract_hardening_execplan.md closes the contract-level
@@ -78,6 +80,11 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   returns no matches. AppFrame dialog-exposure properties and certificate dialog compatibility
   fields remain intentional owner-specific surfaces; broader safe-links release acceptance remains
   open.
+- [x] (2026-08-16) Reconciled the stale navigation dependency against the
+  current parent ledger and neutral viewer/session paths. Focused safe-links,
+  document-safety, viewer, AppFrame, and QtPdf validation passes through the
+  current reconciliation slice; only release/HITL evidence and any proven
+  compatibility cleanup remain open.
 - [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean processes and artifacts.
 - [x] (2026-08-10) Update this plan and relevant docs; the complete source-recovery slice is committed
   in `0d5116084`.

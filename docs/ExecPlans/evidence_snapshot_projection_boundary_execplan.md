@@ -114,4 +114,8 @@ projections and restore only the smallest adapter until parity is proven.
   `.55`; no component regression exceeded `-.10` and no critical/major finding remains.
 - [x] (2026-08-06) Committed as `4916fa839` (`Centralize evidence snapshot projection`); the
   post-commit worktree is clean.
-- [ ] Fresh post-commit scan and final parent ledger closure.
+- [x] (2026-08-16) Fresh post-commit scan confirms the projection module is
+  imported by the harness/reporting consumers and its boundary tests remain
+  current. Focused projection/harness/reporting validation passes (`82 passed,
+  9 skipped, 1 warning`); final parent/release status is reconciled by
+  `release_readiness_reconciliation_execplan.md`.

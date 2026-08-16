@@ -30,12 +30,17 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   effects, modeless ownership, bridge routing, and close/replacement cleanup.
 - [x] (2026-08-10) Implement the smallest complete model/application/Qt path: a modeless Document
   Signatures window, a View command, typed selection/jump/highlight, and integrity-first details.
-- [ ] Retire migrated compatibility or acceptance product cruft only where this slice proves its callers
-  are gone; do not rename unrelated evidence infrastructure.
+- [x] (2026-08-16) Compatibility/acceptance audit found no remaining
+  document-review-specific consumerless seam. The prior review-surface
+  implementation is committed in `9a064669b`; unrelated evidence contracts
+  remain unchanged.
 - [x] (2026-08-10) Run focused, regression, and real offscreen Qt validation; clean processes and
   artifacts.
 - [x] (2026-08-10) Update this plan and architecture/status documentation and complete the compliance
   review. Commit is the final handoff gate for this slice.
+- [x] (2026-08-16) Reconciled the stale publication marker against current
+  review/application/Qt tests; no richer V2 browser or certificate-path
+  surface is claimed by this child.
 
 ## Surprises & Discoveries
 

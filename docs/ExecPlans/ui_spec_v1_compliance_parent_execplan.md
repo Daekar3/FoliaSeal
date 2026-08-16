@@ -209,10 +209,13 @@ Release tranche:
 - [x] docs/ExecPlans/ui_accessibility_acceptance_execplan.md — focused real-Qt/offscreen
   accessibility acceptance is implemented and validated; display-backed screen-reader,
   high-contrast, DPI/monitor, package-install, and final release gates remain open.
+- [x] docs/ExecPlans/release_readiness_reconciliation_execplan.md — active-plan status
+  reconciliation verifies completed behavior and preserves genuine release/HITL gates.
 
 ## Progress
 
-- [ ] (2026-08-09) Confirm the frozen SPEC/UI_SPEC baseline and current implementation map.
+- [x] (2026-08-16) Reconfirmed the frozen SPEC/UI_SPEC/SCHEMAS baseline and current
+  implementation map during the release-readiness reconciliation audit.
 - [x] (2026-08-09) Created and structurally reviewed the original 29 child ExecPlans in dependency order.
 - [x] (2026-08-10) Added the focused Help child after a fresh audit found the broad release plan too
   coarse for one restartable implementation slice.
