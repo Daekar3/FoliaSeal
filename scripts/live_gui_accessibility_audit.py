@@ -114,6 +114,37 @@ def _activate_window(window_id: int) -> bool:
     return result.returncode == 0
 
 
+def _probe_atspi(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]:
+    """Run the optional host-Python AT-SPI probe for this exact audit process."""
+
+    try:
+        result = subprocess.run(
+            [
+                "/usr/bin/python3",
+                str(Path(__file__).with_name("x11_atspi_probe.py")),
+                "--pid",
+                str(pid),
+                "--title",
+                title,
+                "--timeout-seconds",
+                str(max(0.1, timeout_seconds)),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=max(1.0, timeout_seconds + 1.0),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"status": "unavailable", "reason": f"probe process: {type(exc).__name__}: {exc}"}
+    try:
+        payload = json.loads(result.stdout)
+    except (TypeError, ValueError) as exc:
+        return {"status": "unavailable", "reason": f"probe output: {type(exc).__name__}: {exc}"}
+    if not isinstance(payload, dict):
+        return {"status": "unavailable", "reason": "probe output was not a JSON object"}
+    return payload
+
+
 def _window_is_present(title: str) -> bool:
     windows = _run_context(["wmctrl", "-l"]) or ""
     return any(title in line for line in windows.splitlines())
@@ -284,7 +315,12 @@ def _help_command_id() -> Any:
     return AppFrameCommandId.HELP
 
 
-def run_audit(artifacts_dir: Path, timeout_seconds: float, capture_screenshot: bool) -> int:
+def run_audit(
+    artifacts_dir: Path,
+    timeout_seconds: float,
+    capture_screenshot: bool,
+    probe_atspi: bool,
+) -> int:
     report: dict[str, Any] = {
         "status": "failed",
         "display": os.environ.get("DISPLAY"),
@@ -372,6 +408,10 @@ def run_audit(artifacts_dir: Path, timeout_seconds: float, capture_screenshot: b
                         ),
                         "close_accessible_name": frame.help_viewer.close_button.accessibleName(),
                     }
+                    if probe_atspi:
+                        report["atspi"] = _probe_atspi(
+                            os.getpid(), AUDIT_WINDOW_TITLE, min(2.0, timeout_seconds / 4)
+                        )
                     report["status"] = "passed"
                     exit_code = 0
                 except Exception as exc:  # pragma: no cover - display environment dependent
@@ -420,8 +460,18 @@ def main() -> int:
         action="store_true",
         help="Capture the audit-owned X11 frame as frame.png and record display geometry.",
     )
+    parser.add_argument(
+        "--probe-atspi",
+        action="store_true",
+        help="Inspect the audit-owned window through host Python AT-SPI (read-only, optional).",
+    )
     args = parser.parse_args()
-    return run_audit(args.artifacts_dir, args.timeout_seconds, args.capture_screenshot)
+    return run_audit(
+        args.artifacts_dir,
+        args.timeout_seconds,
+        args.capture_screenshot,
+        args.probe_atspi,
+    )
 
 
 if __name__ == "__main__":

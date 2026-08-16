@@ -47,6 +47,10 @@ installation, or Wayland support.
 - [x] (2026-08-16) Addressed review findings by requiring successful exact WM
   activation before XTest input, adding the runner deadline, and making the
   report fail if an owned window, child process, or temporary root remains.
+- [x] (2026-08-16) The optional host-Python AT-SPI probe classified the current
+  session as unavailable because the session bus lacks
+  `org.a11y.atspi.Registry`; native F1, semantic Qt evidence, and cleanup still
+  pass. This does not claim an accessible-tree or screen-reader result.
 - [x] (2026-08-16) Reconciled the accessibility/release/parent plans and obtained
   independent architecture/documentation review; the focused slice is committed
   as `746025bcb` (`test: audit X11 accessibility input path`).

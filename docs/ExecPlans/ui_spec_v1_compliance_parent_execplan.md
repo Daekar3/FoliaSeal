@@ -657,6 +657,11 @@ Release tranche:
   and per-signature review guidance (`8cddd7546`, `4cb84e52a`, `5d05e71b5`)
   are complete. Historical plans remain historical; external release gates
   remain open or deferred.
+- [x] (2026-08-16) Exercised the optional host AT-SPI probe on Cinnamon/X11.
+  The bounded report classified the registry as unavailable because
+  `org.a11y.atspi.Registry` is absent from the session bus; native F1, semantic
+  Qt evidence, and cleanup remained green. Human screen-reader and visual
+  acceptance remain open, and Wayland remains deferred.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

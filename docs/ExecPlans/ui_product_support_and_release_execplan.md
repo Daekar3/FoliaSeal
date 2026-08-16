@@ -145,6 +145,10 @@ Qt surface, focused tests, and observable acceptance.
   current implementation commits and focused evidence. No new AFK product
   implementation gap was found; the remaining unchecked release items are
   human/display, privileged-host, or final-release gates.
+- [x] (2026-08-16) Exercised the optional X11 AT-SPI evidence boundary. The
+  host probe safely reported `unavailable` because the session bus lacks
+  `org.a11y.atspi.Registry`; the source-tree native-X11 and cleanup evidence
+  remained green. No screen-reader speech or visual acceptance claim was made.
 - [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
   cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager

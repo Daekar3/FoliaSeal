@@ -148,6 +148,11 @@ owned-window, process, and temporary-root cleanup. This remains concrete X11
 evidence, not human screen-reader, contrast, physical-DPI, monitor-move,
 packaged, or final release approval; Wayland is deferred for Mint 22.3.
 
+The optional host-Python AT-SPI probe was also exercised against the owned
+window. It returned a bounded `unavailable` classification because the session
+bus does not advertise `org.a11y.atspi.Registry`; native F1 and teardown still
+passed. This is an environment limitation, not screen-reader speech evidence.
+
 ## Context and Orientation
 
 `src/foliaseal/presentation/qt/app_frame.py` constructs the real `QMainWindow`, typed menu actions,
