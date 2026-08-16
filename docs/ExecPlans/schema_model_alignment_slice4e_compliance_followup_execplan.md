@@ -17,7 +17,10 @@ After the Slice 4E compliance review, two issues need a narrow follow-up: stale 
 - [x] (2026-05-08 00:20Z) Created this compliance follow-up plan.
 - [x] (2026-05-08 00:23Z) Corrected stale architecture/parent-plan wording.
 - [x] (2026-05-08 00:24Z) Strengthened app-frame settings propagation test coverage.
-- [ ] Run focused validation and commit the follow-up.
+- [x] (2026-08-16) Re-ran the focused settings/frame/shell validation: `183 passed` across
+  `test_qt_app_frame.py`, `test_qt_signing_shell.py`, and `test_app_settings_storage.py`; Ruff,
+  compile, and `git diff --check` passed. The follow-up documentation and test change is now
+  committed.
 
 ## Surprises & Discoveries
 
@@ -35,9 +38,12 @@ After the Slice 4E compliance review, two issues need a narrow follow-up: stale 
 
 ## Outcomes & Retrospective
 
-At creation, this follow-up is expected to be small and compliance-only.
+At creation, this follow-up was expected to be small and compliance-only.
 
-The follow-up corrected the stale docs and expanded the propagation test to assert that the saved output directory reaches the loaded shell workspace path that controls future output-dialog defaults.
+The follow-up corrected the stale docs and expanded the propagation test to assert that the saved
+output directory reaches the loaded shell workspace path that controls future output-dialog
+defaults. Current focused validation passes and the follow-up is committed; no additional Slice 4E
+implementation work remains.
 
 ## Context and Orientation
 
