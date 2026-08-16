@@ -21,8 +21,8 @@ No source, test, schema, GUI behavior, lifecycle, or compatibility-surface chang
   orchestration and `app_frame.py` is only the Settings-routing edge.
 - [x] (2026-08-16) Existing focused tests, Ruff, architecture reconciliation, and compliance
   review evidence cover the implemented extraction; no display/HITL dependency remains.
-- [ ] (2026-08-16) The stale commit marker is ready for the focused documentation commit after
-  rerunning the affected tests and cleanup audit.
+- [x] (2026-08-16) Commit `9d13b01d5` closed the stale marker after rerunning the affected tests,
+  architecture/compliance review, and cleanup audit.
 
 ## Validation and acceptance
 
