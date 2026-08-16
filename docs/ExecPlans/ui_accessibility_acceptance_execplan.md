@@ -73,6 +73,12 @@ as environment-dependent rather than being falsely claimed by headless tests.
   AT-SPI probe remained `unavailable` because the session bus does not advertise
   `org.a11y.atspi.Registry`; this is machine evidence only and does not close human speech,
   contrast, physical-DPI, or final-release gates. The exact screenshot/report root was removed.
+- [x] (2026-08-16) Re-ran the owned X11 audit and inspected its exact Qt frame. Mint-Y-Dark,
+  1100x700 geometry, two 1920x1080 monitors, native F1/Help, named controls, and teardown all
+  passed; the screenshot showed no clipping in the menu, no-document message, Open, or Library
+  controls. AT-SPI again reported `unavailable` because `org.a11y.atspi.Registry` is absent from
+  the session bus. This strengthens supported-X11 machine evidence only and does not claim human
+  screen-reader speech, high contrast, physical-DPI interpretation, or final acceptance.
 
 ## Surprises & Discoveries
 

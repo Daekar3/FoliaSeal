@@ -247,6 +247,13 @@ Qt surface, focused tests, and observable acceptance.
   extraction/process teardown. This refreshes packaged-X11 startup evidence only; it does not
   close human accessibility, privileged host installation, final release acceptance, or deferred
   Mint 22.3 Wayland.
+- [x] (2026-08-16) Re-ran the owned source-tree X11 accessibility audit with screenshot capture and
+  inspected the Qt-owned frame. Native F1/Help, named controls, 1100x700 geometry, two-monitor
+  metadata, and teardown passed; AT-SPI remained unavailable because the session bus lacks
+  `org.a11y.atspi.Registry`. This is supported-X11 machine evidence only, not human speech,
+  high-contrast, physical-DPI, or final-release acceptance. A privileged `sudo dpkg -i` attempt was
+  not made because escalation for host package-database mutation was not authorized; that gate
+  remains explicitly HITL.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor

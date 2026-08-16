@@ -744,6 +744,12 @@ Release tranche:
   GUI startup all passed (`display_backed=true`, `qt_platform=xcb`, `gui_startup.status=started`);
   the owned package root and child process were removed. This does not close human accessibility,
   privileged host installation, final release signoff, or deferred Mint 22.3 Wayland.
+- [x] (2026-08-16) Re-ran and inspected the supported source-tree X11 accessibility frame. Native
+  F1/Help, named controls, two-monitor geometry, and cleanup passed; AT-SPI remained unavailable
+  because the session bus lacks `org.a11y.atspi.Registry`. The privileged host-install gate was
+  not attempted without explicit escalation authorization. These results strengthen machine/X11
+  evidence but do not close human accessibility, privileged installation, final signoff, or the
+  deferred Mint 22.3 Wayland gate.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
