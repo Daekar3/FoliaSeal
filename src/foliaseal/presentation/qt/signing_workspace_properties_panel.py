@@ -44,7 +44,6 @@ from foliaseal.presentation.qt.signature_preview_lifecycle import (
     QtCanonicalPreviewLifecycle,
 )
 from foliaseal.presentation.qt.signing_workspace_refinement_dialog import (
-    RefinementDialogState,
     SignatureRefinementDialog,
 )
 from foliaseal.presentation.qt.visible_signature_setup_form import (
@@ -456,7 +455,6 @@ class SignaturePropertiesPanel:
         self._refinement_controls = self._build_refinement_controls()
         self.preview_controls = self._preview_controls
         self._validation_text = ""
-        self._active_refinement_dialog: Any | None = None
 
         self._layout.addWidget(self._signature_preset_controls.container)
         self._layout.addWidget(self._certificate_controls.container)
@@ -930,7 +928,6 @@ class SignaturePropertiesPanel:
             certificate_configuration_id_getter=lambda: (
                 self._coordinator.workflow.selected_certificate_configuration_id
             ),
-            active_state_changed=self._set_active_refinement_dialog,
         )
         result = dialog.open(state.visible_signature_setup_draft)
         if not result.accepted or result.draft is None:
@@ -942,12 +939,6 @@ class SignaturePropertiesPanel:
         self._apply_coordinator_state(applied_state)
         self._notify_change()
         return True
-
-    def _set_active_refinement_dialog(
-        self,
-        state: RefinementDialogState | None,
-    ) -> None:
-        self._active_refinement_dialog = state
 
     @property
     def app_settings(self) -> AppSettings:

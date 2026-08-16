@@ -88,7 +88,10 @@ Document-flow tranche:
 - [x] docs/ExecPlans/ui_document_signatures_review_execplan.md — bounded signature projection and
   modeless review surface are committed; the bounded later-approval permission gate is now covered
   by the verification-recovery child, while broader reopen/display policy remains open.
-- [ ] docs/ExecPlans/ui_safe_links_external_changes_execplan.md
+- [x] docs/ExecPlans/ui_safe_links_external_changes_execplan.md — internal Pan-only navigation/history,
+  cancel-default external-link confirmation, draft-preserving source-change recovery, and the
+  migrated refinement-dialog test-backdoor cleanup are implemented and validated; display-backed
+  and final release acceptance remain open.
 - [x] docs/ExecPlans/ui_pdf_link_inspection_execplan.md — neutral QtPdf link extraction and
   PDF-space rectangle normalization are implemented; activation and reload remain with safe-links.
 - [x] docs/ExecPlans/ui_safe_links_source_safety_contracts_execplan.md — pure destination safety
@@ -544,8 +547,11 @@ Release tranche:
   separate plan.
 - [x] (2026-08-10) Current source-recovery closeout reconciles the downstream safe-links/lifecycle
   records: Reload/Ignore and Locate/Close are implemented, authored state and session secrets survive
-  validated replacement, and the remaining safe-links parent work is limited to explicit compatibility
-  cleanup and final release acceptance rather than missing recovery behavior.
+  validated replacement, and the remaining safe-links parent work is limited to final release
+  acceptance rather than missing recovery behavior. The 2026-08-16 refinement-dialog cleanup closed
+  the downstream private-panel bridge: its focused proof is `5 passed, 105 deselected`, with no
+  `_active_refinement_dialog` or `_set_active_refinement_dialog` match under `src` or the affected
+  refinement test. AppFrame and certificate compatibility surfaces remain with their owning plans.
 - [x] (2026-08-10) Added the signing transaction-progress increment: the real Qt composition now
   runs the injected executor on an owned worker, polls terminal completion on the Qt thread, shows
   truthful delayed stage/long-running copy without percentages or cancellation, and joins workers

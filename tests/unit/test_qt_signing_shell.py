@@ -49,6 +49,7 @@ from foliaseal.infra.render import PdfPageGeometry, RenderPageRequest, RenderPag
 from foliaseal.presentation.qt import build_qt_signing_shell as _build_qt_signing_shell
 from foliaseal.presentation.qt import signature_preview_lifecycle as preview_lifecycle_module
 from foliaseal.presentation.qt import signing_shell as signing_shell_module
+from foliaseal.presentation.qt import signing_workspace_properties_panel as properties_panel_module
 from foliaseal.presentation.qt.signing_shell import QtSigningWidgetBindings
 from foliaseal.presentation.qt.signing_workspace_properties_panel import (
     SIGNATURE_PRESET_PLACEHOLDER,
@@ -79,6 +80,23 @@ class _FakeSecretProvider:
 
     def get_secret(self, secret_ref: str) -> str | None:
         return self._secrets.get(secret_ref)
+
+
+def _observe_refinement_dialog(monkeypatch, state_holder: dict[str, object]) -> None:
+    """Inject the dialog's explicit observer without reaching through the panel."""
+
+    class _ObservedRefinementDialog(properties_panel_module.SignatureRefinementDialog):
+        def __init__(self, *args, **kwargs):
+            kwargs["active_state_changed"] = lambda state: state_holder.__setitem__(
+                "value", state
+            )
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(
+        properties_panel_module,
+        "SignatureRefinementDialog",
+        _ObservedRefinementDialog,
+    )
 
 
 def build_qt_signing_shell(**kwargs):
@@ -2957,10 +2975,11 @@ def test_signing_shell_refinement_dialog_applies_current_pdf_setup(
         lambda **kwargs: _FakeViewerWidget(**kwargs),
     )
     bindings = _fake_bindings()
+    state_holder: dict[str, object] = {"value": None}
+    _observe_refinement_dialog(monkeypatch, state_holder)
 
     def _accept_with_changes(dialog):
-        panel = widget.properties_panel
-        active = panel._active_refinement_dialog
+        active = state_holder["value"]
         assert active is not None
         active.setup_form.appearance_controls.signer_label_prefix.setText("Reviewed by")
         active.setup_form.placement_controls.page_spin.setValue(2)
@@ -2983,7 +3002,7 @@ def test_signing_shell_refinement_dialog_applies_current_pdf_setup(
     applied = widget.properties_panel.open_refinement_dialog()
 
     assert applied is True
-    assert widget.properties_panel._active_refinement_dialog is None
+    assert state_holder["value"] is None
     assert widget.properties_panel._appearance_controls.signer_label_prefix.text() == "Reviewed by"
     assert widget.properties_panel._placement_controls.page_spin.value() == 2
     assert widget.properties_panel._placement_controls.width_spin.value() == 144.0
@@ -3000,10 +3019,11 @@ def test_signing_shell_refinement_dialog_cancel_keeps_current_state(
         lambda **kwargs: _FakeViewerWidget(**kwargs),
     )
     bindings = _fake_bindings()
+    state_holder: dict[str, object] = {"value": None}
+    _observe_refinement_dialog(monkeypatch, state_holder)
 
     def _cancel(dialog):
-        panel = widget.properties_panel
-        active = panel._active_refinement_dialog
+        active = state_holder["value"]
         assert active is not None
         active.setup_form.appearance_controls.signer_label_prefix.setText("Should not apply")
         active.cancel_button.click()
@@ -3024,7 +3044,7 @@ def test_signing_shell_refinement_dialog_cancel_keeps_current_state(
     applied = widget.properties_panel.open_refinement_dialog()
 
     assert applied is False
-    assert widget.properties_panel._active_refinement_dialog is None
+    assert state_holder["value"] is None
     assert (
         widget.properties_panel._appearance_controls.signer_label_prefix.text() == original_prefix
     )
@@ -3041,14 +3061,15 @@ def test_signing_shell_refinement_dialog_saves_appearance_without_applying_draft
     )
     bindings = _fake_bindings()
     bindings.q_input_dialog.next_text = "Contract approval"
+    state_holder: dict[str, object] = {"value": None}
+    _observe_refinement_dialog(monkeypatch, state_holder)
 
     def _save_then_cancel(dialog):
-        panel = widget.properties_panel
-        active = panel._active_refinement_dialog
+        active = state_holder["value"]
         assert active is not None
         active.setup_form.appearance_controls.signer_label_prefix.setText("Reviewed by")
         active.save_appearance_button.click()
-        assert panel._active_refinement_dialog is active
+        assert state_holder["value"] is active
         active.cancel_button.click()
 
     _FakeDialog.next_on_exec = _save_then_cancel
@@ -3094,11 +3115,12 @@ def test_signing_shell_refinement_dialog_saves_placement_profile_without_applyin
     )
     bindings = _fake_bindings()
     bindings.q_input_dialog.next_text = "Bottom right"
+    state_holder: dict[str, object] = {"value": None}
+    _observe_refinement_dialog(monkeypatch, state_holder)
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
 
     def _save_then_cancel(dialog):
-        panel = widget.properties_panel
-        active = panel._active_refinement_dialog
+        active = state_holder["value"]
         assert active is not None
         active.setup_form.set_placement_enabled(True)
         active.setup_form.placement_controls.left_spin.setValue(11.0)
@@ -3106,7 +3128,7 @@ def test_signing_shell_refinement_dialog_saves_placement_profile_without_applyin
         active.setup_form.placement_controls.width_spin.setValue(130.0)
         active.setup_form.placement_controls.height_spin.setValue(44.0)
         active.save_placement_button.click()
-        assert panel._active_refinement_dialog is active
+        assert state_holder["value"] is active
         active.cancel_button.click()
 
     _FakeDialog.next_on_exec = _save_then_cancel
@@ -3166,6 +3188,8 @@ def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
     )
     bindings = _fake_bindings()
     bindings.q_input_dialog.next_text = "Contract signing"
+    state_holder: dict[str, object] = {"value": None}
+    _observe_refinement_dialog(monkeypatch, state_holder)
     store = SignaturePresetCatalogStore(storage_dir=tmp_path / PROFILE_DIRECTORY_NAME)
     appearance = build_signature_appearance()
     objects = ReusableSigningObjects(store)
@@ -3185,7 +3209,7 @@ def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
     )
 
     def _save_then_cancel(dialog):
-        active = widget.properties_panel._active_refinement_dialog
+        active = state_holder["value"]
         assert active is not None
         assert active.appearance_profile_combo._items == ["Approval appearance"]
         assert active.placement_profile_combo._items == [

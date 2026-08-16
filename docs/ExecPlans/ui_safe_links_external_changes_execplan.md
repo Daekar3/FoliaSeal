@@ -70,7 +70,14 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 
 - [x] (2026-08-09) Audit current behavior and add a failing focused test.
 - [x] (2026-08-09) Implement the smallest complete model/application/Qt path.
-- [ ] (2026-08-09) Retire migrated compatibility or acceptance product cruft whose consumers are gone.
+- [x] (2026-08-16) Retire the migrated refinement-dialog test backdoor whose consumers were gone.
+  `SignaturePropertiesPanel` no longer stores `_active_refinement_dialog` or exposes its setter;
+  the five refinement tests observe the existing typed dialog callback through a test-local dialog
+  subclass. The focused proof is `5 passed, 105 deselected`, and
+  `rg -n '_active_refinement_dialog|_set_active_refinement_dialog' src tests/unit/test_qt_signing_shell.py`
+  returns no matches. AppFrame dialog-exposure properties and certificate dialog compatibility
+  fields remain intentional owner-specific surfaces; broader safe-links release acceptance remains
+  open.
 - [x] (2026-08-10) Run focused, regression, and bounded GUI validation; clean processes and artifacts.
 - [x] (2026-08-10) Update this plan and relevant docs; the complete source-recovery slice is committed
   in `0d5116084`.
@@ -96,9 +103,10 @@ The safe-links behavior is complete through internal Pan-only navigation/history
 classification, cancel-default external confirmation/launch, and draft-preserving source-change
 recovery. The source-recovery child records `89` focused passes and the current full-suite result of
 `1465 passed, 20 skipped, 1 warning`, with a bounded GUI launch limited by the isolated
-`SingleInstanceUnavailable` endpoint and clean process/temp teardown. This parent remains open only
-for its explicit migrated compatibility/acceptance cleanup requirement and final parent-level release
-reconciliation; no source-recovery behavior is deferred.
+`SingleInstanceUnavailable` endpoint and clean process/temp teardown. The migrated refinement-dialog
+compatibility cleanup is now closed: the focused proof is `5 passed, 105 deselected` and the private
+bridge grep is empty. This parent remains open for broader release reconciliation/acceptance; no
+source-recovery behavior is deferred.
 
 ## Context and Orientation
 
