@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from foliaseal.application.signing_transaction_recovery import SigningRecoveryCandidate
+from foliaseal.application.signing_transaction_recovery import (
+    RecoveryAction,
+    SigningRecoveryCandidate,
+    SigningRecoveryResolution,
+)
 from foliaseal.domain.models import SigningRequest, SigningResult, VerificationSummary
 
 
@@ -46,6 +50,34 @@ class LazySigningRequestExecutor:
             self._delegate = self.factory()
         recover = getattr(self._delegate, "verified_recovery_candidates", None)
         return () if not callable(recover) else tuple(recover())
+
+    def resolve_recovery_candidate(
+        self,
+        candidate: SigningRecoveryCandidate,
+        action: RecoveryAction,
+        *,
+        destination_path: str | None = None,
+        replace_authorized: bool = False,
+        overwrite_authorized: bool = False,
+    ) -> SigningRecoveryResolution:
+        """Resolve one verified candidate through the concrete executor."""
+
+        if self._delegate is None:
+            self._delegate = self.factory()
+        resolve = getattr(self._delegate, "resolve_recovery_candidate", None)
+        if not callable(resolve):
+            return SigningRecoveryResolution(
+                action=action,
+                success=False,
+                error="Signing recovery is unavailable in this executor.",
+            )
+        return resolve(
+            candidate,
+            action,
+            destination_path=destination_path,
+            replace_authorized=replace_authorized,
+            overwrite_authorized=overwrite_authorized,
+        )
 
 
 def build_default_signing_executor() -> LazySigningRequestExecutor:

@@ -16,7 +16,10 @@ from foliaseal.application.pdf_compatibility import (
 )
 from foliaseal.application.preview_render_boundary import PreviewRasterRenderer
 from foliaseal.application.signing_transaction_recovery import (
+    RecoveryAction,
     SigningRecoveryCandidate,
+    SigningRecoveryResolution,
+    SigningRecoveryResolutionPort,
     SigningTransactionJournal,
     SigningTransactionRecord,
 )
@@ -217,6 +220,7 @@ class SignPdfUseCase:
     compatibility_profile: PdfCompatibilityProfile = PdfCompatibilityProfile()
     preview_render_port: PreviewRasterRenderer | None = None
     transaction_journal: SigningTransactionJournal | None = None
+    recovery_resolver: SigningRecoveryResolutionPort | None = None
 
     def verify_preserved_artifact(
         self,
@@ -249,6 +253,31 @@ class SignPdfUseCase:
             # is unavailable (for example, a read-only sandbox).  Signing must
             # retain its normal failure semantics in that environment.
             return ()
+
+    def resolve_recovery_candidate(
+        self,
+        candidate: SigningRecoveryCandidate,
+        action: RecoveryAction,
+        *,
+        destination_path: str | None = None,
+        replace_authorized: bool = False,
+        overwrite_authorized: bool = False,
+    ) -> SigningRecoveryResolution:
+        """Resolve a verified restart candidate through the injected filesystem boundary."""
+
+        if self.recovery_resolver is None:
+            return SigningRecoveryResolution(
+                action=action,
+                success=False,
+                error="Signing recovery is unavailable in this executor.",
+            )
+        return self.recovery_resolver.resolve(
+            candidate,
+            action,
+            destination_path=destination_path,
+            replace_authorized=replace_authorized,
+            overwrite_authorized=overwrite_authorized,
+        )
 
     def execute(self, request: SigningRequest) -> SigningResult:
         """Execute the headless signing pipeline."""

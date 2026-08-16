@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 TransactionState = Literal["started", "staged", "preserved", "committing"]
+RecoveryAction = Literal["open", "copy", "replace", "discard"]
 _JOURNAL_FIELDS = frozenset(
     {
         "version",
@@ -174,6 +175,31 @@ class SigningRecoveryCandidate:
         return Path(self.record.output_pdf_path)
 
 
+@dataclass(frozen=True)
+class SigningRecoveryResolution:
+    """Typed result returned after resolving one verified recovery candidate."""
+
+    action: RecoveryAction
+    success: bool
+    artifact_path: str | None = None
+    destination_path: str | None = None
+    error: str | None = None
+
+
+class SigningRecoveryResolutionPort(Protocol):
+    """Resolve one already-verified candidate without exposing storage policy to Qt."""
+
+    def resolve(
+        self,
+        candidate: SigningRecoveryCandidate,
+        action: RecoveryAction,
+        *,
+        destination_path: str | None = None,
+        replace_authorized: bool = False,
+        overwrite_authorized: bool = False,
+    ) -> SigningRecoveryResolution: ...
+
+
 def is_owned_staged_artifact(record: SigningTransactionRecord, artifact_path: Path) -> bool:
     """Return whether an artifact has the exact sibling shape created by atomic staging."""
 
@@ -189,6 +215,19 @@ def is_owned_staged_artifact(record: SigningTransactionRecord, artifact_path: Pa
     if staged != expected or staged.parent != output.parent:
         return False
     return staged.name.startswith(f".{output.name}.") and staged.name.endswith(".tmp")
+
+
+def is_current_recovery_artifact(record: SigningTransactionRecord, artifact_path: Path) -> bool:
+    """Return whether an owned artifact still matches its journaled digest."""
+
+    if not is_owned_staged_artifact(record, artifact_path):
+        return False
+    if record.staged_sha256 is None:
+        return False
+    try:
+        return sha256(artifact_path.read_bytes()).hexdigest() == record.staged_sha256
+    except OSError:
+        return False
 
 
 class SigningTransactionJournal(Protocol):

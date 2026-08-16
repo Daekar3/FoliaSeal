@@ -174,6 +174,41 @@ def test_use_case_leaves_preserved_artifact_journal_for_restart_recovery(tmp_pat
     assert tuple((tmp_path / "journal").glob("*.json"))
 
 
+def test_use_case_discovers_verified_restart_candidate_through_production_path(
+    tmp_path: Path,
+) -> None:
+    from foliaseal.infra.config.signing_transaction_journal import FileSigningTransactionJournal
+
+    journal = FileSigningTransactionJournal(tmp_path / "journal")
+    record = SigningTransactionRecord.new(
+        transaction_id="transaction-1",
+        input_pdf_path=str(tmp_path / "input.pdf"),
+        output_pdf_path=str(tmp_path / "signed.pdf"),
+    )
+    artifact = tmp_path / ".signed.pdf.transaction.tmp"
+    artifact.write_bytes(b"signed")
+    journal.begin(record)
+    journal.mark_staged(record.transaction_id, str(artifact))
+    use_case = SignPdfUseCase(
+        inspector=_Inspector(),
+        certificate_loader=_Loader(),
+        signer=_Signer(),
+        verifier=_Verifier(
+            VerificationSummary(
+                signature_count=1,
+                timestamp_present=False,
+                signatures_cryptographically_valid=True,
+            )
+        ),
+        transaction_journal=journal,
+    )
+
+    candidates = use_case.verified_recovery_candidates()
+
+    assert len(candidates) == 1
+    assert candidates[0].artifact_path == artifact
+
+
 @pytest.mark.parametrize("operation", ["begin", "mark_staged", "mark_committing", "complete"])
 def test_journal_write_failures_fail_closed(tmp_path: Path, operation: str) -> None:
     request = build_signing_request(tmp_path)

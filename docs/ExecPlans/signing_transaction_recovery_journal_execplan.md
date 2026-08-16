@@ -26,9 +26,8 @@ only the journal and artifact proven to belong to that transaction.
   prepare/write/verify transaction boundary and owned temporary-output cleanup.
 - [x] `docs/ExecPlans/ui_verification_recovery_reopen_execplan.md` provides the in-process
   preserved-artifact verification and untrusted-reopen semantics.
-- [ ] A later GUI child must connect verified candidates to explicit Open, Save copy as, Replace,
-  and Discard recovery actions; this slice exposes the typed candidate API without inventing a
-  display-only claim.
+- [x] `docs/ExecPlans/signing_transaction_recovery_gui_execplan.md` connects verified candidates to
+  explicit Open, Save copy as, Replace, and Discard actions; display-backed HITL remains open.
 
 ## Progress
 
@@ -47,7 +46,8 @@ only the journal and artifact proven to belong to that transaction.
   verification gating, resolution cleanup, and idempotent restart scans.
 - [x] (2026-08-16) Ran focused/full validation and reconciled architecture/parent/child plans;
   no generated journals or staged PDFs were retained. Full validation is `1519 passed, 20 skipped,
-  1 warning`; display-backed and privileged gates remain open.
+  1 warning`; display-backed and privileged gates remain open. The subsequent GUI recovery child
+  raises the current full-suite evidence to `1535 passed, 20 skipped, 1 warning`.
 - [ ] Commit the complete slice and record the final revision.
 
 ## Surprises & Discoveries
@@ -104,9 +104,11 @@ records, ownership requires the recorded sibling shape (or the recorded output p
 in the committing crash window), and an injected verifier must positively validate the artifact.
 Malformed records, verifier exceptions, missing files, and unrelated neighboring files are ignored
 without cleanup. A post-replace crash in the `committing` state recovers the final output by digest.
-Focused journal/recovery tests and the full suite are green (`1519 passed, 20 skipped, 1 warning`),
-with `git diff --check` clean. The GUI recovery surface and its explicit Open, Save copy as, Replace,
-and Discard actions remain deferred; display-backed and privileged-host acceptance remain open.
+The follow-on GUI child now supplies the Qt-free `FileSigningTransactionRecoveryResolver` and the
+AppFrame Open, Save copy as, Replace, and Discard surface; resolution revalidates the candidate
+digest before acting. The journal foundation's focused/full evidence was `1519 passed, 20 skipped,
+1 warning`; the combined current suite is `1535 passed, 20 skipped, 1 warning`. Display-backed and
+privileged-host acceptance remain open.
 
 ## Context and Orientation
 

@@ -2665,10 +2665,14 @@ def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_
             self.kwargs = kwargs
             self.window = _FakeMainWindow()
             self.opened_paths = []
+            self.recovery_offer_calls = 0
             type(self).instances.append(self)
 
         def open_pdf_path(self, path) -> None:
             self.opened_paths.append(path)
+
+        def offer_startup_recovery(self) -> None:
+            self.recovery_offer_calls += 1
 
         def handle_open_request(self, request: OpenRequest) -> None:
             if request.pdf_path is not None:
@@ -2698,6 +2702,7 @@ def test_launch_qt_app_frame_creates_application_shows_window_and_opens_initial_
     frame = _FakeLaunchFrame.instances[0]
     assert frame.window.show_calls == 1
     assert frame.opened_paths == ["/tmp/sample.pdf"]
+    assert frame.recovery_offer_calls == 1
 
 
 def test_launch_qt_app_frame_restores_before_show_and_persists_after_exec(

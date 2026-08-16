@@ -168,8 +168,13 @@ Placement, preview, and signing tranche:
   GUI Open/Save copy as/Replace/Discard surface remains open.
 - [x] docs/ExecPlans/signing_transaction_recovery_journal_execplan.md — secret-free durable
   transaction journal, fail-closed write/decode/ownership behavior, verified headless candidate
-  discovery, and post-replace digest recovery are implemented and validated; the explicit GUI
-  Open, Save copy as, Replace, and Discard actions remain open.
+  discovery, post-replace digest recovery, and the dependent GUI recovery surface are implemented
+  and validated; display-backed HITL and privileged release gates remain open.
+- [x] docs/ExecPlans/signing_transaction_recovery_gui_execplan.md — production verified candidate
+  discovery, Qt-free Open/Save copy as/Replace/Discard resolution with digest revalidation, explicit
+  replace and copy-overwrite confirmations, and startup offers after no-document and initial-PDF
+  launch are implemented and validated. Recovery-focused evidence is 31 passed and AppFrame/launch
+  evidence is 64 passed; display-backed HITL remains open.
 - [x] docs/ExecPlans/ui_atomic_sign_write_safety_execplan.md — default executor and verified staging
   are committed; confirmation/source policy is now bounded in its follow-on child, while async
   recovery and package acceptance remain open.
@@ -547,13 +552,18 @@ Release tranche:
   during disposal. Focused coverage, production-composition fake-Qt timer cleanup, and the real
   offscreen timing test are green; full regression is `1435 passed, 20 skipped, 1 warning`.
   Durable transaction journals/autosave were subsequently completed by the recovery-journal child;
-  its GUI recovery actions remain open.
+  its GUI recovery actions were subsequently completed by the dependent recovery-GUI child.
 - [x] (2026-08-16) Added durable signing-transaction recovery: a secret-free atomic JSON journal
   records begin/stage/preserve/commit transitions, fails closed when journal writes fail, and
   exposes only verifier-approved owned artifacts through the Qt-free executor API. A crash after
   final replacement is recovered by matching the recorded digest. Full validation is `1519 passed,
-  20 skipped, 1 warning`; GUI Open, Save copy as, Replace, and Discard actions plus display-backed
+  20 skipped, 1 warning`; the dependent GUI recovery surface is now complete, while display-backed
   and privileged acceptance remain open.
+- [x] (2026-08-16) Completed the signing-transaction recovery GUI slice: production verified
+  candidate discovery, Qt-free Open/Save copy as/Replace/Discard resolution with digest
+  revalidation, explicit replace/copy-overwrite confirmations, and startup offers after both
+  no-document and initial-PDF launch. Recovery-focused evidence is `31 passed`; AppFrame/launch
+  evidence is `64 passed`; the current full suite is `1535 passed, 20 skipped, 1 warning`.
 - [x] (2026-08-10) Completed the single-instance open-routing child: secondary invocations forward
   one bounded absolute-path request to the existing frame; active signing keeps the current workspace,
   replaces older pending requests with the newest basename in an AppFrame-owned condition-only status

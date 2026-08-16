@@ -41,7 +41,11 @@ from foliaseal.application.signing_draft_contracts import (
     SigningDraftValidationIssue,
     SigningDraftValidationSeverity,
 )
-from foliaseal.application.signing_transaction_recovery import SigningRecoveryCandidate
+from foliaseal.application.signing_transaction_recovery import (
+    RecoveryAction,
+    SigningRecoveryCandidate,
+    SigningRecoveryResolution,
+)
 from foliaseal.application.stamp_background import (
     stamp_background_for_path as _neutral_stamp_background_for_path,
 )
@@ -102,6 +106,9 @@ from foliaseal.domain.models import (
 )
 from foliaseal.infra.certification import inspect_pdf_certification_reader
 from foliaseal.infra.config.signing_transaction_journal import FileSigningTransactionJournal
+from foliaseal.infra.config.signing_transaction_recovery_resolver import (
+    FileSigningTransactionRecoveryResolver,
+)
 from foliaseal.infra.tsa import build_http_timestamper, build_timestamp_validation_context
 
 _PDF_VERSION_PATTERN = re.compile(rb"%PDF-(\d+\.\d+)")
@@ -421,21 +428,42 @@ class SigningExecutor:
     def verified_recovery_candidates(self) -> tuple[SigningRecoveryCandidate, ...]:
         return self.use_case.verified_recovery_candidates()
 
+    def resolve_recovery_candidate(
+        self,
+        candidate: SigningRecoveryCandidate,
+        action: RecoveryAction,
+        *,
+        destination_path: str | None = None,
+        replace_authorized: bool = False,
+        overwrite_authorized: bool = False,
+    ) -> SigningRecoveryResolution:
+        return self.use_case.resolve_recovery_candidate(
+            candidate,
+            action,
+            destination_path=destination_path,
+            replace_authorized=replace_authorized,
+            overwrite_authorized=overwrite_authorized,
+        )
+
 
 def build_signing_executor(
     *,
     timestamper_factory: Callable[[str], object] | None = None,
     render_port: PreviewRasterRenderer | None = None,
     transaction_journal: FileSigningTransactionJournal | None = None,
+    recovery_resolver: FileSigningTransactionRecoveryResolver | None = None,
 ) -> SigningExecutor:
     """Build the concrete signing executor used by the Acceptance shell."""
+    journal = transaction_journal
     use_case = SignPdfUseCase(
         inspector=PyHankoPdfInspector(),
         certificate_loader=PyHankoCertificateLoader(),
         signer=PyHankoPdfSigner(timestamper_factory=timestamper_factory),
         verifier=PyHankoSignatureVerifier(),
         preview_render_port=render_port,
-        transaction_journal=transaction_journal,
+        transaction_journal=journal,
+        recovery_resolver=recovery_resolver
+        or (FileSigningTransactionRecoveryResolver(journal) if journal is not None else None),
     )
     return SigningExecutor(use_case=use_case)
 

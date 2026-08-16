@@ -13,6 +13,7 @@ from foliaseal.application.signing_transaction_recovery import (
     SigningRecoveryCandidate,
     SigningTransactionJournalError,
     SigningTransactionRecord,
+    is_current_recovery_artifact,
     is_owned_staged_artifact,
 )
 
@@ -86,7 +87,7 @@ class FileSigningTransactionJournal:
                 artifact = SigningRecoveryCandidate(journal_path, record).artifact_path
                 if record.state not in ("staged", "preserved", "committing"):
                     continue
-                if not artifact.is_file() or not is_owned_staged_artifact(record, artifact):
+                if not artifact.is_file() or not is_current_recovery_artifact(record, artifact):
                     continue
                 if verifier(str(artifact)):
                     candidates.append(SigningRecoveryCandidate(journal_path, record))

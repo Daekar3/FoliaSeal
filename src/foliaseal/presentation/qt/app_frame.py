@@ -32,6 +32,10 @@ from foliaseal.application.signing_material_resolver import (
     CertificateSigningMaterialPort,
     RepositoryBackedCertificateSigningMaterialPort,
 )
+from foliaseal.application.signing_transaction_recovery import (
+    RecoveryAction,
+    SigningRecoveryCandidate,
+)
 from foliaseal.application.support_diagnostics import DiagnosticLogWriter, SupportLocations
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect, SigningRequest
@@ -414,6 +418,7 @@ class FoliaSealAppFrame:
         self._external_link_launcher = external_link_launcher
         self._pending_external_link: LinkDecision | None = None
         self._pending_open_request: OpenRequest | None = None
+        self._startup_recovery_candidate: SigningRecoveryCandidate | None = None
         self._signing_transaction_active = False
         self._workspace_open_port: WorkspaceOpenPort = WorkspaceOpenService(
             page_count_port=QtPdfPageCountLoader(bindings.qpdf_document),
@@ -816,6 +821,186 @@ class FoliaSealAppFrame:
         self._apply_workspace_action_state(workspace_action_state_open())
         self._sync_page_navigation_actions()
         return handle.view.mount_target()
+
+    @property
+    def startup_recovery_candidate(self) -> SigningRecoveryCandidate | None:
+        """Expose the currently offered restart candidate for deterministic adapters/tests."""
+
+        return self._startup_recovery_candidate
+
+    def offer_startup_recovery(self) -> SigningRecoveryCandidate | None:
+        """Offer the first verified restart candidate without implying it is trusted."""
+
+        discover = getattr(self._sign_executor, "verified_recovery_candidates", None)
+        if not callable(discover):
+            return None
+        try:
+            candidates = tuple(discover())
+        except Exception as exc:
+            self._emit_error(f"Unable to inspect signing recovery records: {exc}")
+            return None
+        if not candidates:
+            return None
+        candidate = candidates[0]
+        self._startup_recovery_candidate = candidate
+        action = self._ask_startup_recovery_action(candidate)
+        if action is None:
+            return candidate
+        if action == "open":
+            opened = self.open_recovery_pdf_path(candidate.artifact_path)
+            if opened is None:
+                self._emit_error("Unable to open the verified recovery artifact.")
+            return candidate
+        if action == "copy":
+            self._save_startup_recovery_copy(candidate)
+            return candidate
+        if action == "replace":
+            if self._confirm_startup_recovery_replace(candidate):
+                self._resolve_startup_recovery(candidate, "replace", replace_authorized=True)
+            return self._startup_recovery_candidate
+        if action == "discard":
+            self._resolve_startup_recovery(candidate, "discard")
+        return self._startup_recovery_candidate
+
+    def _ask_startup_recovery_action(
+        self,
+        candidate: SigningRecoveryCandidate,
+    ) -> RecoveryAction | None:
+        message_box = self._bindings.q_message_box
+        title = "Recover interrupted signing?"
+        text = (
+            "FoliaSeal found a verified artifact from an interrupted signing transaction.\n\n"
+            f"Source: {Path(candidate.record.input_pdf_path).name}\n"
+            f"Artifact: {candidate.artifact_path.name}\n\n"
+            "The artifact remains untrusted until you choose how to resolve it."
+        )
+        if isinstance(message_box, type):
+            try:
+                dialog = message_box(self.window)
+                add_button = getattr(dialog, "addButton", None)
+                role_type = getattr(message_box, "ButtonRole", None)
+                if not callable(add_button) or role_type is None:
+                    raise RuntimeError("custom recovery buttons unavailable")
+                open_button = add_button("Open recovered copy", role_type.AcceptRole)
+                copy_button = add_button("Save copy as…", role_type.ActionRole)
+                replace_button = add_button("Replace recorded output", role_type.DestructiveRole)
+                discard_button = add_button("Discard artifact", role_type.DestructiveRole)
+                dialog.setWindowTitle(title)
+                dialog.setText(text)
+                set_default = getattr(dialog, "setDefaultButton", None)
+                if callable(set_default):
+                    set_default(open_button)
+                exec_method = getattr(dialog, "exec", None) or getattr(dialog, "exec_", None)
+                if not callable(exec_method):
+                    return None
+                exec_method()
+                clicked = getattr(dialog, "clickedButton", lambda: None)()
+                return {
+                    open_button: "open",
+                    copy_button: "copy",
+                    replace_button: "replace",
+                    discard_button: "discard",
+                }.get(clicked)
+            except Exception:
+                pass
+        question = getattr(message_box, "question", None)
+        if not callable(question):
+            return None
+        result = self._question_with_buttons(
+            question,
+            parent=self.window,
+            title=title,
+            text=text,
+            buttons=[self._message_box_button(message_box, "Yes", "Open")],
+            default_button=self._message_box_button(message_box, "No", "Cancel"),
+        )
+        return "open" if result == self._message_box_button(message_box, "Yes", "Open") else None
+
+    def _save_startup_recovery_copy(self, candidate: SigningRecoveryCandidate) -> None:
+        selected = self._bindings.q_file_dialog.getSaveFileName(
+            self.window,
+            "Save recovered copy as",
+            str(Path(candidate.record.output_pdf_path).with_name(
+                f"{Path(candidate.record.output_pdf_path).stem}-recovered.pdf"
+            )),
+            "PDF files (*.pdf)",
+        )
+        destination = str(selected[0] if isinstance(selected, tuple) else selected).strip()
+        if destination:
+            destination_path = Path(destination)
+            overwrite_authorized = not destination_path.exists()
+            if not overwrite_authorized and not self._confirm_startup_recovery_copy_overwrite(
+                destination_path
+            ):
+                return
+            self._resolve_startup_recovery(
+                candidate,
+                "copy",
+                destination_path=destination,
+                overwrite_authorized=overwrite_authorized,
+            )
+
+    def _confirm_startup_recovery_replace(self, candidate: SigningRecoveryCandidate) -> bool:
+        question = getattr(self._bindings.q_message_box, "question", None)
+        if not callable(question):
+            return False
+        yes = self._message_box_button(self._bindings.q_message_box, "Yes", "Replace")
+        no = self._message_box_button(self._bindings.q_message_box, "No", "Cancel")
+        result = self._question_with_buttons(
+            question,
+            parent=self.window,
+            title="Replace recorded output?",
+            text=(
+                f"Replace {Path(candidate.record.output_pdf_path).name} with the verified "
+                "recovery artifact? This cannot be undone."
+            ),
+            buttons=[yes, no],
+            default_button=no,
+        )
+        return result == yes
+
+    def _confirm_startup_recovery_copy_overwrite(self, destination: Path) -> bool:
+        question = getattr(self._bindings.q_message_box, "question", None)
+        if not callable(question):
+            return False
+        yes = self._message_box_button(self._bindings.q_message_box, "Yes", "Replace")
+        no = self._message_box_button(self._bindings.q_message_box, "No", "Cancel")
+        result = self._question_with_buttons(
+            question,
+            parent=self.window,
+            title="Overwrite existing file?",
+            text=f"Replace the existing file {destination.name} with the recovered copy?",
+            buttons=[yes, no],
+            default_button=no,
+        )
+        return result == yes
+
+    def _resolve_startup_recovery(
+        self,
+        candidate: SigningRecoveryCandidate,
+        action: RecoveryAction,
+        *,
+        destination_path: str | None = None,
+        replace_authorized: bool = False,
+        overwrite_authorized: bool = False,
+    ) -> None:
+        resolve = getattr(self._sign_executor, "resolve_recovery_candidate", None)
+        if not callable(resolve):
+            self._emit_error("Signing recovery is unavailable in this executor.")
+            return
+        result = resolve(
+            candidate,
+            action,
+            destination_path=destination_path,
+            replace_authorized=replace_authorized,
+            overwrite_authorized=overwrite_authorized,
+        )
+        if not result.success:
+            self._emit_error(result.error or "Unable to resolve the signing recovery artifact.")
+            return
+        if action in {"replace", "discard"}:
+            self._startup_recovery_candidate = None
+        self._handle_status_change(f"signing_recovery_{action}")
 
     def _reload_current_source(self) -> Any | None:
         """Reload the mounted source after an explicit changed-source action."""
@@ -2724,6 +2909,9 @@ class QtAppFrameAdapter:
                 apply_restored_state()
             if initial_pdf_path is not None:
                 frame.open_pdf_path(initial_pdf_path)
+            offer_recovery = getattr(frame, "offer_startup_recovery", None)
+            if callable(offer_recovery):
+                offer_recovery()
             for request in pending_requests:
                 handle_open_request(request)
             exec_method = getattr(app, "exec", None)
