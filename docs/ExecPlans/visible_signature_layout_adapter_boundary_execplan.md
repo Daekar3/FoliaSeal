@@ -114,8 +114,9 @@ import-purity tests or duplicate preparation.
   scenarios with 6 successful signings, 2 matched intentional rejections, zero
   cryptographic/annotation/preview-output failures, and `acceptance_expectations_passed=True`.
   Explicit `/tmp/foliaseal-layout-preview` and `/tmp/foliaseal-layout-signed` directories were
-  removed and the process audit is clean. The worktree is intentionally still uncommitted, and the
-  post-implementation architecture rescan is pending the commit.
+  removed and the process audit is clean. The migration is committed as `4554c6922`; the
+  post-implementation architecture rescan below confirms the neutral import boundary and current
+  architecture record.
 
 ## Status
 
@@ -124,4 +125,8 @@ import-purity tests or duplicate preparation.
 - [x] Full test/Ruff/diff/import-isolation validation and docs reconciliation.
 - [x] Release preview and signed matrices, post-measurement, and docs reconciliation.
 - [x] Commit `4554c6922` (`refactor: isolate visible-signature layout adapters`).
-- [ ] Post-commit architecture rescan.
+- [x] (2026-08-16) Post-commit architecture rescan confirmed the neutral module remains free of
+  Pillow, PyHanko, Qt, and backend imports; the adapter/artifact ownership described in
+  `docs/ARCHITECTURE.md` matches the current source, and the current focused boundary/fit subset
+  passed `105` tests; this is a narrower recheck of the historical `175 passed` focused
+  layout/backend/boundary command recorded above.
