@@ -13,16 +13,16 @@ the user-owned signing values (placement, appearance/content, and an explicitly 
 path); the frame asks whether to continue editing or discard it, and cancellation leaves the
 current workspace mounted. The same decision is available to the native window-close event. This
 slice is the first safe lifecycle seam for UI_SPEC WF01, WF05, section 16, and acceptance scenarios
-6 and 7. It deliberately does not invent an on-disk recovery journal or claim crash recovery;
-that requires a separate transaction-artifact plan once the signing transaction exposes its owned
-temporary/final paths.
+6 and 7. Verified interrupted-signing artifact recovery is now supplied by the separate
+transaction-journal and recovery-GUI children. This plan does not claim autosave or restoration of
+an unsaved in-memory signing session across a process crash; that remains an explicit V1 exclusion.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are the frozen governing contracts.
-- [ ] docs/ExecPlans/ui_launch_no_document_execplan.md
-- [ ] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [x] docs/ExecPlans/ui_launch_no_document_execplan.md
+- [x] docs/ExecPlans/ui_single_instance_open_routing_execplan.md
+- [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
 - [x] docs/ExecPlans/ui_document_source_change_recovery_execplan.md adds explicit source-change
   recovery while preserving this plan's dirty-draft and candidate lifecycle ownership.
 
@@ -31,12 +31,17 @@ temporary/final paths.
 - [x] (2026-08-09) Audit the current implementation and identify the missing dirty-state and close-event seams; explorer report recorded below.
 - [x] (2026-08-09) Add a red focused contract suite for dirty projection, discard, replacement cancellation, and native close routing; the pre-implementation run was `2 failed, 16 passed` and the focused contract is now green.
 - [x] (2026-08-09) Implement the smallest complete workflow/typed-port/Qt frame path, including candidate prepare/commit ordering and action-specific consequence-verb decisions.
-- [x] (2026-08-10) Add the child source-change recovery path without introducing product-facing phase labels;
-  crash journals/autosave remain explicitly deferred.
+- [x] (2026-08-10) Historical source-change recovery increment without product-facing phase labels;
+  the journal/recovery-GUI children later supplied verified artifact recovery, while unsaved-session
+  autosave/restoration remains explicitly deferred.
 - [x] (2026-08-10) Run focused, regression, and real offscreen Qt validation; display-backed GUI acceptance
   remains environment-blocked (`xcb`/`:0`) and stays explicitly open.
 - [x] (2026-08-10) Update this plan and relevant architecture/status documentation; the source-change
   recovery child was committed in `0d5116084`.
+- [x] (2026-08-16) Reconciled dependency markers and recovery wording against the completed
+  transaction-journal and recovery-GUI children. Dirty-draft/source-change behavior remains owned
+  here; verified artifact recovery is delegated to those children; unsaved-session autosave remains
+  explicitly excluded.
 
 ## Surprises & Discoveries
 
@@ -88,12 +93,12 @@ temporary/final paths.
 
 ## Outcomes & Retrospective
 
-Implementation and focused validation are complete. The lifecycle-focused unit suite remains green,
-the source-change child adds draft-preserving Reload/Locate/Ignore coverage, and the current full
-suite is green (`1465 passed, 20 skipped, 1 warning`); the bounded launch remains limited by the
-isolated `SingleInstanceUnavailable` endpoint before window creation, with owned cleanup verified.
-The slice does not provide a crash-recovery journal, autosave, or interrupted-session restoration;
-those remain an explicit follow-on requirement.
+Implementation and focused validation are complete. The lifecycle-focused unit suite and source-change
+child cover dirty-draft protection, candidate replacement, Reload/Locate/Ignore/Close, pending-open
+handling, and secret clearing. The separate journal/recovery-GUI children now cover verified
+interrupted-signing artifacts, including Open, Save copy as, Replace, and Discard. The latest recorded
+full suite is green (`1535 passed, 20 skipped, 1 warning`); bounded launch/display acceptance remains
+environment-limited. Unsaved in-memory session autosave/restoration is intentionally not part of V1.
 
 ## Context and Orientation
 
@@ -158,13 +163,14 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     rm -rf "$audit_root"
     test ! -e "$audit_root"
 
-Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+The implementation evidence is focused and offscreen Qt coverage plus the recorded bounded launch
+limitation. A display-backed walkthrough remains a separate parent/release gate; an offscreen run
+must not be described as human visual acceptance.
 
-Current validation evidence: `.venv/bin/pytest -q` completed with `1191 passed, 20 skipped, 1
-warning`; lifecycle-focused tests completed with `75 passed`; the real offscreen native-close test
-completed with `1 passed`; `.venv/bin/ruff check src tests` and `git diff --check` passed. The
+Historical validation evidence: an earlier `.venv/bin/pytest -q` completed with `1191 passed, 20
+skipped, 1 warning`; lifecycle-focused tests completed with `75 passed`; the real offscreen
+native-close test completed with `1 passed`; Ruff and `git diff --check` passed. Current repository
+regression evidence is `1535 passed, 20 skipped, 1 warning` in the parent/recovery closeouts. The
 offscreen CLI walkthrough exited `1` because the sandbox could not claim the local-instance socket;
 the display-backed audit exited `134` because `xcb` could not connect to `DISPLAY=:0`. Both exact
 temporary roots were removed and process inspection found no FoliaSeal/PySide6 processes. A
@@ -174,29 +180,35 @@ display-backed session remains an environment-dependent follow-on acceptance che
 
 Acceptance is behavioral: Close/Open/Exit preserves a dirty draft when the user cancels, discards
 only after explicit confirmation, and clears the in-memory passphrase on the confirmed discard/close
-path. A successful sign marks the draft clean. Native window close uses the same policy. Crash
-recovery remains explicitly unimplemented and must not be presented as available. The focused
-regression suite must pass, the full suite must remain green when shared code changed, and the GUI
-audit must record the visible result and cleanup. A passing import or unit test without the stated
-user-visible behavior is insufficient.
+path. A successful sign marks the draft clean. Native window close uses the same policy. Verified
+interrupted-signing artifacts are accepted only through the separate journal/recovery-GUI contracts;
+unsaved in-memory crash restoration is not offered. Focused/full validation and cleanup must remain
+green, while display-backed GUI acceptance is recorded separately.
 
 ## Required Acceptance Cases
 
 Password-protected drafts prompt before replacement. Session password memory is cleared when the
 confirmed discard/close path runs. Successful signing marks the draft clean. Certification and
-ordinary-signature restrictions remain owned by the existing signing preflight. Crash recovery and
-artifact cleanup are not acceptance claims for this slice and must be covered by a follow-on plan.
+ordinary-signature restrictions remain owned by the existing signing preflight. Unsaved-session
+autosave/restoration is outside the V1 acceptance claim; verified artifact recovery and ownership-safe
+cleanup are accepted by the dedicated recovery children.
 
 ## Evidence Record
 
 Before completion, record agreement with `docs/ui/main-workspace-document-open-exploratory.svg`,
 the exact lifecycle test command and result, dirty/preset/cancel/discard/native-close observations,
-the in-memory password-clearing assertion, GUI input sequence if the display-backed audit is
-available, evidence path, cleanup, and compatibility grep proof. Record the deferred recovery
-journal as an explicit next plan rather than implying it was verified here.
+the in-memory password-clearing assertion, linked journal/recovery-GUI evidence, display-backed
+availability or exact limitation, evidence path, cleanup, and compatibility grep proof. Do not
+duplicate recovery-journal policy in this child.
 
 Record the contributing UI_SPEC scenario ID(s) and either the owning SVG path or an explicit
 "no SVG" decision alongside the evidence row.
+
+Revision note: 2026-08-16 / Codex
+Reconciled this child with the completed transaction-journal/recovery-GUI children and the parent’s
+completed dependency markers. Verified artifact recovery is delegated to those plans; only unsaved
+in-memory autosave/restoration remains excluded, and display-backed acceptance remains environment-
+dependent.
 Also record the exact focused test node and expected result (`N passed`); when the slice adds a new
 contract, record that the test was red before implementation and green afterward.
 

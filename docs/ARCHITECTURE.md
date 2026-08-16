@@ -476,7 +476,8 @@ The canonical repository document split is:
 - Does not own: PDF annotation extraction, file fingerprint acquisition, browser/file launching,
   source reload, signing-draft mutation, or banner rendering.
 - Key collaborators: `DocumentLinkInspector` supplied by `QtPdfRenderBackend`,
-  `document_source_monitor.py`, and the future workspace lifecycle/safe-links children.
+  `document_source_monitor.py`, `app_frame_workspace_open.py`, and the implemented safe-links/
+  document-lifecycle boundaries.
 - Known constraints: `QtPdfRenderBackend.inspect_links()` reads QtPdf link-model rows without
   activating destinations and normalizes each Qt top-left rectangle into PDF bottom-left
   `PdfRect` coordinates. `DocumentLinkActivationService` performs pure PDF-space hit testing and
@@ -486,11 +487,11 @@ The canonical repository document split is:
   is never treated as unchanged; `LinkDecision.destination` is a bounded display value while
   `LinkDecision.launch_destination` is the complete sanitized target reserved for an approved
   launch, and no result carries a launcher callback. AppFrame owns the consequence-labeled
-  confirmation and injected Qt launch edge; source reload/recovery and banner lifecycle remain
-  explicitly deferred to safe-links and document-lifecycle children.
+  confirmation and injected Qt launch edge; source reload/recovery and banner lifecycle are owned
+  by the implemented safe-links and document-lifecycle boundaries.
 - Status: Implemented and confirmed by focused tests; extraction, Pan hit testing, internal-page
-  activation/history, and AppFrame confirmation/launch are integrated while source recovery and
-  lifecycle effects remain deferred.
+  activation/history, AppFrame confirmation/launch, source recovery, and lifecycle effects are
+  integrated. Display-backed acceptance remains a separate gate.
 
 ### Qt external-link confirmation
 
@@ -512,10 +513,10 @@ The canonical repository document split is:
   the injected `QDesktopServices` launcher. While an active signing transaction is in progress,
   AppFrame defers external requests and retains only the newest one, returning a typed replaced
   outcome when a newer request supersedes it; the pending request is offered after the transaction
-  returns to a safe state. Source reload/recovery, locate/ignore actions, and banner mutation
-  remain deferred to the safe-links/document-lifecycle children.
-- Status: Implemented and confirmed by focused tests; source recovery and lifecycle effects remain
-  deferred.
+  returns to a safe state. Source reload/recovery, locate/ignore actions, and banner mutation are
+  owned by the implemented safe-links/document-lifecycle boundaries.
+- Status: Implemented and confirmed by focused tests; display-backed acceptance remains a separate
+  gate.
 
 ### Single-instance open routing and pending-open surface
 
@@ -553,7 +554,8 @@ The canonical repository document split is:
 - Responsibility: Capture and compare the mounted PDF's local source identity for readiness gating.
 - Owns: `SourceFingerprint`, `fingerprint_source()`, `DocumentSourceMonitor.for_path()`, `decision()`, and `acknowledge_current_source()`.
 - Does not own: PDF reload, source locating, ignore/acknowledgement UI, banner mutation, renderer refresh, or signing-draft mutation.
-- Key collaborators: `document_safety.py`, `signing_readiness.py`, `app_frame_workspace_open.py`, and the future workspace lifecycle/safe-links children.
+- Key collaborators: `document_safety.py`, `signing_readiness.py`, `app_frame_workspace_open.py`, and
+  the Qt safe-links/document-lifecycle boundaries.
 - Known constraints: The fingerprint is metadata-only `(st_dev, st_ino, st_size, st_mtime_ns)` and missing/unreadable sources produce unknown/missing decisions through the pure safety policy. `decision()` is read-only; only an owning reload or explicit ignore flow may call `acknowledge_current_source()`. Reload/locate/ignore actions, safety banners, and draft-preserving lifecycle mutation remain outside this application boundary and are owned by the Qt shell/AppFrame recovery boundary below.
 - Status: Implemented and confirmed by focused tests; condition polling/banner presentation and recovery actions are owned by the Qt shell/AppFrame boundary below.
 
@@ -578,7 +580,8 @@ The canonical repository document split is:
   `SigningDraftSnapshot`, prepare a candidate, restore the snapshot into that candidate, and
   atomically publish it through `replace_prepared()`; a failed prepare/mount disposes the
   candidate and leaves the prior workspace active. Ignore acknowledges the observed identity
-  without remounting, while Close follows the ordinary dirty-draft decision. Crash-journal,
+  without remounting, while Close follows the ordinary dirty-draft decision. Verified interrupted-
+  signing artifacts are handled by the separate journal/recovery-GUI boundaries; unsaved-session
   autosave, interrupted-draft persistence, and restart restoration remain explicitly deferred.
 - Status: Implemented and confirmed by focused tests.
 
@@ -773,7 +776,7 @@ The canonical repository document split is:
 - Key collaborators: `WorkspaceOpenPort`, `OpenWorkspaceCommand`, `WorkspaceHandle`, `SigningWorkspaceHost`, and `FoliaSealAppFrame`.
 - Main entry points: `SigningWorkspaceLifecycle.prepare()`, `SigningWorkspaceLifecycle.replace()`, `SigningWorkspaceLifecycle.replace_prepared()`, and `SigningWorkspaceLifecycle.close()`.
 - Host entry points: `SigningWorkspaceHost.open()`, `SigningWorkspaceHost.prepare()`, `SigningWorkspaceHost.replace_prepared()`, `SigningWorkspaceHost.active()`, and `SigningWorkspaceHost.close()`.
-- Known constraints: Replacement is ordered prepare/compose → mount → publish-active → dispose-old; `prepare()` composes a candidate without changing the mounted workspace, and `replace_prepared()` validates/mounts that candidate only after the frame's action-specific dirty decision. If mounting fails, the candidate is disposed and the previous active workspace remains recorded. Disposal invokes the narrow maintenance cleanup hook before best-effort widget cleanup (`close()` then `deleteLater()`), and repeated close calls are no-ops; this releases app-owned preserved recovery artifacts even when the workspace is clean. The frame delegates central-widget installation to `QtWorkspaceMount`; it does not reach into the concrete shell widget for lifecycle replacement. `SigningWorkspacePort` remains the narrow production caller contract, exposing typed `has_unsaved_changes()`, `discard_draft()`, `cleanup_recovery_artifact()`, and `clear_session_secrets()` for lifecycle policy; `SigningWorkspaceTestingPort` remains the separate diagnostics/harness contract and is not widened by lifecycle management. Crash recovery, autosave, and restoration of an interrupted draft are explicitly deferred.
+- Known constraints: Replacement is ordered prepare/compose → mount → publish-active → dispose-old; `prepare()` composes a candidate without changing the mounted workspace, and `replace_prepared()` validates/mounts that candidate only after the frame's action-specific dirty decision. If mounting fails, the candidate is disposed and the previous active workspace remains recorded. Disposal invokes the narrow maintenance cleanup hook before best-effort widget cleanup (`close()` then `deleteLater()`), and repeated close calls are no-ops; this releases app-owned preserved recovery artifacts even when the workspace is clean. The frame delegates central-widget installation to `QtWorkspaceMount`; it does not reach into the concrete shell widget for lifecycle replacement. `SigningWorkspacePort` remains the narrow production caller contract, exposing typed `has_unsaved_changes()`, `discard_draft()`, `cleanup_recovery_artifact()`, and `clear_session_secrets()` for lifecycle policy; `SigningWorkspaceTestingPort` remains the separate diagnostics/harness contract and is not widened by lifecycle management. Verified interrupted-signing artifact recovery is owned by the Qt-free journal/resolver and AppFrame recovery surface; autosave/restoration of an unsaved in-memory draft remains explicitly deferred.
 - Status: Confirmed by code and tests.
 
 ### Qt signing workspace bundle and ports
@@ -1328,7 +1331,7 @@ boundary fakeable while preserving native Qt shortcuts.
 | `SigningBackendRequest` | `application/sign_pdf_use_case.py` | Backend-facing normalized signing payload. | public signing fields plus `SigningBackendAppearance`, optional `signing_time`, and optional `render_port`. | Created by `from_signing_request()`; `SignPdfUseCase.execute()` carries its configured preview renderer into `render_port` for production fit planning. |
 | `PreparedSigningPlan` | `application/signing_backend.py` | Immutable application-owned preparation shared by visible signing and layout adapters. | normalized backend request, optional visible semantics/layout plan, typed fit issues, stamp text, visible flag. | `prepare_signing_plan()` creates it; no PyHanko/Pillow objects cross this boundary. |
 | `SigningDraftWorkflow` | `application/signing_draft_workflow.py` | Mutable application state for an in-progress signing draft. | signing paths, credentials, selected reusable-object ids, rect, appearance, placement context. | Produces preview and final `SigningRequest`; can apply resolved `CertificateConfiguration` material. |
-| `SigningActionState` | `presentation/qt/signing_action_coordinator.py` | Immutable Qt-facing projection of the supported signing-action state. | typed `status`, stage/detail/result text, sign/reopen/recovery enablement, last result/output, typed `recommended_action`. | Normal draft readiness comes from `application.signing_readiness.project_signing_readiness()` through the setup port; a preserved `FailureCode.POST_VERIFY_FAILED` projects the normative `Saved but not verified` state, disables Sign and save, and exposes Verify again, Return to draft, and Open preserved copy without treating the artifact as safe. Ordinary pre-write failures use the distinct `signing_failed` status. The bounded later-approval gate requires every-signature verification and allowed DocMDP permission; transaction feedback is coarse and truthful, with percentage and cancellation still out of scope. Durable journal/restart recovery is headless and Qt-free; its GUI Open, Save copy as, Replace, and Discard actions remain deferred. |
+| `SigningActionState` | `presentation/qt/signing_action_coordinator.py` | Immutable Qt-facing projection of the supported signing-action state. | typed `status`, stage/detail/result text, sign/reopen/recovery enablement, last result/output, typed `recommended_action`. | Normal draft readiness comes from `application.signing_readiness.project_signing_readiness()` through the setup port; a preserved `FailureCode.POST_VERIFY_FAILED` projects the normative `Saved but not verified` state, disables Sign and save, and exposes Verify again, Return to draft, and Open preserved copy without treating the artifact as safe. Ordinary pre-write failures use the distinct `signing_failed` status. The bounded later-approval gate requires every-signature verification and allowed DocMDP permission; transaction feedback is coarse and truthful, with percentage and cancellation out of scope. The durable journal/resolver is Qt-free, while AppFrame now owns verified candidate discovery and GUI Open, Save copy as, Replace, and Discard actions; unsaved-session autosave/restoration remains outside V1. |
 | `CertificatePreviewReader` / `Pkcs12CertificatePreviewReader` | `application/certificate_preview.py` | Extract certificate-derived visible-signature preview values. | certificate path, passphrase -> field-value map and availability flag. | Injected into draft workflow so PKCS#12 parsing is not implemented inside the draft object. |
 | `SigningDraftPreview` | `application/signing_draft_contracts.py` | Immutable UI-ready normalized preview payload. | rect, appearance settings, fields, detail text, stamp text, issues, can_submit. | Constructed by `SigningDraftWorkflow`; used by Qt and preview renderer. |
 | `BackendReservationEvidence` | `application/signing_backend.py` | JSON-ready backend reservation evidence for non-Qt callers and temporary harnesses. | snapshot dict, top-level error string. | Lets the harness consume backend reservation facts without reconstructing them from private helpers. |
@@ -1932,10 +1935,11 @@ Default local validation from README:
 | 2026-08-10 | Added typed Edit Undo/Redo over native text-editor and visible-signature placement histories. | `AppFrameCommandId.UNDO`/`REDO` expose `Ctrl+Z`/`Ctrl+Shift+Z`; the frame routes to a focused native editor when present and otherwise crosses `SigningWorkspaceSessionPort` to the viewer-owned `PlacementHistory`. `WorkspaceActionState` projects the selected history capability, while placement undo/redo restores exact `SignatureRect | None` states and clears at lifecycle/external-sync boundaries. |
 | 2026-08-10 | Added Pan-only document-link activation and internal-page history. | Historical precursor: `DocumentLinkActivationService` performs pure PDF-space hit testing, `ViewerLinkHistory` owns Back/Forward page outcomes, `PopplerPdfRenderBackend.inspect_links()` delegates optionally to QtPdf, `SigningWorkspaceRuntime` routes typed activation/history outcomes, and `PdfViewerWidgetAdapter` maps stationary Pan clicks through zoom/pan/page transforms while keeping drags as pan gestures. AppFrame confirmation/launch is documented by the subsequent safe-links slice; source reload/banner lifecycle remains deferred. |
 | 2026-08-10 | Added AppFrame-owned external-link confirmation and safe launch boundary. | AppFrame now presents a consequence-labeled, cancel-default confirmation using bounded display text, passes only the complete sanitized launch target to an injected Qt `QDesktopServices` launcher after approval, and defers active-signing requests while retaining only the newest pending request. Source reload/recovery and banner lifecycle remain deferred to safe-links/document-lifecycle children. |
-| 2026-08-10 | Added source-change recovery and draft-transfer ownership. | `SigningDraftSnapshot` transfers authored state across a validated replacement; AppFrame prepares and atomically mounts a candidate for Reload/Locate, while Ignore acknowledges the observed identity and Close follows ordinary dirty-draft policy. The shell owns condition-only one-second polling/banner refresh; crash journals, autosave, and restart restoration remain deferred. |
+| 2026-08-10 | Added source-change recovery and draft-transfer ownership. | `SigningDraftSnapshot` transfers authored state across a validated replacement; AppFrame prepares and atomically mounts a candidate for Reload/Locate, while Ignore acknowledges the observed identity and Close follows ordinary dirty-draft policy. The shell owns condition-only one-second polling/banner refresh. Verified interrupted-signing artifacts are handled by the later journal/recovery-GUI path; unsaved-session autosave and restart restoration remain deferred. |
 | 2026-08-10 | Added the non-blocking signing transaction boundary. | `SigningActionCoordinator` owns begin/complete lifecycle state, `ThreadSigningTransactionRunner` runs one request off the Qt event loop, and the boundary/bridge poll terminal results while the widget-owned `QTimer` applies coarse stage feedback and stops before worker cleanup. Percent progress and cancellation remain deferred; durable crash journaling is recorded by the later recovery-journal child. |
 | 2026-08-15 | Added the typed View → Pan app-frame command. | `AppFrameCommandId.PAN` and its no-shortcut registry definition are mapped to the frame-owned QAction, enabled only for an open workspace, and routed through `SigningWorkspaceSessionPort.set_viewer_interaction_mode("pan")`; runtime-owned text-mode clearing and placement retention are covered by focused and real offscreen tests. |
 | 2026-08-16 | Closed the desktop command-model status reconciliation. | A fresh source/spec audit confirmed that the typed registry now covers all UI_SPEC §7 File/Edit/View/Signing/Settings/Help commands, with AppFrame routing through public workspace ports or focused native-editor behavior and focused/offscreen evidence. Historical deferred-command rows remain audit records; display-backed GUI and final release acceptance remain separate parent gates. |
+| 2026-08-16 | Reconciled lifecycle and readiness status with the completed child plans. | Dirty-draft/source-change replacement, source safety monitoring, ordered readiness/caveats, `Saved but not verified`, and verified transaction-artifact recovery are implemented across their typed boundaries. Unsaved-session autosave/restoration, display-backed HITL, and privileged release acceptance remain explicit exclusions or environment gates. |
 | 2026-08-10 | Added typed View Back/Forward command routing. | `AppFrameCommandId.BACK`/`FORWARD` now carry `Alt+Left`/`Alt+Right` metadata through the shared registry; AppFrame routes them through `SigningWorkspaceSessionPort`, while `WorkspaceActionState` projects capability state and status-driven synchronization keeps actions truthful after internal navigation, history moves, unavailable outcomes, and history branching. |
 | 2026-08-10 | Added the implemented Signing menu commands and readiness routing. | `SIGNATURE_LIBRARY` opens the AppFrame-owned modeless Library and `SIGN_AND_SAVE` routes through the public session port; `can_submit_sign_request()` plus readiness/status synchronization keeps Sign and save enabled only when the active workspace can submit. Placement commands were added by the following increment. |
 | 2026-08-10 | Added typed Signing placement commands. | `PLACE_SIGNATURE`, `ADJUST_PLACEMENT`, and `REMOVE_PLACEMENT` now route through public session capabilities/actions; AppFrame synchronizes them with readiness/status changes, and runtime guards keep targeted unsigned-field page/geometry fixed. |

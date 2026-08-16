@@ -7,20 +7,23 @@ docs/ExecPlans/ui_spec_v1_compliance_parent_execplan.md.
 
 ## Purpose / Big Picture
 
-After this slice, a user can see ordered readiness states with one plain-language caveat or next action in the real FoliaSeal GUI. It is mapped to UI_SPEC section 11 and acceptance scenarios 2 and 5. The
-slice is one vertical path through the relevant persistent model,
-application workflow, Qt surface, focused tests, and observable acceptance.
+This child now supplies the ordered readiness projection, plain-language caveat/next action, source
+safety blocker, and post-write recovery state required by UI_SPEC section 11 and acceptance
+scenarios 2 and 5. The live GUI distinguishes document safety, setup, certificate, placement,
+review/fit, signing, verified completion, and `Saved but not verified` recovery. The remaining
+release work is display-backed/accessibility evidence and any broader rail integration owned by the
+parent/release plans, not an unimplemented readiness vocabulary.
 
 ## Child ExecPlan Dependencies
 
 - [x] docs/SPEC.md and docs/UI_SPEC.md are frozen governing contracts.
-- [ ] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
-- [ ] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
-- [ ] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
-- [ ] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
+- [x] docs/ExecPlans/ui_signing_rail_stage_status_execplan.md
+- [x] docs/ExecPlans/ui_certificate_selection_readiness_execplan.md
+- [x] docs/ExecPlans/ui_signature_field_targeting_profiles_execplan.md
+- [x] docs/ExecPlans/ui_preview_fidelity_fit_validation_execplan.md
 - [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — prerequisite typed readiness
-  projection and action vocabulary are implemented; this parent remains open for document-safety
-  input and full rail state/action integration.
+  projection and action vocabulary are implemented; document-safety input and full rail state/action
+  integration were subsequently completed by this child and its owning rail/preview children.
 
 ## Progress
 
@@ -51,9 +54,15 @@ application workflow, Qt surface, focused tests, and observable acceptance.
   the real offscreen rail test proves the heading, warning, disabled Sign button, and Verify again
   recommendation. The synthetic rail state is intentionally a rendering-boundary test, not a
   replacement for coordinator transition coverage.
-- [x] (2026-08-10) Final validation passed: focused action-coordinator/sidebar/rail coverage is
-  `135 passed`, full regression is `1482 passed, 20 skipped, 1 warning`, Ruff, `pip check`, and
-  `git diff --check` are clean, and no owned Qt/test process or temporary FoliaSeal root remains.
+- [x] (2026-08-10) Historical final validation passed: focused action-coordinator/sidebar/rail
+  coverage was `135 passed`, full regression was `1482 passed, 20 skipped, 1 warning`, Ruff,
+  `pip check`, and `git diff --check` were clean, and no owned Qt/test process or temporary
+  FoliaSeal root remained. Current repository regression evidence is recorded as `1535 passed,
+  20 skipped, 1 warning` in the parent/recovery closeouts.
+- [x] (2026-08-16) Reconciled the child’s dependencies and current readiness wording against the
+  completed rail, certificate, targeting, preview/fit, lifecycle, source-safety, and recovery
+  children. The readiness child is behaviorally complete; display-backed and final release gates
+  remain with the parent/release plan.
 
 ## Surprises & Discoveries
 
@@ -87,12 +96,14 @@ application workflow, Qt surface, focused tests, and observable acceptance.
 ## Outcomes & Retrospective
 
 The typed readiness child supplies one ordered state and recommended action to the rail while
-preserving signed/recovery/no-document precedence. The coordinator now adds the typed
-`saved_but_not_verified`/`signing_failed` distinction for terminal signing results. The composition now captures source identity,
-the panel prioritizes changed/missing/unknown safety before setup, and direct workflow request
-construction rejects unresolved source safety. Reload/locate/ignore, condition-only banners,
-full appearance/fit readiness vocabulary, asynchronous signing progress, and the remaining rail
-state-machine work remain assigned to the other children.
+preserving signed/recovery/no-document precedence. The coordinator adds the typed
+`saved_but_not_verified`/`signing_failed` distinction for terminal signing results. Composition
+captures source identity, the panel prioritizes changed/missing/unknown safety before setup, and
+direct workflow request construction rejects unresolved source safety. Reload/locate/ignore and
+condition-only banners are implemented by the lifecycle/safe-links children; appearance/fit
+readiness, asynchronous transaction progress, and rail geometry are implemented by their owning
+children. This plan is complete for the readiness projection and caveat behavior it owns; display-
+backed and final release acceptance remain separate gates.
 
 ## Context and Orientation
 
@@ -147,14 +158,17 @@ Run this bounded walkthrough from /home/daekar/FoliaSeal with an isolated config
     rm -rf "$audit_root"
     test ! -e "$audit_root"
 
-Expected evidence is the stated user-visible behavior plus a mandatory Qt-test or display-backed
-walkthrough. Record the exact input sequence, widget state, expected observation, evidence path, and
-cleanup result; the bounded timeout is only a lifecycle check.
+The implementation evidence is focused and offscreen Qt coverage plus the deterministic readiness
+walkthrough. A display-backed walkthrough remains a separate parent/release gate; an offscreen run
+must not be described as human visual acceptance.
 
 ## Validation and Acceptance
 
-Acceptance is behavioral: The rail distinguishes no document, preset required, setup required, ready, signing, signed/verified, saved/unverified, and failed; caveats do not displace Ready and self-signed trust language is honest. Focused tests must pass, shared-code changes must
-leave the full suite green, and the GUI audit must record the visible result and cleanup.
+Acceptance is behavioral: The rail distinguishes no document, source safety, preset/setup required,
+certificate/placement/review blockers, Ready, signing, signed/verified, saved/unverified, and failed;
+caveats do not displace Ready and self-signed trust language is honest. Focused/offscreen tests and
+the deterministic walkthrough pass; display-backed accessibility and final package/release checks
+remain outside this child.
 
 ## Evidence Record
 
@@ -174,7 +188,8 @@ properties-panel integration test observes a changed source and asserts the `doc
 `review_document_safety` state before setup. The bounded CLI walkthrough exits at the known
 isolated `SingleInstanceUnavailable` endpoint before window creation; its exact temporary root is
 removed and process inspection finds no FoliaSeal/PySide6 process. A display-backed
-banner/reload walkthrough remains deferred to the safe-links/lifecycle children.
+banner/reload walkthrough behavior is owned by the safe-links/lifecycle children; only their separate
+display-backed acceptance remains environment-dependent.
 
 ## Idempotence and Recovery
 
@@ -199,3 +214,7 @@ name its remaining consumer and retirement condition in this plan.
 
 Revision note: 2026-08-09 / Codex
 Created as a dependency-ordered child of the approved SPEC/UI_SPEC compliance breakdown.
+Revision note: 2026-08-16 / Codex
+Reconciled the readiness child with the completed rail, certificate, targeting, preview/fit,
+source-safety, lifecycle, and transaction-recovery children. The typed readiness/caveat behavior is
+complete; display-backed and final release acceptance remain parent-owned gates.

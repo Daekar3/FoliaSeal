@@ -75,7 +75,10 @@ Document-flow tranche:
   AppFrame newest-request deferral, condition-only queued-filename/Cancel surface, terminal cleanup,
   focused/offscreen evidence, and architecture reconciliation are complete; QLocalServer bind and
   display-backed two-process acceptance remain environment-limited.
-- [ ] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md
+- [x] docs/ExecPlans/ui_document_lifecycle_recovery_execplan.md — dirty-draft, candidate replacement,
+  source Reload/Ignore/Locate/Close, pending-open handling, and secret clearing are implemented;
+  verified interrupted-signing artifact recovery is owned by the journal/recovery-GUI children;
+  unsaved-session autosave/restoration remains an explicit V1 exclusion.
 - [x] docs/ExecPlans/ui_pdf_navigation_zoom_pan_execplan.md — typed fit, zoom, pan, and navigation
   behavior is implemented and validated; UI_SPEC §8 navigation now consumes only Ctrl+Home/End,
   with bare Home/End forwarded to the focused widget hierarchy.
@@ -157,7 +160,10 @@ Placement, preview, and signing tranche:
   blocking, frozen-time reuse across unchanged preview refreshes, and public readiness walkthrough
   are implemented and validated; display-backed accessibility/DPI/monitor, privileged host package installation, and
   legacy acceptance compatibility/nomenclature gates remain open.
-- [ ] docs/ExecPlans/ui_readiness_caveats_status_execplan.md
+- [x] docs/ExecPlans/ui_readiness_caveats_status_execplan.md — ordered source/setup/certificate/
+  placement/review readiness, typed caveats/actions, source-safety blocking, and Saved but not
+  verified recovery projection are implemented and validated; display-backed/release gates remain
+  with the parent.
 - [x] docs/ExecPlans/ui_readiness_projection_contract_execplan.md — typed ordered readiness
   projection and action vocabulary landed in the current slice; document-safety source gating is
   now implemented by the readiness-caveats child, while the remaining full rail state machine
@@ -591,6 +597,10 @@ Release tranche:
   covered by focused/offscreen evidence. Stale deferred-command wording was reconciled in the child
   and architecture records; documentation closeout is committed as `4a0fd494d`; display-backed and
   final release gates remain separate.
+- [x] (2026-08-16) Reconciled the lifecycle and readiness children against current source and their
+  downstream plans. Dirty/source-change/recovery lifecycle and ordered readiness/caveat projection
+  are complete; unsaved-session autosave/restoration, display-backed HITL, and privileged release
+  acceptance remain explicit independent gates.
 - [x] (2026-08-16) Re-ran the current signed-evidence harness audit through
   `docs/ExecPlans/manual_harness_current_audit_execplan.md`: the strict headless gates pass with
   18/18 parity signings and 3/3 matched fit rejections, and the four tracer artifacts are coherent.
