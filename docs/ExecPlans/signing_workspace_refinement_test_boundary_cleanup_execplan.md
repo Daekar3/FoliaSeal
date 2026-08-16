@@ -43,6 +43,7 @@ objects without applying them, and cancel without mutating the live draft.
   remain transactional. Focused validation is `5 passed, 105 deselected`.
 - [x] (2026-08-16) Reconciled architecture/parent/safe-links plan status and retained no dead
   refinement compatibility surface. The broader safe-links/UI parent release gates remain open.
+- [x] (2026-08-16) Committed the cleanup as `12b1803cc`; the worktree and process scan were clean.
 
 ## Surprises & Discoveries
 
@@ -91,6 +92,8 @@ The remaining dialog compatibility surfaces are intentional and outside this sli
 dialog-exposure properties are retained for current tests/old callers, and certificate dialog
 outcomes retain their compatibility fields for the certificate-management owner to migrate. No
 broader safe-links or UI release completion is claimed.
+
+The implementation commit is `12b1803cc` (`Clean up refinement dialog test boundaries`).
 
 ## Context and Orientation
 
@@ -185,5 +188,6 @@ the existing `active_state_changed: Callable[[RefinementDialogState | None], Non
 callback on a test-local subclass. No new runtime dependency, persisted field, Qt signal, or public
 AppFrame property is introduced.
 
-Revision note: 2026-08-16 / Codex. Created after the safe-links cleanup audit found the refinement
-dialog cache was the only removable test-only production backdoor with no live source consumers.
+Revision note: 2026-08-16 / Codex. Completed and committed as `12b1803cc` after the safe-links cleanup
+audit found the refinement dialog cache was the only removable test-only production backdoor with no
+live source consumers.
