@@ -41,8 +41,10 @@ seams are reused. This slice owns only the nested Library/Preset return path and
   result evidence, and stale documentation; all were corrected.
 - [x] (2026-08-16) Ran focused validation (`35 passed` for the added slice set; independent review
   observed `102 passed`) and full validation (`1559 passed, 20 skipped, 1 warning`), with Ruff,
-  compileall, and diff checks clean. Commit and final process/
-  temporary-root cleanup remain for closeout.
+  compileall, and diff checks clean.
+- [x] (2026-08-16) Committed the bounded slice as `b701a095f` (`Add nested certificate create and
+  import flow`), verified the commit diff, and removed all 208 FoliaSeal-owned temporary roots;
+  no FoliaSeal, Qt, pytest, or audit processes remain.
 
 ## Surprises & Discoveries
 
