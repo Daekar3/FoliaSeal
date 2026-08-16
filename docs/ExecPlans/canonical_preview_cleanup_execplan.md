@@ -41,8 +41,9 @@ the requested artifacts directory remain available.
   compileall passed, and `git diff --check` was clean. The final owned-root
   check printed nothing. The result is zero roots after test-scoped cleanup,
   backed by explicit renderer failure and adapter success/exception tests.
-- [ ] Reconcile the release plans, commit the bounded cleanup slice, and verify
-  the post-commit checkout.
+- [x] (2026-08-16) Reconciled the release plans and committed the bounded cleanup
+  slice as `1f5ff0f80`; the post-commit checkout and owned-resource verification
+  are clean.
 
 ## Surprises & Discoveries
 
