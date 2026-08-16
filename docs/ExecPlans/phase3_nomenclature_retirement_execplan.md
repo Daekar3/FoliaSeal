@@ -147,5 +147,8 @@ an unbounded compatibility layer.
   prominence in the Qt harness. The mixed ten-scenario manifest remains standalone diagnostic
   coverage and is not a strict release gate.
 - [x] (2026-08-16) Architecture/README/active ExecPlans reconciled. Historical completed plans
-  remain archival provenance by design; the migration plan is the only active plan retaining the
-  old label.
+  remain archival provenance by design; this migration plan is the only active
+  implementation/migration plan retaining the old label.
+- [x] (2026-08-16) Archival-status reconciliation completed: the early evidence-core child and
+  neutral-harness child now identify their later completion/no-child decision explicitly without
+  rewriting historical command, path, DTO, fixture, or artifact examples.

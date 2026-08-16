@@ -30,9 +30,9 @@ counts and summaries, and import/lifecycle/artifact audits remain clean.
 - [x] A fresh explorer-light review inspected the live helpers, tests,
   architecture/spec contracts, and active ExecPlans before this plan was
   written.
-- [ ] No child ExecPlan is expected. If compliance review finds a discrepancy
-  that cannot be corrected inside this bounded rename/cleanup, create a child
-  plan before unrelated edits.
+- [x] (2026-08-16) No child ExecPlan was required. The later atomic nomenclature migration and
+  current compliance audit resolved the remaining discrepancy without widening this historical
+  slice; retain this conditional rule for future audits.
 
 ## Progress
 
@@ -98,8 +98,9 @@ counts and summaries, and import/lifecycle/artifact audits remain clean.
 
 ## Outcomes & Retrospective
 
-Completed 2026-08-04. The private Qt composition helpers now use neutral evidence terminology, and
-the signed scenario executor has one typed `run_result()` path. The unused
+Completed 2026-08-04. This section is a historical snapshot of the private Qt composition
+helpers before the later atomic nomenclature migration. At that time, the helpers used neutral
+evidence terminology, and the signed scenario executor had one typed `run_result()` path. The unused
 checklist helper, signed `run(...)` fallback, and duplicate analysis-engine
 assignment were removed or confirmed absent. Public `Phase3*` DTOs, CLI
 commands, JSON keys, summary/artifact paths, matrix semantics, and lifecycle
@@ -113,8 +114,9 @@ signed matrix covered 8 scenarios with 6 successful signings, 2 matched
 intentional fit rejections, and `acceptance_expectations_passed=true`.
 Temporary preview/signed output directories were removed and no FoliaSeal
 process remained. README and `docs/ARCHITECTURE.md` were reconciled to the
-current ownership while retaining historical references where module or
-public names are compatibility records.
+then-current ownership while retaining historical references where module or
+public names were compatibility records. Later atomic migration status is
+authoritative; this paragraph is not a current contract inventory.
 
 ## Context and Orientation
 
@@ -272,6 +274,10 @@ Record final evidence here during execution:
        implementation commit: c8c0210d2
 
 ## Interfaces and Dependencies
+
+The interfaces below are historical snapshot contracts for this completed plan. They are retained
+for provenance; current names and migration status are authoritative in
+`phase3_nomenclature_retirement_execplan.md`.
 
 No new public interface is introduced. The existing explicit application
 contracts remain authoritative:

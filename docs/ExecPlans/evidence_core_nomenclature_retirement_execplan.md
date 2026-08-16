@@ -35,10 +35,22 @@ until a later contract-migration slice can change them atomically.
   no package export or entry-point shim is required.
 - [x] (2026-08-08) Scope constrained to internal module/test paths; no compatibility alias will be
   added and no persisted/CLI/fixture contract will be changed.
-- [ ] Rename modules and tests, update imports and import-isolation assertions, and remove old paths.
-- [ ] Run focused/full validation, naming/import checks, and the offscreen evidence smoke.
-- [ ] Reconcile `README.md`, `docs/ARCHITECTURE.md`, the parent nomenclature plan, and this plan.
-- [ ] Remove temporary artifacts/processes and commit the complete slice.
+- [x] (2026-08-16) Superseded/completed by the later atomic migration recorded in
+  `phase3_nomenclature_retirement_execplan.md`: modules/tests were renamed, imports and
+  import-isolation assertions were migrated, and the old paths were removed without aliases.
+- [x] (2026-08-16) Focused/full validation, naming/import checks, and offscreen evidence smoke
+  were completed by the later migration; current evidence is recorded in the parent plan.
+- [x] (2026-08-16) README, `docs/ARCHITECTURE.md`, the parent nomenclature plan, and this
+  archival child are reconciled to the current neutral module names.
+- [x] (2026-08-16) Temporary artifacts/processes were cleaned up and the complete migration was
+  committed by the later atomic slice. This child remains historical provenance, not active work.
+
+### Archival status
+
+This early child plan is retained to explain the original narrow rename boundary. Its historical
+`phase3` module paths, commands, and contract examples are intentionally not rewritten. The
+authoritative current status is the atomic migration entry in
+`phase3_nomenclature_retirement_execplan.md` and this archival-status reconciliation plan.
 
 ## Problem frame
 
