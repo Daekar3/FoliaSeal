@@ -27,8 +27,12 @@ success when the environment cannot provide it.
 - [x] `docs/ExecPlans/ui_support_surfaces_execplan.md` owns product diagnostics and Settings support.
 - [x] `docs/ExecPlans/ui_accessibility_acceptance_execplan.md` owns offscreen keyboard/name metadata;
   this child owns installed-package evidence only.
-- [ ] A real display-backed desktop launch and screen-reader/DPI run; this is an external evidence
-  gate and is intentionally classified rather than faked here.
+- [x] A real display-backed packaged desktop launch is covered by
+  `packaged_x11_gui_acceptance_execplan.md`; its supported-X11 startup evidence
+  is complete.
+- [ ] Human screen-reader, high-contrast, physical-DPI, and monitor observations
+  remain an external evidence gate and are intentionally classified rather than
+  faked here.
 
 ## Progress
 
@@ -45,6 +49,14 @@ success when the environment cannot provide it.
 - [x] Build a fresh bundle and `.deb`, run the extraction and isolated install-root audits, clean all
   owned roots/processes, and reconcile release/architecture status. The child implementation and
   evidence are complete; display-backed GUI and privileged host package installation remain open.
+- [x] (2026-08-16) Completed the packaged Cinnamon/X11 child
+  `packaged_x11_gui_acceptance_execplan.md`. The PyInstaller asset collector
+  now includes the two runtime SVG icons used by the Qt menus and toolbar, and
+  a fresh package audit passed with `gui_environment.qt_platform=xcb`,
+  `gui_startup.status=started`, 18 fonts, two icons, offline Help, Poppler
+  conversion, and clean owned-process/root teardown. This closes packaged-X11
+  startup evidence only; human accessibility, privileged host installation,
+  and final release acceptance remain open.
 
 ## Surprises & Discoveries
 
@@ -99,9 +111,11 @@ five topics with IDs `getting-started`, `signing-basics`, `certificates`, `priva
 checks. The extracted bundle contained the complete canonical 18-font set and used the PyInstaller 6 resource root
 `_internal/foliaseal/resources`. `/usr/bin/pdftoppm` performed the fixture conversion successfully.
 
-The packaged GUI probe is intentionally limited: return code `1`, status `limited`, and exact reason
-`SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal instance endpoint:` because the
-isolated/offscreen environment cannot claim or reach the local endpoint. Build warnings recorded
+The default packaged GUI probe remains intentionally limited in offscreen mode: return code `1`,
+status `limited`, and exact reason `SingleInstanceUnavailable: Unable to claim or reach the FoliaSeal
+instance endpoint:` because that isolated environment cannot claim or reach the local endpoint. A
+separate supported Cinnamon/X11 run through `packaged_x11_gui_acceptance_execplan.md` reached the
+real `xcb` startup boundary with status `started` after the runtime icon assets were added. Build warnings recorded
 missing `pycparser.lextab`/`pycparser.yacctab` hidden imports and optional `libtiff.so.5`; these did
 not invalidate the audited payload, Help, or Poppler checks. Temporary extraction and the child
 process were cleaned. The package and extracted evidence were temporary and no generated artifact
@@ -109,7 +123,10 @@ was committed. Display-backed accessibility/GUI and privileged host package inst
 external gates; this evidence does not claim screen-reader, high-contrast, physical DPI/monitor, or
 privileged host package-manager acceptance. The separate isolated install-root smoke proves private
 `dpkg --unpack` payload installation and installed-wrapper parity, but does not mutate or certify the
-host package database.
+host package database. The packaged-X11 child supplies a separate `xcb` startup
+result and validates the two runtime SVG icons required by the existing Qt
+menu/toolbar consumers; this does not close human accessibility or
+privileged-host acceptance.
 
 ## Context and Orientation
 

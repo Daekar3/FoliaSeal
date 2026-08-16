@@ -1,4 +1,5 @@
 import ast
+import tomllib
 from pathlib import Path
 
 from foliaseal.application.signature_font_registry import bundled_font_root
@@ -24,6 +25,7 @@ def test_collect_runtime_assets_preserves_package_font_destination() -> None:
     assert {destination for _source, destination in assets} == {
         "foliaseal/resources/fonts",
         "foliaseal/resources/help",
+        "foliaseal/resources/icons",
     }
 
 
@@ -38,6 +40,26 @@ def test_collect_runtime_assets_includes_packaged_help_topics() -> None:
     }
 
     assert collected_help == expected_help
+
+
+def test_collect_runtime_assets_includes_bundled_qt_icons() -> None:
+    icon_root = Path(__file__).resolve().parents[2] / "src/foliaseal/resources/icons"
+    expected_icons = {path.name for path in icon_root.glob("*.svg")}
+
+    collected_icons = {
+        Path(source).name
+        for source, destination in collect_runtime_assets()
+        if destination == "foliaseal/resources/icons"
+    }
+
+    assert collected_icons == expected_icons
+
+
+def test_setuptools_package_data_includes_bundled_qt_icons() -> None:
+    pyproject_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    metadata = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+
+    assert "resources/icons/*.svg" in metadata["tool"]["setuptools"]["package-data"]["foliaseal"]
 
 
 def test_pyinstaller_spec_uses_runtime_assets_helper_for_analysis_datas() -> None:

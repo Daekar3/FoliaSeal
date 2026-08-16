@@ -547,8 +547,8 @@ The canonical repository document split is:
   unsandboxed Cinnamon/X11 source-tree smoke proves the real two-process route; packaged GUI and
   Wayland transport remain outside that evidence.
 - Status: Implemented and confirmed by focused fake-Qt/offscreen tests plus the bounded Cinnamon/X11
-  source-tree smoke; packaged/display-accessibility acceptance and compatibility/acceptance retirement
-  remain open.
+  source-tree smoke; packaged human/display-accessibility acceptance and compatibility/acceptance
+  retirement remain open.
 
 ### Document source monitor
 
@@ -1301,24 +1301,20 @@ boundary fakeable while preserving native Qt shortcuts.
 - Owns: the `foliaseal` console script; bundled font assets, Python runtime, and Qt runtime; deterministic `.deb` naming and staging; `/usr/bin/foliaseal` relocation-aware launcher; desktop entry and icon; `Depends: poppler-utils`; and package-owned extraction/startup/signed-acceptance auditing.
 - Does not own: system-wide package installation, distribution repositories, or copying arbitrary host libraries into the bundle.
 - Known constraints: Runtime dependencies in `pyproject.toml` are `fonttools`, `pyHanko[opentype]`, and Pillow; FontTools is required at runtime because exact bundled-font cmap validation is part of visible-signature readiness. The optional `gui` extra installs `PySide6`, while the Debian package bundles PySide6 and the Python runtime. Interactive pixels still late-resolve the host `pdftoppm` supplied by `poppler-utils`; canonical preview and evidence rendering remain QtPdf-scoped. The first supported distribution mode is Debian-family `amd64` (architecture is read from `dpkg --print-architecture`).
-- Status: Confirmed by code, focused audit tests, and one fresh temporary package audit. The audit
-  script executable bit is restored; the current package-audit helper/install-root tests pass (`17
-  passed`), including offline-environment and complete-font-set checks. The extracted package report
-  ended with `status=passed` and recorded
-  `offline_environment.proxy_environment_removed=true`, `network_requests_required=false`, and
-  `dependency.help_output_present=true` for the wrapper, executable, desktop entry/icon,
-  `Depends: poppler-utils`, five offline Help topics, the complete canonical 18-font set, the
-  PyInstaller 6 `_internal/foliaseal/resources` root, and a successful `pdftoppm` fixture conversion.
-  The packaged GUI probe is `limited` (return code `1`) with the
-  exact isolated-environment reason `SingleInstanceUnavailable: Unable to claim or reach the
-  FoliaSeal instance endpoint:`. Build warnings included missing `pycparser.lextab` and
-  `pycparser.yacctab` hidden imports plus optional `libtiff.so.5`. Temporary extraction/process
-  cleanup succeeded; no generated package or signing-audit/hash claim is retained here. The isolated
-  package-manager smoke now also passes a fresh `.deb` through private `dpkg --unpack` (`dpkg` code
-  `0`) and cleans its dedicated install root; its `pdftoppm` dependency probe is explicitly
-  `scope=host-runtime`. A separate unsandboxed source-tree Cinnamon/X11 smoke now proves the
-  checkout GUI can launch and route a second invocation; this does not certify the packaged GUI or
-  Wayland. Display-backed accessibility and privileged host package installation remain open gates.
+- Status: Confirmed by code, focused tests, and fresh temporary package audits. The current
+  package/resource helper tests pass (`28 passed`), and the full suite is `1543 passed, 20 skipped,
+  1 warning`. Setuptools package data and `collect_runtime_assets()` both include the canonical
+  runtime SVG icons as well as fonts and Help. A fresh extracted Debian package reports
+  `status=passed`, `gui_environment.display_backed=true`, `gui_environment.qt_platform=xcb`, and
+  `gui_startup.status=started`; it also proves the wrapper, executable, desktop entry/icon,
+  `Depends: poppler-utils`, five offline Help topics, 18 fonts, two runtime icons, the PyInstaller 6
+  `_internal/foliaseal/resources` root, and a successful `pdftoppm` fixture conversion. Build
+  warnings still include missing `pycparser.lextab`/`pycparser.yacctab` hidden imports and optional
+  `libtiff.so.5`; they are recorded without hiding a runtime failure. Temporary extraction,
+  package/build roots, and the owned GUI process are cleaned; no generated package or signing-
+  audit/hash claim is retained here. The private package-manager smoke remains offscreen and uses
+  a dedicated install root; privileged host installation, human screen-reader/high-contrast/DPI/
+  monitor acceptance, final release, and Wayland remain open or deferred.
 
 ## 5. Object model / domain model
 
@@ -1858,7 +1854,7 @@ explicitly deferred.
 | Timestamp factory | `signing_backend.py`, `infra/tsa/pyhanko_adapter.py` | Use dummy TSA in tests/matrices or HTTP TSA in real signing. | Production URLs must validate as HTTP(S). |
 | Profile storage root | `SignaturePresetCatalogStore.default(app_name=...)` | Test/custom app-name storage location. | Default follows XDG data home. |
 | Qt binding loaders | `presentation/qt/*` | Test with fake widgets or run with real PySide6. | Dynamic imports should fail with explicit unavailable errors/diagnostics. |
-| PyInstaller support | `src/foliaseal/build/pyinstaller_support.py` | Collect runtime assets for bundles, including bundled fonts and every Help Markdown/index file. | `foliaseal.spec` uses this helper; setuptools declarations in `pyproject.toml` own wheel/editable-install parity. Keep both declarations synchronized and test asset lists. |
+| PyInstaller support | `src/foliaseal/build/pyinstaller_support.py` | Collect runtime assets for bundles, including bundled fonts, every Help Markdown/index file, and the existing Qt SVG icons. | `foliaseal.spec` uses this helper; setuptools declarations in `pyproject.toml` own wheel/editable-install parity. Keep both declarations synchronized and test asset lists. |
 
 ## 11. Testing architecture
 
@@ -1926,6 +1922,7 @@ Default local validation from README:
 |---|---|---|
 | 2026-08-16 | Added durable signing-transaction recovery journaling. | `SignPdfUseCase` now records secret-free begin/stage/preserve/committing/complete/discard transitions through the Qt-free recovery contract; the atomic XDG-backed journal fails closed on write errors, ignores malformed/secret-bearing/unowned records, exposes only verifier-approved candidates through the lazy executor, and recovers a post-replace crash by matching the recorded SHA-256 digest. Full validation is `1519 passed, 20 skipped, 1 warning`; GUI Open, Save copy as, Replace, and Discard actions, display-backed acceptance, and privileged host gates remain open. |
 | 2026-08-16 | Added the isolated package-manager install-root acceptance boundary. | `scripts/deb_package_audit.py` now installs a fresh Debian artifact with a private dpkg database under an unshare user namespace (runtime fakeroot fallback), exercises the installed wrapper's Help/resources/fonts/GUI startup and host-runtime `pdftoppm` conversion, rejects non-dedicated cleanup roots, and always removes the temporary root. The fresh extraction and install audits pass (`1504 passed, 20 skipped, 1 warning` full suite); display-backed acceptance and privileged host package installation remain open. |
+| 2026-08-16 | Added opt-in packaged Cinnamon/X11 startup evidence and corrected runtime icon packaging. | `scripts/deb_package_audit.py --display-backed` now requires `DISPLAY`, uses Qt `xcb`, preserves temporary XDG roots, and reports the real packaged startup boundary without changing default offscreen or private install-root audits. `pyproject.toml` and `collect_runtime_assets()` now include the existing `copy.svg` and `text-select.svg` assets, and the audit validates the exact set. A fresh package passed with `gui_startup.status=started`, `28` focused package/resource tests, and `1543 passed, 20 skipped, 1 warning` full-suite validation; human accessibility, privileged installation, final release, and Wayland remain open. |
 | 2026-08-16 | Separated strict signed-evidence release gates and preserved preview primary-image prominence during signed reconstruction. | `EvidenceService.signed_acceptance_evidence()` now requires independent success-only preview parity and intentional fit-rejection matrices; the mixed signed-acceptance manifest remains standalone diagnostic coverage. The Qt harness carries `image_prominence` through preview snapshots and text-bound reconstruction, eliminating the observed primary-image geometry drift. Offscreen evidence is green at 18/18 parity signings and 3/3 matched rejections; live Qt/manual HITL and repository-wide closure checks remain open in the owning ExecPlan. |
 | 2026-08-10 | Tightened viewer first/last-page keyboard routing to the UI_SPEC contract. | `PdfViewerWidgetAdapter` consumes only `Ctrl+Home`/`Ctrl+End` for document navigation; bare Home/End are forwarded to Qt's focused-widget hierarchy. Fake-Qt and real offscreen tests prove no bare-key render and exactly one transition/render for each Ctrl command. The navigation child remains separate from open display/package-install and acceptance nomenclature gates. |
 | 2026-08-10 | Added the explicit Saved-but-not-verified signing-rail state. | `SigningActionCoordinator` recognizes only a failed `POST_VERIFY_FAILED` result with a preserved artifact, emits the UI_SPEC heading and warning, disables a new Sign and save attempt, and retains Verify again, Return to draft, and Open preserved copy. Coordinator tests and the real offscreen rail rendering boundary cover the distinction from ordinary pre-write failure; the preserved artifact remains untrusted until recovery verification succeeds. |

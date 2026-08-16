@@ -126,6 +126,13 @@ Qt surface, focused tests, and observable acceptance.
   its owned windows and temporary stores. This closes native X11 keyboard/Help evidence only;
   human assistive-technology speech, high contrast, physical-DPI interpretation, packaged GUI,
   privileged installation, final release acceptance, and Wayland remain open/deferred.
+- [x] (2026-08-16) Completed the packaged-X11 release child
+  `packaged_x11_gui_acceptance_execplan.md`. A fresh Debian package reached the
+  real `xcb` startup boundary with `gui_startup.status=started`; the corrected
+  PyInstaller payload contains the two runtime SVG icons, 18 fonts, offline
+  Help, Poppler support, and clean owned-process/root teardown. This does not
+  close human accessibility, privileged host installation, final release
+  matrix, or Wayland.
 - [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
   cruft only after a fresh consumer audit proves its retirement condition.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
@@ -162,8 +169,8 @@ Qt surface, focused tests, and observable acceptance.
 
 The local support/release implementation and evidence are complete for their available environments:
 packaged Help, privacy-safe diagnostics, Restore defaults, real-Qt/offscreen accessibility, package
-payload parity, private install-root `dpkg --unpack`, and source-tree native-X11 keyboard/Help
-evidence all have owning children and current evidence. This plan remains open only for
+payload parity, private install-root `dpkg --unpack`, source-tree native-X11 keyboard/Help
+evidence, and packaged-X11 startup all have owning children and current evidence. This plan remains open only for
 display-backed screen-reader/high-contrast/physical-DPI/monitor and human GUI acceptance,
 privileged host package installation, final cross-surface release execution, and any approved
 compatibility/nomenclature retirement. The isolated package audit’s GUI result is explicitly limited

@@ -49,6 +49,7 @@ _REQUIRED_FONT_FILES = frozenset(
         "Segoe_Script_Bold.ttf",
     }
 )
+_REQUIRED_ICON_FILES = frozenset({"copy.svg", "text-select.svg"})
 
 
 def _run(
@@ -169,6 +170,15 @@ def validate_font_files(fonts: list[str]) -> None:
         raise ValueError(f"bundled font set differs; missing={missing}, unexpected={unexpected}")
 
 
+def validate_icon_files(icons: list[str]) -> None:
+    """Require the SVGs used by the installed Qt menus and toolbar."""
+
+    if set(icons) != _REQUIRED_ICON_FILES:
+        missing = sorted(_REQUIRED_ICON_FILES - set(icons))
+        unexpected = sorted(set(icons) - _REQUIRED_ICON_FILES)
+        raise ValueError(f"bundled icon set differs; missing={missing}, unexpected={unexpected}")
+
+
 def offline_environment(base_env: dict[str, str]) -> dict[str, str]:
     """Create a child environment with ambient proxy/network hints removed."""
 
@@ -188,6 +198,19 @@ def offline_environment(base_env: dict[str, str]) -> dict[str, str]:
         env.pop(name, None)
     env["NO_PROXY"] = "*"
     env["no_proxy"] = "*"
+    return env
+
+
+def gui_environment(base_env: dict[str, str], *, display_backed: bool) -> dict[str, str]:
+    """Return an isolated GUI environment for headless or supported X11 audits."""
+
+    env = offline_environment(base_env)
+    if display_backed:
+        if not env.get("DISPLAY"):
+            raise RuntimeError("display-backed package audit requires DISPLAY")
+        env["QT_QPA_PLATFORM"] = "xcb"
+    else:
+        env["QT_QPA_PLATFORM"] = "offscreen"
     return env
 
 
@@ -551,6 +574,8 @@ def _audit_package_manager_install(
         resource_root = _runtime_resource_root(bundle_root)
         fonts = sorted(path.name for path in (resource_root / "fonts").glob("*.ttf"))
         validate_font_files(fonts)
+        icons = sorted(path.name for path in (resource_root / "icons").glob("*.svg"))
+        validate_icon_files(icons)
         help_result_report = _audit_help(
             wrapper,
             help_root=resource_root / "help",
@@ -571,6 +596,7 @@ def _audit_package_manager_install(
             "resource_root": str(resource_root.relative_to(install_root)),
             "help": help_result_report,
             "fonts": {"count": len(fonts), "files": fonts},
+            "icons": {"count": len(icons), "files": icons},
             "dependency": dependency_result,
             "gui_startup": gui_result,
             "temporary_install_root_cleaned": False,
@@ -585,6 +611,7 @@ def audit(
     *,
     build_log: Path | None = None,
     package_manager_root: Path | None = None,
+    display_backed: bool = False,
 ) -> dict[str, object]:
     """Extract and validate one Debian artifact, returning a bounded JSON report."""
 
@@ -634,12 +661,11 @@ def audit(
         if any(desktop_fields.get(key) != value for key, value in expected_desktop.items()):
             raise RuntimeError("desktop entry does not match the installed GUI launcher contract")
 
-        env = offline_environment(base_env)
+        env = gui_environment(base_env, display_backed=display_backed)
         env["HOME"] = str(root / "home")
         env["XDG_CONFIG_HOME"] = str(root / "config")
         env["XDG_DATA_HOME"] = str(root / "data")
         env["XDG_CACHE_HOME"] = str(root / "cache")
-        env["QT_QPA_PLATFORM"] = "offscreen"
         for directory in ("home", "config", "data", "cache"):
             (root / directory).mkdir()
         fixture = root / "audit.pdf"
@@ -655,6 +681,11 @@ def audit(
         fonts = sorted(path.name for path in font_root.glob("*.ttf"))
         try:
             validate_font_files(fonts)
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
+        icons = sorted(path.name for path in (resource_root / "icons").glob("*.svg"))
+        try:
+            validate_icon_files(icons)
         except ValueError as exc:
             raise RuntimeError(str(exc)) from exc
         if not (help_root / "index.json").is_file():
@@ -691,9 +722,14 @@ def audit(
             },
             "help": help_result_report,
             "fonts": {"count": len(fonts), "files": fonts},
+            "icons": {"count": len(icons), "files": icons},
             "resource_root": str(resource_root.relative_to(extract_root)),
             "dependency": dependency_result,
             "gui_startup": gui_result,
+            "gui_environment": {
+                "display_backed": display_backed,
+                "qt_platform": env["QT_QPA_PLATFORM"],
+            },
             "build_warnings": build_warning_lines(
                 build_log.read_text(encoding="utf-8", errors="replace")
                 if build_log is not None and build_log.is_file()
@@ -736,6 +772,11 @@ def main() -> int:
         default=None,
         help="Optional disposable root for an isolated dpkg/fakeroot install smoke check.",
     )
+    parser.add_argument(
+        "--display-backed",
+        action="store_true",
+        help="Use the existing Cinnamon/X11 DISPLAY instead of Qt offscreen mode.",
+    )
     args = parser.parse_args()
     print(
         json.dumps(
@@ -744,6 +785,7 @@ def main() -> int:
                 args.artifacts_dir,
                 build_log=args.build_log,
                 package_manager_root=args.package_manager_root,
+                display_backed=args.display_backed,
             ),
             indent=2,
         )

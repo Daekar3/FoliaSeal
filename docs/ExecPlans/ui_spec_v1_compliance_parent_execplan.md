@@ -635,6 +635,13 @@ Release tranche:
   its temporary stores and windows. This closes native X11 keyboard/Help evidence only; human
   assistive-technology, high-contrast, physical-DPI, packaged GUI, privileged-install, and final
   release gates remain open. Wayland is intentionally deferred for Mint 22.3.
+- [x] (2026-08-16) Completed the packaged-X11 release evidence child. A fresh
+  Debian package reached the real `xcb` startup boundary, offline Help and
+  Poppler checks passed, and the PyInstaller collector now includes the two
+  runtime SVG icons required by existing Qt menus/toolbars. Package/build roots
+  and the owned GUI process were cleaned. This closes packaged-X11 startup
+  evidence only; human accessibility, privileged installation, final release,
+  and Wayland remain open/deferred.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

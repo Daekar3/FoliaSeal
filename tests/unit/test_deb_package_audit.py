@@ -113,12 +113,47 @@ def test_offline_environment_removes_ambient_proxy_hints() -> None:
     assert env["PATH"] == "/usr/bin"
 
 
+def test_gui_environment_defaults_to_headless_qt_without_display() -> None:
+    audit = _audit_module()
+
+    env = audit.gui_environment(
+        {"DISPLAY": ":0", "PYTHONPATH": "/checkout/src"}, display_backed=False
+    )
+
+    assert env["QT_QPA_PLATFORM"] == "offscreen"
+    assert "PYTHONPATH" not in env
+
+
+def test_gui_environment_requires_display_for_x11_mode() -> None:
+    audit = _audit_module()
+
+    with pytest.raises(RuntimeError, match="requires DISPLAY"):
+        audit.gui_environment({}, display_backed=True)
+
+
+def test_gui_environment_uses_xcb_for_opt_in_x11_mode() -> None:
+    audit = _audit_module()
+
+    env = audit.gui_environment({"DISPLAY": ":0"}, display_backed=True)
+
+    assert env["DISPLAY"] == ":0"
+    assert env["QT_QPA_PLATFORM"] == "xcb"
+
+
 def test_validate_font_files_rejects_truncated_payload() -> None:
     audit = _audit_module()
 
     audit.validate_font_files(sorted(audit._REQUIRED_FONT_FILES))
     with pytest.raises(ValueError, match="missing"):
         audit.validate_font_files(sorted(audit._REQUIRED_FONT_FILES)[:-1])
+
+
+def test_validate_icon_files_requires_the_bundled_qt_icons() -> None:
+    audit = _audit_module()
+
+    audit.validate_icon_files(sorted(audit._REQUIRED_ICON_FILES))
+    with pytest.raises(ValueError, match="missing"):
+        audit.validate_icon_files(["copy.svg"])
 
 
 def test_write_report_serializes_one_json_evidence_file(tmp_path: Path) -> None:
