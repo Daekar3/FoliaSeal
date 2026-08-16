@@ -36,17 +36,29 @@ usability.
 - [x] (2026-08-16) Added the optional host-Python probe and integrated its
   bounded JSON result into the existing audit without adding a runtime product
   dependency. A session-bus preflight avoids creating AT-SPI sockets when the
-  registry service is absent.
+  accessibility bus launcher is absent.
 - [x] (2026-08-16) Ran and inspected the real X11 report: native F1 and owned
-  cleanup passed, while AT-SPI was classified unavailable because
-  `org.a11y.atspi.Registry` is absent from the session bus. Status docs were
-  reconciled, reviewed GO, and committed in the focused AT-SPI slice.
+  cleanup passed, while the initial AT-SPI preflight incorrectly classified
+  the dedicated registry as absent from the user session bus. Status docs were
+  reconciled, reviewed GO, and committed in the focused AT-SPI slice; the
+  corrected follow-up is recorded below.
+- [x] (2026-08-16) Corrected the AT-SPI2 preflight after inspecting the live
+  Cinnamon bus. The user session exposes `org.a11y.Bus`; the dedicated AT-SPI
+  address is returned by `GetAddress` and must be placed in `AT_SPI_BUS_ADDRESS`
+  before importing host `pyatspi`. Focused probe tests now cover launcher
+  detection, address resolution, registry failures, and owned-frame traversal.
+  A fresh display-backed run reached the dedicated bus but timed out while
+  discovering the owned Qt frame and emitted Qt's
+  `GetApplicationBusAddress` warning; this supersedes the earlier false
+  "registry absent" classification.
 
 ## Surprises & Discoveries
 
-- Observation: system Python can import `pyatspi`, but the current session
-  lacks `org.a11y.atspi.Registry`, so no accessibility-tree connection or
-  inspection was obtained; the project venv does not require those bindings.
+- Observation (superseded): the first implementation treated the absence of
+  `org.a11y.atspi.Registry` on the user session bus as unavailable. AT-SPI2
+  publishes `org.a11y.Bus` there and exposes the registry on its dedicated bus.
+  The corrected helper resolves that address before importing `pyatspi`; the
+  current Qt frame still does not become discoverable within the bounded probe.
 - Observation: AT-SPI warnings may appear while the registry discovers the
   session socket. The probe must classify an unavailable registry as an
   evidence limitation, not as a product failure.
@@ -83,15 +95,13 @@ usability.
 
 ## Outcomes & Retrospective
 
-The optional audit run passed with native X11 F1 and cleanup intact. The report
-recorded the exact audit PID/title and classified AT-SPI as unavailable because
-the session bus did not advertise `org.a11y.atspi.Registry`; no accessible
-tree claim was made. The focused tests (7), full suite (1543 passed, 20
-skipped), Ruff, compile, and diff checks passed. No owned window, process, or
-artifact root remained. The human screen-reader, high-contrast, physical-DPI,
+The optional audit run passes native X11 F1 and cleanup. The corrected helper
+now detects the session-bus launcher and resolves the dedicated AT-SPI address,
+but the owned Qt frame is not discoverable before the bounded timeout and Qt
+reports that its application interface lacks `GetApplicationBusAddress`; no
+accessible-tree claim is made. Focused probe/audit tests, Ruff, compile, and
+diff checks pass. The human screen-reader, high-contrast, physical-DPI,
 monitor, privileged, final release, and Wayland gates remain open or deferred.
-The implementation and reconciled status documents were committed in the
-focused AT-SPI slice.
 
 ## Context and Orientation
 
@@ -211,6 +221,6 @@ interfaces. The production runner invokes it as a subprocess only when
 `src/foliaseal` or the project dependency set.
 
 Revision note: 2026-08-16 / Codex: created after host Python exposed
-`pyatspi`; the current session lacks the AT-SPI registry service, so the
-optional probe records an unavailable classification without claiming tree or
-speech evidence.
+`pyatspi`; the helper resolves the dedicated bus address from `org.a11y.Bus` and
+records a bounded unavailable classification if the owned Qt frame cannot be
+discovered, without claiming tree or speech evidence.

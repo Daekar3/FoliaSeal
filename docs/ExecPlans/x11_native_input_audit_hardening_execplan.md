@@ -192,8 +192,10 @@ Run from `/home/daekar/FoliaSeal`:
 
 Inspect the JSON report before closeout. A successful live run includes
 `native_input` attempt/focus diagnostics, `help.opened=true`, and
-`cleanup.passed=true`. A limited AT-SPI result is acceptable when the session
-bus lacks `org.a11y.atspi.Registry`; it is not screen-reader acceptance.
+`cleanup.passed=true`. A limited AT-SPI result is acceptable when the session-bus
+launcher or dedicated AT-SPI address is unavailable, or when the owned Qt frame
+cannot be discovered within the bounded probe timeout; it is not screen-reader
+acceptance.
 Remove the exact audit root and verify no FoliaSeal/PySide6/pytest process or
 owned window remains. Never run the command with a Wayland display.
 

@@ -692,10 +692,12 @@ Release tranche:
   are complete. Historical plans remain historical; external release gates
   remain open or deferred.
 - [x] (2026-08-16) Exercised the optional host AT-SPI probe on Cinnamon/X11.
-  The bounded report classified the registry as unavailable because
-  `org.a11y.atspi.Registry` is absent from the session bus; native F1, semantic
-  Qt evidence, and cleanup remained green. Human screen-reader and visual
-  acceptance remain open, and Wayland remains deferred.
+  The initial bounded report exposed an incorrect session-bus preflight. The
+  corrected probe now resolves `org.a11y.Bus` and the dedicated AT-SPI address,
+  but a fresh run timed out discovering the owned Qt frame with Qt's
+  `GetApplicationBusAddress` warning; native F1, semantic Qt evidence, and
+  cleanup remained green. Human screen-reader and visual acceptance remain
+  open, and Wayland remains deferred.
 - [x] (2026-08-16) Repeated the owned X11 geometry audit at Qt scale 2. The
   report retained DPR `2.0`, a `1100x700` logical frame, two-screen context,
   native F1, and clean teardown; direct screenshot inspection found the menu,
@@ -745,8 +747,8 @@ Release tranche:
   the owned package root and child process were removed. This does not close human accessibility,
   privileged host installation, final release signoff, or deferred Mint 22.3 Wayland.
 - [x] (2026-08-16) Re-ran and inspected the supported source-tree X11 accessibility frame. Native
-  F1/Help, named controls, two-monitor geometry, and cleanup passed; AT-SPI remained unavailable
-  because the session bus lacks `org.a11y.atspi.Registry`. The privileged host-install gate was
+  F1/Help, named controls, two-monitor geometry, and cleanup passed; the corrected AT-SPI probe
+  reached the dedicated bus address but timed out discovering the owned Qt frame. The privileged host-install gate was
   not attempted without explicit escalation authorization. These results strengthen machine/X11
   evidence but do not close human accessibility, privileged installation, final signoff, or the
   deferred Mint 22.3 Wayland gate.
@@ -755,6 +757,12 @@ Release tranche:
   representative screenshots were inspected and the owned audit root/processes/outputs were
   removed. This closes no additional human, privileged-host, final-release, or deferred Wayland
   gate, but confirms the current source-tree workflow remains healthy.
+- [x] (2026-08-16) Corrected the optional AT-SPI probe to resolve `org.a11y.Bus` and
+  `GetAddress` before host `pyatspi` discovery. Focused probe/audit coverage is `7 passed`; the
+  current full suite is `1588 passed, 20 skipped, 1 warning`, with Ruff, compilation, `pip check`,
+  and diff checks clean. The real X11 run reaches the dedicated bridge but times out discovering
+  the Qt frame with `GetApplicationBusAddress` warning; this removes a false negative but closes
+  no human, privileged-host, final-release, or deferred Wayland gate.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

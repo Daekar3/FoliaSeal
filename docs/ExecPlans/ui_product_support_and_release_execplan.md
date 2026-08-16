@@ -169,9 +169,12 @@ Qt surface, focused tests, and observable acceptance.
   implementation gap was found; the remaining unchecked release items are
   human/display, privileged-host, or final-release gates.
 - [x] (2026-08-16) Exercised the optional X11 AT-SPI evidence boundary. The
-  host probe safely reported `unavailable` because the session bus lacks
-  `org.a11y.atspi.Registry`; the source-tree native-X11 and cleanup evidence
-  remained green. No screen-reader speech or visual acceptance claim was made.
+  original host probe reported `unavailable` from an incorrect session-bus
+  preflight. The corrected probe now resolves `org.a11y.Bus` and its dedicated
+  AT-SPI address, but the owned Qt frame still timed out during tree discovery
+  with Qt's `GetApplicationBusAddress` warning. Native-X11 and cleanup evidence
+  remained green; no accessible-tree, screen-reader speech, or visual acceptance
+  claim was made.
 - [x] (2026-08-16) Repeated the supported source-tree X11 audit at Qt scale 2.
   DPR `2.0`, the `1100x700` logical frame, two-screen context, native F1, and
   owned cleanup passed; direct inspection found no clipping in the primary
@@ -208,8 +211,9 @@ Qt surface, focused tests, and observable acceptance.
 - [x] (2026-08-16) Repeated the supported X11 audit with Orca present (`46.1`) and inspected the
   exact Qt-owned screenshot. One native-F1 attempt opened Help; the two-monitor frame reported
   `1100x700`, primary `1920x1080`, DPR `1.0`, and logical DPI `96`, with no clipping in the menu,
-  empty-state message, Open, or Library controls. AT-SPI remained unavailable because the session
-  bus lacks `org.a11y.atspi.Registry`; this strengthens machine/X11 evidence only and does not
+  empty-state message, Open, or Library controls. The corrected AT-SPI probe reached the dedicated
+  bus address but timed out while discovering the owned Qt frame, with Qt's `GetApplicationBusAddress`
+  warning; this strengthens machine/X11 evidence only and does not
   close human speech/contrast, physical-DPI interpretation, privileged installation, final release,
   or deferred Wayland gates. The exact report/screenshot root and owned processes were cleaned.
 - [x] (2026-08-16) Re-ran the automated release gates from a fresh build: full suite `1574 passed,
@@ -249,8 +253,9 @@ Qt surface, focused tests, and observable acceptance.
   Mint 22.3 Wayland.
 - [x] (2026-08-16) Re-ran the owned source-tree X11 accessibility audit with screenshot capture and
   inspected the Qt-owned frame. Native F1/Help, named controls, 1100x700 geometry, two-monitor
-  metadata, and teardown passed; AT-SPI remained unavailable because the session bus lacks
-  `org.a11y.atspi.Registry`. This is supported-X11 machine evidence only, not human speech,
+  metadata, and teardown passed; the corrected AT-SPI probe reached `org.a11y.Bus` and the dedicated
+  bus address but timed out while discovering the owned Qt frame. This is supported-X11 machine
+  evidence only, not human speech,
   high-contrast, physical-DPI, or final-release acceptance. A privileged `sudo dpkg -i` attempt was
   not made because escalation for host package-database mutation was not authorized; that gate
   remains explicitly HITL.
@@ -260,6 +265,12 @@ Qt surface, focused tests, and observable acceptance.
   outputs, windows, and processes were removed. This strengthens source-tree workflow evidence only;
   human accessibility, privileged installation, final release signoff, and deferred Wayland remain
   open.
+- [x] (2026-08-16) Corrected the optional AT-SPI probe's session-bus contract. Focused probe/audit
+  coverage is `7 passed`; the full suite is `1588 passed, 20 skipped, 1 warning`, and Ruff,
+  compilation, `pip check`, and diff checks are clean. A fresh X11 run now resolves `org.a11y.Bus`
+  and the dedicated address before timing out on the owned Qt frame with Qt's
+  `GetApplicationBusAddress` warning. This removes the false registry-absent claim but does not
+  close accessible-tree, human speech, visual, privileged, final-release, or Wayland gates.
 - [ ] (remaining release gate) Close the remaining release-matrix acceptance work. The
   focused/regression rerun and source-tree Cinnamon/X11/native-F1 evidence are complete; the
   remaining external gates are display-backed screen-reader/high-contrast and physical-DPI/monitor

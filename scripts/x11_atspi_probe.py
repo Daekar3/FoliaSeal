@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import time
 from collections import deque
@@ -102,6 +103,35 @@ def _find_frame(application: Any, title: str, pyatspi: Any) -> Any | None:
     return None
 
 
+def _atspi_bus_address() -> tuple[str | None, str | None]:
+    """Resolve the dedicated AT-SPI bus address from the session bus launcher."""
+
+    try:
+        result = subprocess.run(
+            [
+                "busctl",
+                "--user",
+                "call",
+                "org.a11y.Bus",
+                "/org/a11y/bus",
+                "org.a11y.Bus",
+                "GetAddress",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"AT-SPI bus address lookup: {type(exc).__name__}: {exc}"
+    if result.returncode != 0:
+        return None, f"AT-SPI bus address lookup failed with code {result.returncode}"
+    output = result.stdout.strip()
+    if not output.startswith("s \"") or not output.endswith('"'):
+        return None, "AT-SPI bus address lookup returned no usable address"
+    return output[3:-1], None
+
+
 def inspect(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]:
     try:
         bus = subprocess.run(
@@ -116,13 +146,25 @@ def inspect(pid: int, title: str, timeout_seconds: float) -> dict[str, Any]:
             "status": "unavailable",
             "reason": f"accessibility bus: {type(exc).__name__}: {exc}",
         }
-    if "org.a11y.atspi.Registry" not in bus.stdout:
+    # AT-SPI2 exposes the accessibility bus launcher on the user session bus.
+    # The registry itself is reached through that bridge by pyatspi and does
+    # not normally appear as a well-known name in this bus listing.
+    if "org.a11y.Bus" not in bus.stdout:
         return {
             "status": "unavailable",
-            "reason": "AT-SPI registry service is not present on the session bus",
+            "reason": "AT-SPI bus launcher org.a11y.Bus is not present on the session bus",
             "process_id": pid,
             "title": title,
         }
+    address, address_error = _atspi_bus_address()
+    if address is None:
+        return {
+            "status": "unavailable",
+            "reason": address_error or "AT-SPI bus address is unavailable",
+            "process_id": pid,
+            "title": title,
+        }
+    os.environ["AT_SPI_BUS_ADDRESS"] = address
     try:
         import pyatspi
     except Exception as exc:

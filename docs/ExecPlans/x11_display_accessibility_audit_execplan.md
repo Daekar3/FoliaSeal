@@ -47,10 +47,12 @@ installation, or Wayland support.
 - [x] (2026-08-16) Addressed review findings by requiring successful exact WM
   activation before XTest input, adding the runner deadline, and making the
   report fail if an owned window, child process, or temporary root remains.
-- [x] (2026-08-16) The optional host-Python AT-SPI probe classified the current
-  session as unavailable because the session bus lacks
-  `org.a11y.atspi.Registry`; native F1, semantic Qt evidence, and cleanup still
-  pass. This does not claim an accessible-tree or screen-reader result.
+- [x] (2026-08-16) The optional host-Python AT-SPI probe was corrected to use the
+  `org.a11y.Bus` session-bus launcher and resolve the dedicated AT-SPI address.
+  A fresh run reached that bus but timed out discovering the owned Qt frame
+  (with Qt's `GetApplicationBusAddress` warning); native F1, semantic Qt
+  evidence, and cleanup still pass. This does not claim an accessible-tree or
+  screen-reader result.
 - [x] (2026-08-16) Repeated the owned X11 audit at `QT_SCALE_FACTOR=2` with
   `QT_AUTO_SCREEN_SCALE_FACTOR=0`; DPR `2.0`, the `1100x700` logical frame,
   two-screen context, native F1, and teardown all remained green. The exact

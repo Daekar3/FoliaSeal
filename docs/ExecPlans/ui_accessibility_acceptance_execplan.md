@@ -70,15 +70,22 @@ as environment-dependent rather than being falsely claimed by headless tests.
   inspected Qt-owned frame on the two-monitor Cinnamon session. The audit passed in one native-F1
   attempt with `1100x700` geometry, `1920x1080` primary display, DPR `1.0`, logical DPI `96`,
   full-width Open/Library controls, accessible Help controls, and clean teardown. The optional
-  AT-SPI probe remained `unavailable` because the session bus does not advertise
-  `org.a11y.atspi.Registry`; this is machine evidence only and does not close human speech,
+  initial AT-SPI preflight was later found to be incorrect; the corrected probe reaches the
+  dedicated bus but the owned Qt frame times out during discovery. This is machine evidence only
+  and does not close human speech,
   contrast, physical-DPI, or final-release gates. The exact screenshot/report root was removed.
 - [x] (2026-08-16) Re-ran the owned X11 audit and inspected its exact Qt frame. Mint-Y-Dark,
   1100x700 geometry, two 1920x1080 monitors, native F1/Help, named controls, and teardown all
   passed; the screenshot showed no clipping in the menu, no-document message, Open, or Library
-  controls. AT-SPI again reported `unavailable` because `org.a11y.atspi.Registry` is absent from
-  the session bus. This strengthens supported-X11 machine evidence only and does not claim human
+  controls. The corrected AT-SPI probe reached the dedicated bus address but timed out discovering
+  the owned Qt frame, with Qt's `GetApplicationBusAddress` warning. This strengthens supported-X11
+  machine evidence only and does not claim human
   screen-reader speech, high contrast, physical-DPI interpretation, or final acceptance.
+- [x] (2026-08-16) Corrected the optional host probe to use the AT-SPI2 session-bus launcher and
+  dedicated address. Focused probe/audit coverage is `7 passed`; the full suite is `1588 passed,
+  20 skipped, 1 warning`. The live run reached the bridge but timed out discovering the owned Qt
+  frame with `GetApplicationBusAddress` warning, so human screen-reader and visual acceptance remain
+  open rather than being inferred from the corrected machine probe.
 
 ## Surprises & Discoveries
 
@@ -162,9 +169,11 @@ evidence, not human screen-reader, contrast, physical-DPI, monitor-move,
 packaged, or final release approval; Wayland is deferred for Mint 22.3.
 
 The optional host-Python AT-SPI probe was also exercised against the owned
-window. It returned a bounded `unavailable` classification because the session
-bus does not advertise `org.a11y.atspi.Registry`; native F1 and teardown still
-passed. This is an environment limitation, not screen-reader speech evidence.
+window. The corrected helper resolved `org.a11y.Bus` and the dedicated AT-SPI
+address, then returned a bounded `unavailable` classification because the owned
+Qt frame was not discoverable before timeout; native F1 and teardown still
+passed. This is an environment/Qt bridge limitation, not screen-reader speech
+evidence.
 
 The same owned X11 frame was rerun at Qt device-pixel ratio 2.0 with two
 monitors present. The report retained the 1100x700 logical frame and native F1;
