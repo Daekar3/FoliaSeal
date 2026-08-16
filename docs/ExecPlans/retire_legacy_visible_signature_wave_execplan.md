@@ -45,7 +45,7 @@ the live modules they name.
 - [x] (2026-08-16) Independent compliance and documentation reviews passed;
   all eight targeted historical plans have no actionable unchecked task, and
   current-owner links/evidence are truthful. The bounded documentation slice
-  is ready for commit and final cleanup.
+  was committed as `01d7dcdef`; post-commit cleanup is clean.
 
 ## Surprises & Discoveries
 
