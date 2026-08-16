@@ -31,7 +31,9 @@ is human visual acceptance or that an isolated package root is a privileged host
   physical DPI/monitor checks and privileged host package installation.
 - [x] Reconcile completed-child dependency markers and obsolete accessibility progress wording.
 - [x] Update release outcomes/gates and architecture status without deleting historical evidence.
-- [x] Run static validation, clean artifacts, and prepare the reconciliation for commit.
+- [x] (2026-08-16) Run static validation, clean artifacts, and prepare/commit the reconciliation;
+  Ruff, compileall, `git diff --check`, and process cleanup are green. The four-file status slice
+  was committed as `6def0b16c`.
 
 ## Surprises & Discoveries
 
@@ -104,7 +106,8 @@ audit roots created during validation. Never delete package fixtures, user data,
 ## Artifacts and Notes
 
 Record the completed child paths, focused/offscreen/package evidence, remaining external gates, and
-the commit hash. Do not commit generated `.deb` files, screenshots, logs, keys, or temporary roots.
+the commit hash (`6def0b16c`). Do not commit generated `.deb` files, screenshots, logs, keys, or
+temporary roots.
 
 ## Interfaces and Dependencies
 
