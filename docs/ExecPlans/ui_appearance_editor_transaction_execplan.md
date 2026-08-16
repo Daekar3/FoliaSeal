@@ -178,7 +178,8 @@ persisted state and selection unchanged; Save preserves stable identity on edit 
 parent detail. Focused tests must cover Create, Edit, Save, Cancel/Discard, dirty prompts, and
 synthetic-preview non-persistence. Shared-code changes must leave the full suite green, and the GUI
 audit must record the visible result and cleanup. Preset-child return, reason/location defaults,
-active-placement invalidation, and renderer-fidelity validation remain explicitly outside this
+active-placement invalidation remained explicitly outside this historical prerequisite slice and
+is implemented by `ui_active_reusable_object_placement_invalidation_execplan.md`; renderer-fidelity validation remains outside this
 slice and must not be claimed as complete here.
 
 ## Evidence Record
@@ -256,7 +257,9 @@ parent restoration, and child-widget cleanup. Full validation reached 1357 passe
 the bounded launch audit still reports the environment's isolated single-instance endpoint error,
 with no leaked processes or temporary roots. The compatibility modal wrapper remains deliberately
 thin and its retirement condition is documented. Preset-child suspension, reason/location defaults,
-active-placement invalidation, and final rendered-preview fidelity are the next separate slices.
+active-placement invalidation was the next separate slice at this historical checkpoint and is now
+implemented by `ui_active_reusable_object_placement_invalidation_execplan.md`; final rendered-preview
+fidelity remains separate.
 
 Revision note: 2026-08-10 / Codex
 Reconciled after a fresh checkout review. The follow-up slice is now explicit about the

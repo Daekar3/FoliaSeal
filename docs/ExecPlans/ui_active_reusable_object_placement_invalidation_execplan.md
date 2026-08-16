@@ -108,8 +108,7 @@ Validation evidence (2026-08-16):
 - `git diff --check` — passed.
 - Cleanup audit found no FoliaSeal-owned process or temporary root; Wayland was not run.
 
-Commit: `feat: protect placed signatures from reusable changes` (the final hash is recorded after
-the focused commit is created).
+Commit: `aabd86eef feat: protect placed signatures from reusable changes`.
 
 ## Context and Orientation
 
