@@ -41,7 +41,9 @@ Out of scope:
   full-suite evidence (`1535 passed, 20 skipped, 1 warning`).
 - [x] (2026-08-16) Independent compliance review and architecture-steward review found only two
   present-tense archival wording ambiguities; both were corrected without changing contracts.
-- [ ] Record the focused commit and final process/worktree cleanup audit.
+- [x] (2026-08-16) Commit `6debad2ef` recorded the four-file reconciliation; the final audit
+  found a clean worktree, clean diff check, no live nomenclature references, and no FoliaSeal,
+  pytest, Qt, or GUI processes.
 
 ## Plan of work
 
