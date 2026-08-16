@@ -149,8 +149,12 @@ Qt surface, focused tests, and observable acceptance.
   host probe safely reported `unavailable` because the session bus lacks
   `org.a11y.atspi.Registry`; the source-tree native-X11 and cleanup evidence
   remained green. No screen-reader speech or visual acceptance claim was made.
-- [ ] (remaining release gate) Retire any additional migrated compatibility or acceptance product
-  cruft only after a fresh consumer audit proves its retirement condition.
+- [x] (2026-08-16) Completed a fresh compatibility and nomenclature consumer audit. No `phase3`
+  references remain in `src/`, `scripts/`, or `tests/`; the remaining `Acceptance*` CLI/DTO/JSON/
+  artifact names are active developer/release contracts, `build_qt_signing_shell` remains consumed
+  by focused tests as an adapter, and `PdfCompatibility` remains production signing policy. No
+  additional compatibility or acceptance cruft met a safe retirement condition, so no source
+  deletion was made.
 - [ ] (remaining release gate) Run the final focused, regression, display-backed, and privileged host package-manager
   validation; clean processes and artifacts.
 - [ ] (remaining release gate) Update this plan and relevant docs, then commit the final release
@@ -188,8 +192,9 @@ packaged Help, privacy-safe diagnostics, Restore defaults, real-Qt/offscreen acc
 payload parity, private install-root `dpkg --unpack`, source-tree native-X11 keyboard/Help
 evidence, and packaged-X11 startup all have owning children and current evidence. This plan remains open only for
 display-backed screen-reader/high-contrast/physical-DPI/monitor and human GUI acceptance,
-privileged host package installation, final cross-surface release execution, and any approved
-compatibility/nomenclature retirement. The isolated package audit’s GUI result is explicitly limited
+privileged host package installation, and final cross-surface release execution. The compatibility
+and nomenclature audit found no safe additional retirement; active Acceptance evidence contracts
+remain intentionally stable. The isolated package audit’s GUI result is explicitly limited
 by `SingleInstanceUnavailable`; no full-release claim is made. Wayland is deferred for Mint 22.3.
 
 ## Context and Orientation

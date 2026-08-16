@@ -662,6 +662,12 @@ Release tranche:
   `org.a11y.atspi.Registry` is absent from the session bus; native F1, semantic
   Qt evidence, and cleanup remained green. Human screen-reader and visual
   acceptance remain open, and Wayland remains deferred.
+- [x] (2026-08-16) Completed a source/spec consumer audit for the remaining
+  compatibility and nomenclature gate. No `phase3` references remain in
+  product source, scripts, or tests; active `Acceptance*` evidence contracts
+  and the test-only `build_qt_signing_shell` adapter remain intentionally
+  retained because their consumers are live. No safe additional retirement was
+  identified.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.
