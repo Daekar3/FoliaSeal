@@ -937,7 +937,7 @@ text/metadata resolution. Before executing the manual harness sanity pass below,
 first execute `docs/ExecPlans/post_semantics_signed_parity_rebaseline_execplan.md`
 and `docs/ExecPlans/post_semantics_preview_matrix_rebaseline_execplan.md`. If
 those automated post-semantics rebaselines are green, continue with
-`docs/ExecPlans/manual_harness_sanity_pass_execplan.md`. This preserves the
+`docs/ExecPlans/manual_harness_current_audit_execplan.md`. This preserves the
 intent of the manual pass while accounting for the newer architecture changes
 and the large preview artifact battery.
 
@@ -963,7 +963,7 @@ The current codebase now has strong automated evidence for:
 The least recently validated surface is the live Qt harness path itself:
 
 - `src/foliaseal/presentation/qt/signing_shell.py`
-- `src/foliaseal/presentation/qt/phase3_harness.py`
+- `src/foliaseal/presentation/qt/interactive_harness.py` and its extracted harness/session modules
 
 That path has had multiple targeted fixes:
 

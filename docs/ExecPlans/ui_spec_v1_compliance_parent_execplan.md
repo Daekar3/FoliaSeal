@@ -559,6 +559,11 @@ Release tranche:
   offscreen production AppFrame test proves the same postconditions. Architecture and child-plan
   evidence are reconciled; the command-model child remains open for final scenario evidence and
   other release gates.
+- [x] (2026-08-16) Re-ran the current signed-evidence harness audit through
+  `docs/ExecPlans/manual_harness_current_audit_execplan.md`: the strict headless gates pass with
+  18/18 parity signings and 3/3 matched fit rejections, and the four tracer artifacts are coherent.
+  The live HITL attempt is still open because the current environment cannot open `DISPLAY=:0` and
+  the xcb Qt plugin aborts before window creation; no full GUI acceptance claim is made.
 - [ ] Implement, validate, document, and commit each child without mixing unrelated change classes.
 - [ ] Run the final live GUI, offline, accessibility, and packaged-install acceptance pass.
 - [ ] Reconcile architecture/status documentation and retire obsolete product-facing terminology.

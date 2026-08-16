@@ -170,7 +170,7 @@ Run focused tests if a code change is needed:
 
 ## Validation and Acceptance
 
-This plan is accepted when the success-only signed preview parity matrix passes after Issue #50, the signed fit-rejection matrix passes after Issue #50, and this document records the exact artifact directories and summary counts. If both matrices pass, the next plan is `docs/ExecPlans/manual_harness_sanity_pass_execplan.md`. If either matrix fails, acceptance requires a concrete classification and a follow-up fix plan before manual GUI review begins.
+This plan is accepted when the success-only signed preview parity matrix passes after Issue #50, the signed fit-rejection matrix passes after Issue #50, and this document records the exact artifact directories and summary counts. If both matrices pass, the current audit plan is `docs/ExecPlans/manual_harness_current_audit_execplan.md`. If either matrix fails, acceptance requires a concrete classification and a follow-up fix plan before manual GUI review begins.
 
 ## Idempotence and Recovery
 

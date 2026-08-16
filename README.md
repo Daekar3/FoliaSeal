@@ -113,7 +113,8 @@ foliaseal acceptance-harness-validate \
 ```
 
 Run the bundled signed-acceptance evidence workflow, which regenerates local fixture assets and
-writes a concise summary:
+writes a concise summary. This workflow is deterministic evidence and may run with
+`QT_QPA_PLATFORM=offscreen`; it does not constitute human visual acceptance:
 
 ```bash
 foliaseal signed-acceptance-evidence
@@ -131,7 +132,9 @@ foliaseal preview-matrix \
   --artifacts-dir artifacts/preview-matrix
 ```
 
-The interactive harnesses launch Qt and are intended for manual review:
+The interactive harnesses launch Qt and are intended for display-backed manual review. An
+offscreen run can exercise the Qt path and generate artifacts, but it cannot prove what an
+operator sees on a real display:
 
 ```bash
 foliaseal interactive-harness \

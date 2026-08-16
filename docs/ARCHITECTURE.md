@@ -1363,6 +1363,10 @@ boundary fakeable while preserving native Qt shortcuts.
 - Consumer: Developers, manual QA, local automation.
 - Stability: Needs review. Commands are documented in README and covered by CLI tests, so treat them as user-facing.
 - Commands: default `foliaseal`, `help`, `phase2-evidence`, `phase2-viewer-harness`, `interactive-harness`, `preview-matrix`, `signed-acceptance`, `signed-acceptance-evidence`, `acceptance-harness-validate`.
+- Evidence modes: `signed-acceptance-evidence` and the matrix commands provide deterministic
+  headless/offscreen evidence; `interactive-harness` is the display-backed human-in-the-loop
+  path. Offscreen Qt execution may exercise composition and artifact generation but must not be
+  reported as visual acceptance.
 - Validation: `argparse` enforces required arguments; command handlers raise on invalid evidence captures.
 - Error behavior: Python exceptions surface for invalid harness/evidence flows unless command handlers map them.
 - Source files: `src/foliaseal/__main__.py`, tests in `tests/unit/test_cli_parser.py` and `tests/unit/test_main_cli.py`.

@@ -10,7 +10,7 @@ The manual Qt harness review found one user-visible defect: cap 9 showed single-
 
 ## Progress
 
-- [x] (2026-05-02T04:18Z) Created this child ExecPlan from the manual cap 9 observation in `docs/ExecPlans/manual_harness_sanity_pass_execplan.md`.
+- [x] (2026-05-02T04:18Z) Created this child ExecPlan from the manual cap 9 observation preserved in the historical record `docs/ExecPlans/manual_harness_sanity_pass_execplan.md`; current audit ownership is `docs/ExecPlans/manual_harness_current_audit_execplan.md`.
 - [x] (2026-05-02T04:18Z) Confirmed no tracked cap 9 harness JSON is available; only the older `captured_states[9]` evidence note and the user's manual observation are present.
 - [x] (2026-05-02T04:20Z) Added `test_single_line_rendered_ink_fallback_rejects_border_flush_text` for rendered single-line text ink touching the border without triggering the existing reference-width-loss rejection.
 - [x] (2026-05-02T04:20Z) Confirmed the new regression failed before the production change: `_single_line_rendered_ink_fits_reservation` returned `True` for border-flush text.

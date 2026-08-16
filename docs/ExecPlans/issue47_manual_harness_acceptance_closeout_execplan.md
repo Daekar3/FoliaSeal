@@ -51,7 +51,7 @@ Issue #47 is titled "Run manual harness acceptance pass for horizontal single-li
 - Signed PDF appearance matches preview for text, stamp, and rounded border.
 - Harness artifacts are reviewed and any remaining mismatch is converted into a new focused issue.
 
-The parent manual evidence lives in `docs/ExecPlans/manual_harness_sanity_pass_execplan.md`. The cap 9 follow-up lives in `docs/ExecPlans/cap9_single_line_validation_honesty_execplan.md`. The durable cap ladder fixture is `tests/fixtures/phase3_horizontal_single_line_manual_replay.json`.
+The current parent manual evidence lives in `docs/ExecPlans/manual_harness_current_audit_execplan.md`; the older `manual_harness_sanity_pass_execplan.md` is historical. The cap 9 follow-up lives in `docs/ExecPlans/cap9_single_line_validation_honesty_execplan.md`. The durable cap ladder fixture is `tests/fixtures/phase3_horizontal_single_line_manual_replay.json`.
 
 The focused automated backstops are:
 
@@ -64,7 +64,7 @@ The focused automated backstops are:
 
 First, run the focused tests listed above. If they fail, inspect the failure and update this plan with the remaining blocker instead of closing Issue #47.
 
-Second, update `docs/ExecPlans/manual_harness_sanity_pass_execplan.md` and this plan with the close-out judgment. The judgment should state that Issue #47's manual acceptance criteria are satisfied by the user manual review plus the completed cap 9 validation-honesty fix.
+Second, update `docs/ExecPlans/manual_harness_current_audit_execplan.md` and this plan with the close-out judgment. The judgment should state that Issue #47's manual acceptance criteria are satisfied by the user manual review plus the completed cap 9 validation-honesty fix.
 
 Third, close GitHub Issue #47 with a concise reason that names the evidence and the cap 9 follow-up fix.
 

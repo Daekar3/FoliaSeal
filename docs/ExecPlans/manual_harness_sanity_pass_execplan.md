@@ -2,6 +2,11 @@
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
+> Historical status: superseded on 2026-08-16 by
+> `docs/ExecPlans/manual_harness_current_audit_execplan.md`. This record preserves the earlier
+> manual review and its cap-9 follow-up, but its retired `phase3-*` commands and old module paths
+> must not be used for current execution.
+
 This document must be maintained in accordance with `.agents/skills/write-execplan/PLANS.md`.
 
 ## Purpose / Big Picture
@@ -73,7 +78,7 @@ Issue #47 close-out is now tracked by `docs/ExecPlans/issue47_manual_harness_acc
 
 ## Context and Orientation
 
-The live Qt signing harness is the path closest to user behavior. It wires together `SigningDraftWorkflow`, the Qt signing shell, preview rendering, request construction, backend signing, and artifact capture. It lives primarily in `src/foliaseal/presentation/qt/phase3_harness.py` and `src/foliaseal/presentation/qt/signing_shell.py`.
+The live Qt signing harness is the path closest to user behavior. It wires together `SigningDraftWorkflow`, the Qt signing shell, preview rendering, request construction, backend signing, and artifact capture. It lives primarily in `src/foliaseal/presentation/qt/interactive_harness.py`, the extracted `acceptance_harness_*`/session modules, and `src/foliaseal/presentation/qt/signing_shell.py`.
 
 A tracer-bullet case means one representative scenario chosen to prove a path end to end. In this plan, use three successful visible-signature cases and one intentional rejection case:
 
@@ -90,7 +95,7 @@ First read the latest post-semantics signed-output rebaseline results and the fu
 
 Next choose exact scenario names from the current manifests. Prefer cases that are already comfortably signable and are not near fit thresholds. The goal is to inspect the GUI composition and final output, not to re-litigate fit boundaries.
 
-Run the Phase 3 signing harness or, if manual interaction is needed, launch the interactive harness with an artifacts directory and use the selected settings. Capture each successful case with preview images, analysis preview images, signed output render/crop, comparison images, and harness JSON. Capture the rejection case with preview validation issues and no signed PDF.
+Run the current interactive harness or, if manual interaction is needed, launch it with an artifacts directory and use the selected settings. Capture each successful case with preview images, analysis preview images, signed output render/crop, comparison images, and harness JSON. Capture the rejection case with preview validation issues and no signed PDF.
 
 Review artifacts manually. For successful cases, inspect whether the live preview card is visually centered and sane, whether the analysis preview matches the intended layout, whether the normalized signed crop matches the preview, and whether structured snapshots agree on text fragments, stamp presence, borders, and bounds. For the rejection case, inspect whether the failure message is clear and no signed output was written.
 
@@ -114,8 +119,8 @@ Inspect the manifests to choose scenario names:
 
 Use the existing harness commands and code paths; do not introduce a new manual runner unless the existing harness cannot capture one of the selected cases. The relevant entry points are:
 
-    .venv/bin/python -m foliaseal phase3-signing-harness --help
-    .venv/bin/python -m foliaseal phase3-signing-acceptance-matrix --help
+    .venv/bin/python -m foliaseal interactive-harness --help
+    .venv/bin/python -m foliaseal signed-acceptance --help
 
 Use an artifacts directory whose name identifies this pass, for example:
 
@@ -165,7 +170,7 @@ That evidence is useful context but should not substitute for the post-Issue-50 
 
 ## Interfaces and Dependencies
 
-Use the existing Qt harness and signed acceptance harness in `src/foliaseal/presentation/qt/phase3_harness.py`; do not create another evidence format. The harness depends on the current architecture: `visible_signature_semantics.py` owns text/metadata semantics, `visible_signature_layout.py` owns geometry planning, `signing_preview_renderer.py` owns canonical preview rendering, `signing_shell.py` owns live Qt composition, and `phase3_signing_backend.py` owns pyHanko signing.
+Use the existing Qt harness and signed acceptance harness in `src/foliaseal/presentation/qt/interactive_harness.py` and its extracted workspace/session modules; do not create another evidence format. The harness depends on the current architecture: `visible_signature_semantics.py` owns text/metadata semantics, `visible_signature_layout.py` owns geometry planning, `signing_preview_renderer.py` owns canonical preview rendering, `signing_shell.py` owns live Qt composition, and `signing_backend.py` owns pyHanko signing.
 
 Revision note: Created 2026-05-02 by Codex to capture the manual GUI sanity pass as a separate, gated follow-on to automated post-semantics signed parity rebaseline.
 
