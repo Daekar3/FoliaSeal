@@ -1,0 +1,181 @@
+# Stabilize placement adjustment, performance, and keyboard affordance
+
+This ExecPlan is a living document and must remain self-contained under
+`/home/daekar/.codex/skills/write-execplan/PLANS.md`. It is Child 3 of
+`docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md`.
+
+## Purpose / Big Picture
+
+After this slice, pointer and keyboard users can enter Place mode, create one visible placement,
+adjust it from the Signing menu, move or resize it with the documented keys, cancel unfinished work,
+remove/undo/restore it, and return to Pan without a crash. Pointer placement will not perform sustained
+redundant work that pegs a CPU core during ordinary dragging.
+
+This slice addresses the observed `Adjust Placement` crash, high CPU during pointer placement, and the
+human inability to discover the keyboard path. It does not change placement persistence schemas,
+signature rendering, or the frozen PDF-first topology.
+
+## Child ExecPlan Dependencies
+
+- [x] `docs/SPEC.md`, `docs/UI_SPEC.md`, and `docs/SCHEMAS.md` are available and authoritative.
+- [x] `docs/ExecPlans/ui_placement_editor_transaction_execplan.md` defines reusable fixed-page profile
+  semantics; this child owns the active document placement interaction only.
+- [x] `docs/ExecPlans/ui_pointer_signature_placement_execplan.md` and existing viewer/history tests
+  provide the placement behavior baseline.
+- [x] `docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md` records the observed crash/performance
+  evidence.
+- [ ] Child 1 or Child 2 is not required. Child 4 depends on this child’s completion.
+
+## Progress
+
+- [x] (2026-08-20) Confirmed `Adjust Placement` is registered as
+  `AppFrameCommandId.ADJUST_PLACEMENT` and routed by `AppFrame._adjust_placement()` to
+  `SigningWorkspaceRuntime.set_viewer_interaction_mode("signature")`.
+- [x] (2026-08-20) Confirmed `viewer_widget.py` already contains Enter, Escape, arrow, Ctrl-arrow,
+  Delete, Ctrl-Z/Ctrl-Shift-Z, and keyboard recovery hooks.
+- [ ] Reproduce the installed crash with a captured traceback and isolate the failing lifecycle seam.
+- [ ] Add failing command/viewer regression tests for adjustment and cleanup.
+- [ ] Measure pointer-drag update work and implement the smallest evidence-backed coalescing/fix.
+- [ ] Expose the keyboard placement path through visible mode guidance, tooltips, or Help without
+  changing the documented key contract.
+- [ ] Run focused, regression, offscreen, and X11 validation.
+- [ ] Reconcile parent/release documentation and commit this behavior slice.
+
+## Surprises & Discoveries
+
+- Observation: the menu command and runtime mode setter are intentionally small, so the crash may be
+  caused by a stale viewer/session port, a disposed widget, or an overlay state transition rather than
+  by the command definition itself.
+  Evidence: `AppFrame._adjust_placement()` only calls `_with_current_session_port` and
+  `set_viewer_interaction_mode("signature")`; runtime then requires the active viewer widget.
+- Observation: the viewer already implements the keyboard contract but does not guarantee that a first
+  user will discover it from the visible shell.
+  Evidence: `viewer_widget.py::keyPressEvent` handles Enter/Escape/arrows/Ctrl-arrow/Delete/Undo, while
+  the human tester reported “Not sure how.”
+- Observation: pointer placement sends interaction callbacks and repaints while dragging, so a 100%
+  CPU observation needs a bounded measurement before selecting a timer or render optimization.
+  Evidence: `viewer_widget.py` processes drag/move/snap updates and calls `update()` during placement.
+
+## Decision Log
+
+- Decision: capture and test the crash before altering command routing.
+  Rationale: changing a thin command because it is the visible entry point could mask a lifecycle bug
+  and break unrelated commands.
+  Date/Author: 2026-08-20 / Codex.
+- Decision: preserve the existing key contract from UI_SPEC §8: Enter creates/accepts, arrows move,
+  Shift accelerates, Ctrl-arrow resizes, Delete removes, Escape cancels/returns to Pan, and Ctrl-Z/
+  Ctrl-Shift-Z undo/redo.
+  Rationale: the contract is already governing behavior; this slice makes it reliable and discoverable.
+  Date/Author: 2026-08-20 / Codex.
+- Decision: optimize only measured redundant work and never make placement asynchronous in a way that
+  changes visible geometry ordering or undo semantics.
+  Rationale: one drag must remain one history step, and the on-page overlay must stay aligned with the
+  current draft.
+  Date/Author: 2026-08-20 / Codex.
+- Decision: do not hide Adjust Placement after a placement exists; make it safe and keep its enablement
+  truthful.
+  Rationale: the command is an explicit recovery path required by the user and UI_SPEC.
+  Date/Author: 2026-08-20 / Codex.
+
+## Outcomes & Retrospective
+
+Initially pointer placement can work while adjustment crashes and keyboard behavior is undiscoverable.
+At completion, the command must be safe across document/session replacement, placement overlay state,
+and repeated enter/exit cycles. Record measured drag/update behavior and whether the remaining CPU cost is
+an environment artifact or a product regression. Do not mark the child complete from a unit test that
+never mounts the real viewer lifecycle.
+
+## Context and Orientation
+
+`src/foliaseal/presentation/qt/app_frame_command_model.py` defines the typed command and accessible
+menu text. `src/foliaseal/presentation/qt/app_frame.py` creates the QAction and calls `_place_signature`,
+`_adjust_placement`, and `_remove_placement` through the active session-port boundary.
+`src/foliaseal/presentation/qt/signing_workspace_runtime.py` validates modes, selects the active viewer,
+and exposes placement capability. `signing_workspace_composition.py` wires viewer mode buttons and
+callbacks. `src/foliaseal/presentation/qt/viewer_widget.py` owns the actual PDF overlay, mouse drag,
+keyboard events, snapping, repaints, and `PlacementHistory` commits. The application workflow receives
+placement changes through the signing workspace port and must remain the source of truth.
+
+## Plan of Work
+
+First reproduce the crash from a real display-backed session and from an offscreen test harness. Record
+the exact traceback, active document/session state, and whether the crash occurs only after pointer
+placement or after any completed placement. Add a failing test that opens a fixture, creates a placement,
+invokes the AppFrame command, and asserts the active viewer remains mounted in signature mode. Add a
+second test for repeated Adjust/Place/Pan/Adjust and one for closing/reopening the document between
+command enablement and invocation.
+
+Repair the owner identified by the traceback. The safe boundary must treat a missing/disposed session or
+viewer as a no-op with a status message, and a live viewer must enter signature mode without replacing
+the draft or clearing history. The action’s enablement must continue to use `can_adjust_signature_placement`.
+Avoid broad `except Exception` around the viewer; convert only known lifecycle absence into a controlled
+result and let unexpected errors fail tests with a traceback.
+
+For CPU behavior, instrument a bounded drag over the disposable fixture using a monotonic timer or
+existing render counters. Determine whether repeated `refresh`, PDF rasterization, snap calculation, or
+Qt repaint dominates. Coalesce only duplicate updates that cannot change the visible final rectangle;
+keep final pointer release synchronous, keep one history commit per drag, and ensure Escape reverts to
+the drag origin. Add a regression assertion for bounded callback/render count rather than a brittle CPU
+percentage threshold, plus a documented local observation of the original and corrected behavior.
+
+Finally, make the keyboard path discoverable. The visible mode label should state the essential keys or
+point to the existing Keyboard Shortcuts/Help surface; Place and Adjust actions need accurate accessible
+names and tooltips. Add offscreen focus tests proving the viewer receives Enter/arrows/Ctrl-arrow/Delete/
+Escape and that the resulting state/status explains what happened.
+
+## Concrete Steps
+
+Run from `/home/daekar/FoliaSeal`.
+
+    rg -n "ADJUST_PLACEMENT|_adjust_placement|set_viewer_interaction_mode|keyPressEvent|PlacementHistory|mouseMoveEvent" src/foliaseal/presentation/qt tests/unit
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_qt_signing_workspace_composition.py tests/unit/test_qt_viewer_widget.py tests/unit/test_placement_history.py
+    .venv/bin/ruff check src/foliaseal/presentation/qt/app_frame.py src/foliaseal/presentation/qt/app_frame_command_model.py src/foliaseal/presentation/qt/signing_workspace_runtime.py src/foliaseal/presentation/qt/viewer_widget.py tests/unit
+
+After implementation, run:
+
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_qt_signing_workspace_composition.py tests/unit/test_qt_viewer_widget.py tests/unit/test_placement_history.py tests/unit/test_qt_signing_action_boundary.py
+    .venv/bin/pytest -q
+    .venv/bin/ruff check src tests
+    .venv/bin/python -m compileall -q src
+    git diff --check
+
+Run the bounded real X11 audit with a unique title and disposable configuration. Create a placement,
+choose Signing → Adjust Placement repeatedly, use keyboard movement and resizing, press Escape during a
+drag, undo/redo, and remove/restore. Keep only the exact child process and audit root for cleanup.
+
+## Validation and Acceptance
+
+The child passes when:
+
+- Adjust Placement never crashes after pointer placement, keyboard placement, document open/close, or
+  repeated mode transitions.
+- A missing active session/viewer leaves the command safely disabled or reports a recoverable status;
+  it never dereferences a disposed widget.
+- Pointer create/drag/resize/cancel commits one history step per drag, keeps the overlay aligned, and
+  does not show sustained redundant render work in the bounded measurement.
+- Enter, arrows, Shift, Ctrl-arrow, Ctrl-Shift-arrow, Delete, Escape, Ctrl-Z, and Ctrl-Shift-Z produce
+  the UI_SPEC behavior and are discoverable from the visible mode guidance or Help.
+- Focused tests, full suite, Ruff, compileall, and diff checks pass.
+
+## Idempotence and Recovery
+
+Use the existing fixture and isolated Qt settings roots. If a crash occurs, preserve the traceback and
+close only the unique FoliaSeal process started for the audit. Do not kill Orca or unrelated desktop
+windows. If a performance probe hangs, terminate it by its recorded PID and remove only its temporary
+root. Keep any optimization behind a focused test so it can be reverted without touching placement
+schemas or persisted user data.
+
+## Artifacts and Notes
+
+The commit may contain only placement command/viewer/runtime source, focused tests, this plan, and narrow
+status documentation. Do not commit profiler dumps, screenshots containing PDF contents, or temporary
+logs. Preserve a concise safe evidence record with the original traceback (redacted of paths if needed),
+render/update counts, and keyboard state transitions.
+
+## Interfaces and Dependencies
+
+Use `AppFrameCommandId.ADJUST_PLACEMENT`, `SigningWorkspaceRuntime`, `SigningShellPort`,
+`ViewerWidget.set_interaction_mode`, `PlacementHistory`, and the existing signing workspace callbacks.
+The viewer may expose a narrow diagnostic counter or interaction result for tests, but the application
+workflow remains the owner of the active `SignatureRect`. Do not bypass the session-port boundary from
+AppFrame or duplicate placement state in the menu action.

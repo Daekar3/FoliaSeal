@@ -60,6 +60,17 @@ automated package audits remain supporting evidence only.
   passed with five Help topics, 18 fonts, two icons, Poppler conversion,
   `gui_startup.status=started`, and owned-root cleanup. No host package database
   was modified; no generated package/build root or child process remains.
+- [x] (2026-08-20) Rebuilt and retained `/tmp/foliaseal-host-install-RJdYxq/foliaseal_0.1.0_amd64.deb`,
+  passed the offline, private-install-root, and real Cinnamon/X11 audits, then
+  installed it on the approved host through the desktop `pkexec` authentication
+  path. The host reports `install ok installed 0.1.0`, `dpkg --audit` is clean,
+  and the installed wrapper exposes all five Help topics. A non-interactive
+  `sudo dpkg -i` attempt was rejected because this execution context cannot
+  read a password; it made no package change and was abandoned before using
+  the successful desktop-authenticated path.
+- [ ] The installed GUI is currently open against the disposable fixture with
+  isolated temporary configuration/cache roots; retain the process until the
+  human matrix below is observed, then perform ownership-aware cleanup.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not
@@ -78,6 +89,11 @@ automated package audits remain supporting evidence only.
   Evidence: `scripts/deb_package_audit.py` checks wrapper, desktop metadata,
   Help, fonts, icons, Poppler, and startup classification; it does not drive a
   packaged signing workflow or interpret speech.
+- Observation: host installation requires an interactive authentication path
+  in this environment.
+  Evidence: `sudo dpkg -i` could not read a password without a terminal;
+  desktop `pkexec` authentication completed the exact same install and left a
+  clean package database.
 - Observation: the fresh package audit passed in both modes, but the build
   still emits optional PyInstaller warnings for missing `pycparser` generated
   tables and `libtiff.so.5`. Evidence: the package audit report and build log;
