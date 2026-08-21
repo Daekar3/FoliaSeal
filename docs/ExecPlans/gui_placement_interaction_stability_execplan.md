@@ -33,13 +33,20 @@ signature rendering, or the frozen PDF-first topology.
   `SigningWorkspaceRuntime.set_viewer_interaction_mode("signature")`.
 - [x] (2026-08-20) Confirmed `viewer_widget.py` already contains Enter, Escape, arrow, Ctrl-arrow,
   Delete, Ctrl-Z/Ctrl-Shift-Z, and keyboard recovery hooks.
-- [ ] Reproduce the installed crash with a captured traceback and isolate the failing lifecycle seam.
-- [ ] Add failing command/viewer regression tests for adjustment and cleanup.
-- [ ] Measure pointer-drag update work and implement the smallest evidence-backed coalescing/fix.
-- [ ] Expose the keyboard placement path through visible mode guidance, tooltips, or Help without
-  changing the documented key contract.
-- [ ] Run focused, regression, offscreen, and X11 validation.
-- [ ] Reconcile parent/release documentation and commit this behavior slice.
+- [x] (2026-08-20) Explorer review confirmed the command-boundary tests live in
+  `tests/unit/test_qt_app_frame.py`; there is no standalone `tests/unit/test_qt_signing_action_boundary.py`.
+- [x] (2026-08-20) Isolate the lifecycle seam as the AppFrame-to-session viewer-mode boundary and add
+  controlled handling for a known disposed viewer wrapper; live-viewer success still requires HITL.
+- [x] (2026-08-20) Add command-boundary and viewer regression tests for disposed-viewer recovery and
+  duplicate pointer positions.
+- [x] (2026-08-20) Coalesce duplicate pointer geometry updates before scheduling repaint; preserve
+  synchronous final release and one history step per drag.
+- [x] (2026-08-20) Expose the existing keyboard contract in the live Place-mode guidance and retain
+  the accurate Place tooltip.
+- [x] (2026-08-20) Run focused validation: 224 AppFrame/shell/viewer tests passed.
+- [ ] Run the final full-suite/package and human acceptance checks in Child 4.
+- [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
+  final package and human acceptance remain tracked in Child 4.
 
 ## Surprises & Discoveries
 
@@ -55,6 +62,11 @@ signature rendering, or the frozen PDF-first topology.
 - Observation: pointer placement sends interaction callbacks and repaints while dragging, so a 100%
   CPU observation needs a bounded measurement before selecting a timer or render optimization.
   Evidence: `viewer_widget.py` processes drag/move/snap updates and calls `update()` during placement.
+- Observation: the available offscreen harness can prove the disposed-wrapper boundary and duplicate
+  pointer-update suppression, but cannot certify a live mounted viewer’s successful Adjust Placement
+  transition or sustained X11 CPU behavior.
+  Evidence: the focused tests use the existing fake session/viewer seams; the display-backed session is
+  an explicit Child 4/HITL gate.
 
 ## Decision Log
 
@@ -133,7 +145,7 @@ Run from `/home/daekar/FoliaSeal`.
 
 After implementation, run:
 
-    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_qt_signing_workspace_composition.py tests/unit/test_qt_viewer_widget.py tests/unit/test_placement_history.py tests/unit/test_qt_signing_action_boundary.py
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame.py tests/unit/test_qt_app_frame_workspace_open.py tests/unit/test_qt_signing_workspace_composition.py tests/unit/test_qt_viewer_widget.py tests/unit/test_placement_history.py
     .venv/bin/pytest -q
     .venv/bin/ruff check src tests
     .venv/bin/python -m compileall -q src
@@ -157,6 +169,9 @@ The child passes when:
   the UI_SPEC behavior and are discoverable from the visible mode guidance or Help.
 - Focused tests, full suite, Ruff, compileall, and diff checks pass.
 
+The installed/live-viewer portions remain open until Child 4 records a successful Adjust Placement
+transition and bounded X11 drag observation.
+
 ## Idempotence and Recovery
 
 Use the existing fixture and isolated Qt settings roots. If a crash occurs, preserve the traceback and
@@ -179,3 +194,8 @@ Use `AppFrameCommandId.ADJUST_PLACEMENT`, `SigningWorkspaceRuntime`, `SigningShe
 The viewer may expose a narrow diagnostic counter or interaction result for tests, but the application
 workflow remains the owner of the active `SignatureRect`. Do not bypass the session-port boundary from
 AppFrame or duplicate placement state in the menu action.
+
+## Revision Note
+
+Revised on 2026-08-20 after the required explorer review to point at the existing AppFrame command
+tests and remove the nonexistent standalone command-boundary test filename.

@@ -34,11 +34,14 @@ def test_browse_remove_and_discard_clean_staged_managed_images(tmp_path: Path) -
     staged = editor.controls.setup_form.build_draft().appearance.image_stamp_path
     assert staged is not None
     assert editor.controls.setup_form.build_draft().appearance.image_asset is not None
+    assert editor.controls.sample_preview_image.visible is True
+    assert editor.controls.sample_preview_image.pixmap().path == staged
     assert Path(staged).exists()
 
     editor.controls.setup_form.appearance_controls.remove_image_button.click()
     assert editor.controls.setup_form.build_draft().appearance.image_stamp_path is None
     assert editor.controls.setup_form.build_draft().appearance.image_asset is None
+    assert editor.controls.sample_preview_image.visible is False
     assert not Path(staged).exists()
 
     editor.controls.setup_form.appearance_controls.browse_image_button.click()

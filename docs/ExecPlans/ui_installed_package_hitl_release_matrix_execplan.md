@@ -68,9 +68,12 @@ automated package audits remain supporting evidence only.
   `sudo dpkg -i` attempt was rejected because this execution context cannot
   read a password; it made no package change and was abandoned before using
   the successful desktop-authenticated path.
-- [ ] The installed GUI is currently open against the disposable fixture with
-  isolated temporary configuration/cache roots; retain the process until the
-  human matrix below is observed, then perform ownership-aware cleanup.
+- [x] (2026-08-20) Confirmed no session-owned FoliaSeal GUI process remains from
+  the earlier interrupted pass; the package audit’s isolated GUI launch could not
+  reach a display in this execution context.
+- [x] (2026-08-20) Rebuilt the corrected package and passed fresh offline extraction and private
+  install-root audits; Help/resources/font/icon checks and host `pdftoppm` conversion passed. The
+  display-backed audit remains blocked solely because this execution context cannot open `DISPLAY=:0`.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not

@@ -88,9 +88,6 @@ def stage_package(
     wrapper.write_text(
         "#!/bin/sh\n"
         "set -eu\n"
-        "if [ -x /usr/lib/foliaseal/foliaseal ]; then\n"
-        "  exec /usr/lib/foliaseal/foliaseal \"$@\"\n"
-        "fi\n"
         "prefix=$(CDPATH= cd -- \"$(dirname -- \"$0\")/../..\" && pwd)\n"
         "exec \"$prefix/usr/lib/foliaseal/foliaseal\" \"$@\"\n",
         encoding="utf-8",

@@ -82,6 +82,27 @@ def test_library_pin_and_duplicate_controls_use_typed_catalog_commands() -> None
     assert rows[1].pinned is False
 
 
+def test_appearance_editor_exposes_reachable_preview_and_minimum_geometry() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        initial_catalog="appearances",
+    )
+
+    dialog.controls.create_button.click()
+
+    editor = dialog.controls.appearance_editor
+    assert editor is not None
+    assert editor.controls.container.minimum_size == (420, 520)
+    assert editor.controls.sample_preview_image.fixed_size == (240, 96)
+    assert editor.controls.sample_preview_image.visible is False
+    assert "Image: none" in editor.controls.sample_preview_label.text()
+
+
 def test_first_use_focuses_presets_without_persisting_navigation_preference() -> None:
     service = ReusableSigningObjects(
         InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))

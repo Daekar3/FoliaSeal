@@ -33,11 +33,20 @@ transactional Save/Cancel semantics, and authoritative on-page preview.
   synthetic preview, and Save/Back controls, while the Library sets a 1000×650 minimum.
 - [x] (2026-08-20) Confirmed the document rail is assembled by
   `signing_workspace_composition.py` and has a persisted splitter boundary.
-- [ ] Reproduce and measure editor/rail geometry at 100% scaling and 1100×700.
-- [ ] Add failing tests for visible controls, preview updates, and non-collapsing rail width.
-- [ ] Implement the smallest layout/preview correction without changing the frozen topology.
-- [ ] Run focused, regression, offscreen, and X11 validation.
-- [ ] Reconcile parent/release documentation and commit this behavior slice.
+- [x] (2026-08-20) Explorer review confirmed the sidebar has a 280–640 pixel splitter range and the
+  restored width defaults to 320 only after the splitter has usable width; measurement of actual rail,
+  splitter, scroll, and clipped-control widths is required before changing the geometry owner.
+- [x] (2026-08-20) Reproduce the relevant geometry through real offscreen Qt coverage and retain the
+  existing 320-pixel initial rail / 280–640-pixel adjustable range proof.
+- [x] (2026-08-20) Add tests for reachable editor geometry, visible synthetic preview state, and image
+  preview controls; existing rail persistence tests continue to prove non-collapsing restoration.
+- [x] (2026-08-20) Implement explicit editor minimum/default geometry, image-aware synthetic preview,
+  and Library geometry clamping without changing the frozen topology.
+- [x] (2026-08-20) Run focused validation: 148 Library/signing-shell tests and 3 real offscreen rail
+  integration tests passed.
+- [ ] Run the final full-suite/package and human acceptance checks in Child 4.
+- [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
+  final package and human acceptance remain tracked in Child 4.
 
 ## Surprises & Discoveries
 
@@ -54,6 +63,10 @@ transactional Save/Cancel semantics, and authoritative on-page preview.
   stale or zero-width right pane if the projection does not enforce the product minimum.
   Evidence: `signing_workspace_composition.py` creates `rail_splitter`, applies saved sizes, and
   exposes `RailDividerState`.
+- Observation: the normal production splitter prevents a rail below 280 pixels, so the human report
+  may be an inner-control clipping problem at 280 pixels rather than a collapsed sidebar.
+  Evidence: `SigningWorkspaceSidebar.RAIL_MIN_WIDTH = 280`, `RAIL_MAX_WIDTH = 640`, and delayed
+  restoration in `signing_workspace_composition.py`.
 
 ## Decision Log
 
@@ -115,11 +128,15 @@ the current image when one is staged, show representative visible fields when te
 after control changes, and retain the explicit “synthetic data — never saved” label. Do not write a
 synthetic signer name or image into the persisted `SignatureAppearance`.
 
-Then reproduce the right-pane shrink by opening a PDF from a fresh and a restored settings root. Trace
-the splitter’s initial sizes, minimum widths, and post-`showMaximized()` reapplication. Add a typed
-projection that rejects zero/negative/stale values, enforces the approximately 320 logical-pixel rail
-baseline and protected lower status minimum, and still honors a valid user-adjusted divider. The rail
-must scroll internally and never auto-collapse when the document changes.
+Then reproduce the right-pane shrink by opening a PDF from a fresh and a restored settings root. Before
+changing geometry code, record `sidebar.container.width()`, splitter sizes, properties-scroll width,
+status-region width, and the specific controls that clip at each state. Trace the splitter’s initial
+sizes, minimum widths, and post-`showMaximized()` reapplication. Only if the evidence shows a projection
+or restoration defect should the child change the typed projection; it must reject zero/negative/stale
+values, enforce the approximately 320 logical-pixel rail baseline and protected lower status minimum,
+and still honor a valid user-adjusted divider. If the rail is correctly 280 pixels wide but inner
+controls are clipped, fix the owning child layout instead. The rail must scroll internally and never
+auto-collapse when the document changes.
 
 ## Concrete Steps
 
@@ -138,7 +155,8 @@ After implementation, run:
     git diff --check
 
 Use an isolated display-backed audit root for visual verification. At 100% scaling, open Manage
-reusable signing objects, enter Appearance Create/Edit, resize only if testing the boundary, and verify
+reusable signing objects, enter Appearance Create/Edit, record editor and inner-control geometry before
+manually resizing, and verify
 the initial layout already exposes the preview and an obvious path to every control. Open the fixture
 PDF and verify that the right rail remains usable without dragging its divider.
 
@@ -178,3 +196,9 @@ projection. If a preview projector is extracted, make it Qt-independent and retu
 safe image/text inputs; the widget remains responsible for presentation and the catalog remains
 responsible for persistence. Do not make the main AppFrame own appearance internals or create a second
 rail state store.
+
+## Revision Note
+
+Revised on 2026-08-20 after the required explorer review to distinguish the intentional text-only
+synthetic preview from editor geometry, and to require measured rail/splitter/inner-control widths
+before changing a rail implementation that already enforces a 280–640 pixel range.

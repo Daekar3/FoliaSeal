@@ -39,6 +39,21 @@ def _build_service(
     return bindings, store, secrets, refresh_log, service
 
 
+def test_certificate_creation_dialog_has_readable_default_geometry_and_optional_display_name(
+    tmp_path: Path,
+) -> None:
+    bindings, _, _, _, service = _build_service(tmp_path)
+
+    dialog = service.show_creation_dialog().compatibility.creation_dialog
+
+    assert dialog.controls.dialog.title == "Create Certificate"
+    assert dialog.controls.dialog.minimum_size == (520, 420)
+    assert dialog.controls.dialog.resize_value == (560, 480)
+    assert dialog.controls.introduction_label.word_wrap is True
+    assert dialog.controls.introduction_label.minimum_height == 42
+    assert dialog.controls.display_name_label.text == "Display name (optional)"
+
+
 def test_certificate_creation_dialog_creates_and_refreshes(tmp_path: Path) -> None:
     bindings, certificate_store, _, refresh_log, service = _build_service(tmp_path)
 

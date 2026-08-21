@@ -29,11 +29,19 @@ change the signed-PDF transaction.
 - [x] (2026-08-20) Confirmed the observed UI and recovery failures against
   `app_frame_certificate_management.py`, `certificate_readiness.py`, and
   `signing_material_resolver.py`.
-- [ ] Add failing geometry/copy tests for the creation dialog at supported default dimensions.
-- [ ] Add failing recovery tests for wrong password, retry, reselect, and cancel.
-- [ ] Implement the smallest dialog and recovery correction.
-- [ ] Run focused, regression, and offscreen display-backed validation.
-- [ ] Reconcile parent/release documentation and commit this behavior slice.
+- [x] (2026-08-20) Explorer review identified the concrete recovery failure: coordinator resolution
+  clears `_selected_certificate_configuration_name`, the session retry helper prompts once, and the
+  invalid-password message does not satisfy `_should_prompt_for_certificate_password`.
+- [x] (2026-08-20) Add geometry/copy tests for the creation dialog and bounded wrong-password retry,
+  reselect, and cancel coverage.
+- [x] (2026-08-20) Implement the smallest dialog and recovery correction: optional display-name copy,
+  readable default geometry, preserved certificate selection, exact invalid-read classification, and
+  a three-prompt retry budget.
+- [x] (2026-08-20) Run focused validation: 71 unit tests passed, including coordinator and session
+  recovery coverage.
+- [ ] Run the final full-suite/package and human acceptance checks in Child 4.
+- [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
+  final package and human acceptance remain tracked in Child 4.
 
 ## Surprises & Discoveries
 
@@ -49,6 +57,10 @@ change the signed-PDF transaction.
   the prompt is adapted by `_QtCertificatePassphrasePrompter` in the signing properties panel.
   Evidence: `certificate_readiness.py`, `signing_material_resolver.py`, and
   `signing_workspace_properties_panel.py`.
+- Observation: the selection dead end is not solely a Qt message-box issue.
+  Evidence: `DefaultSignaturePropertiesCoordinator._resolve_signing_material` clears the selected
+  configuration before raising, and `SigningSetupSession._run_with_manual_certificate_password_retry`
+  executes only one prompted attempt.
 
 ## Decision Log
 
@@ -111,13 +123,15 @@ form cannot fit on the smallest supported desktop. The normal path must not hide
 or actions behind an unannounced resize. Add an accessible description for the optional field and ensure
 the initial focus lands on Full name.
 
-Next trace the wrong-password path from selection through readiness and signing invocation. Add a
-typed, testable UI result boundary if the current callback only returns `None`: an invalid password must
-return control to the same draft with a plain-language error and actions to retry the password, choose a
-different certificate configuration, or cancel. A successful retry must continue the existing signing
-flow exactly once; Cancel must leave the draft and selected document unchanged; selecting another
-certificate must refresh readiness without silently changing appearance or placement. Do not store the
-wrong password, log it, or show it in diagnostics.
+Next trace the wrong-password path from selection through readiness and signing invocation. Preserve the
+prior selected configuration while the failure is being resolved; do not clear it merely because a
+candidate password was invalid. Extend the bounded manual-password flow so an invalid attempt can return
+to a prompt a finite number of times, then offers reselect or cancel without looping forever. The
+invalid-password result must be classified as promptable even though it currently says `The selected
+certificate could not be read. Check the file and password.`. A successful retry must continue the
+existing signing flow exactly once; Cancel must leave the draft and selected document unchanged;
+selecting another certificate must refresh readiness without silently changing appearance or placement.
+Do not store the wrong password, log it, or show it in diagnostics.
 
 Add tests for wrong-password-then-correct, wrong-password-then-cancel, and wrong-password-then-reselect.
 Use a generated disposable PKCS#12 certificate and a fake passphrase prompt; assert that the signing
@@ -133,7 +147,7 @@ Run from `/home/daekar/FoliaSeal`.
 
 After implementation, add or update focused tests in the same modules and run:
 
-    .venv/bin/pytest -q tests/unit/test_qt_app_frame_certificate_management.py tests/unit/test_qt_app_frame_recovery.py tests/unit/test_certificate_manager.py tests/unit/test_certificate_readiness.py tests/unit/test_signing_material_resolver.py
+    .venv/bin/pytest -q tests/unit/test_qt_app_frame_certificate_management.py tests/unit/test_qt_app_frame_recovery.py tests/unit/test_certificate_manager.py tests/unit/test_certificate_readiness.py tests/unit/test_signing_material_resolver.py tests/unit/test_signing_setup_session.py tests/unit/test_signature_properties_coordinator.py
     .venv/bin/pytest -q
     .venv/bin/ruff check src tests
     .venv/bin/python -m compileall -q src
@@ -183,3 +197,10 @@ Keep `CreateCertificateRequest`, `CertificateManager`, `CertificateReadiness`, a
 result or callback, but it must not move PKCS#12 parsing into widgets or mutate the certificate catalog
 while merely prompting for a password. Use the existing `CertificateDialogPort`, signing properties
 panel, and AppFrame command/session seams. UI copy must remain plain language and secret-free.
+
+## Revision Note
+
+Revised on 2026-08-20 after the required explorer review to make bounded retry explicit and name the
+coordinator/session causes of the observed dead end. The plan now requires preserving the selected
+draft, classifying the invalid-password message as promptable, and testing the actual session and
+coordinator modules.

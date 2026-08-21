@@ -367,6 +367,7 @@ class _FakeLabel:
     def __init__(self, text="") -> None:
         self.text = text
         self.word_wrap = False
+        self.minimum_height = None
         self.layout = None
         self.visible = True
         self.object_name = ""
@@ -377,6 +378,9 @@ class _FakeLabel:
 
     def setWordWrap(self, value):  # noqa: N802
         self.word_wrap = bool(value)
+
+    def setMinimumHeight(self, value):  # noqa: N802
+        self.minimum_height = value
 
     def setObjectName(self, name):  # noqa: N802
         self.object_name = name
@@ -405,9 +409,17 @@ class _FakeDialog:
         self.layout = None
         self.visible = False
         self.show_calls = 0
+        self.minimum_size = None
+        self.resize_value = None
 
     def setWindowTitle(self, title):  # noqa: N802
         self.title = title
+
+    def setMinimumSize(self, width, height):  # noqa: N802
+        self.minimum_size = (width, height)
+
+    def resize(self, width, height):
+        self.resize_value = (width, height)
 
     def setLayout(self, layout):  # noqa: N802
         self.layout = layout
@@ -1657,6 +1669,31 @@ def test_signing_menu_routes_library_and_sign_save_through_existing_boundaries(
     sign_action.trigger()
     assert shell.choose_output_pdf_path_calls == 1
     assert shell.submit_sign_request_calls == 1
+
+
+def test_adjust_placement_reports_disposed_viewer_without_raising(tmp_path: Path) -> None:
+    bindings = _fake_bindings()
+    shell = _FakeShell()
+    shell.can_adjust_signature_placement_value = True
+    frame = FoliaSealAppFrame(
+        bindings=bindings,
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(shell),
+        render_backend_factory=lambda: object(),
+    )
+    errors: list[str] = []
+    frame._emit_error = errors.append
+    frame.open_pdf_path(tmp_path / "source" / "contract.pdf")
+    shell.status_callback("placement_changed")
+
+    def raise_disposed(_mode: str) -> str:
+        raise RuntimeError("wrapped C/C++ object of type ViewerWidget has been deleted")
+
+    shell.set_viewer_interaction_mode = raise_disposed
+    frame.command_actions()[AppFrameCommandId.ADJUST_PLACEMENT].trigger()
+
+    assert errors and "active viewer is no longer available" in errors[0]
 
 
 def test_edit_undo_redo_routes_to_placement_history_unless_text_editor_has_focus(

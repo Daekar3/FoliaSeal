@@ -391,6 +391,13 @@ class _FakeRect:
     def bottom(self):
         return self._y2
 
+    def __eq__(self, other):
+        return (
+            isinstance(other, _FakeRect)
+            and (self._x1, self._y1, self._x2, self._y2)
+            == (other._x1, other._y1, other._x2, other._y2)
+        )
+
 
 class _FakeWidget:
     def __init__(self):
@@ -658,6 +665,18 @@ def test_escape_cancels_unfinished_signature_drag_without_emitting_selection(mon
     assert selected == []
     assert widget._drag_origin is None
     assert widget._selection_rect is None
+
+
+def test_duplicate_pointer_position_does_not_schedule_redundant_repaint(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    widget = PdfViewerWidgetAdapter().create(workflow=_build_workflow())
+
+    widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=30))
+    widget.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=60, y=70))
+    updates_after_first_move = widget.update_calls
+    widget.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=60, y=70))
+
+    assert widget.update_calls == updates_after_first_move
 
 
 def test_pointer_placement_snaps_to_page_guides_and_alt_bypasses(monkeypatch):

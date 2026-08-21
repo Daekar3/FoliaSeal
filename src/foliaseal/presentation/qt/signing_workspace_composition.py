@@ -408,6 +408,9 @@ def _assemble_signing_workspace_composition(
     interaction_mode_label = bindings.q_label(
         "Pan mode — drag to move around the page"
     )
+    set_word_wrap = getattr(interaction_mode_label, "setWordWrap", None)
+    if callable(set_word_wrap):
+        set_word_wrap(True)
     pan_button = bindings.q_push_button("Pan")
     place_button = bindings.q_push_button("Place")
     text_selection_button = bindings.q_push_button("")
@@ -565,7 +568,12 @@ def _assemble_signing_workspace_composition(
             else (
                 "Pan mode — drag to move around the page"
                 if selected_viewer_mode["value"] == "pan"
-                else "Place mode — drag on the page to draw or resize the signature"
+                else (
+                    "Place mode — drag to draw/resize; Enter creates/accepts; "
+                    "arrows move; Shift accelerates; Ctrl+arrows resize; "
+                    "Ctrl+Shift resizes faster; Delete removes; Escape cancels; "
+                    "Ctrl+Z/Shift+Ctrl+Z undo/redo"
+                )
             ),
         )
 

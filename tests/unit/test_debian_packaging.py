@@ -53,7 +53,6 @@ def test_stage_package_contains_relocated_bundle_and_metadata(tmp_path: Path) ->
 
     wrapper = staging / "usr/bin/foliaseal"
     wrapper_text = wrapper.read_text(encoding="utf-8")
-    assert 'exec /usr/lib/foliaseal/foliaseal "$@"' in wrapper_text
     assert 'exec "$prefix/usr/lib/foliaseal/foliaseal" "$@"' in wrapper_text
     assert wrapper.stat().st_mode & 0o111
     assert (staging / "usr/lib/foliaseal/foliaseal").is_file()

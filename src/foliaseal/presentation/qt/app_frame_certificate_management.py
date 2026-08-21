@@ -49,8 +49,10 @@ class CertificateCreationDialogControls:
     """Controls used by the certificate creation dialog."""
 
     dialog: Any
+    introduction_label: Any
     common_name: Any
     display_name: Any
+    display_name_label: Any
     email: Any
     title: Any
     organization: Any
@@ -359,7 +361,13 @@ class CertificateCreationDialog:
     def _build_controls(self, *, parent: Any) -> CertificateCreationDialogControls:
         dialog = self._bindings.q_dialog(parent)
         if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Create certificate")
+            dialog.setWindowTitle("Create Certificate")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(520, 420)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(560, 480)
         layout = self._bindings.q_form_layout(dialog)
 
         introduction_label = self._bindings.q_label(
@@ -367,6 +375,9 @@ class CertificateCreationDialog:
             "configuration for the main signing workflow."
         )
         introduction_label.setWordWrap(True)
+        set_minimum_height = getattr(introduction_label, "setMinimumHeight", None)
+        if callable(set_minimum_height):
+            set_minimum_height(42)
         common_name = self._bindings.q_line_edit("")
         display_name = self._bindings.q_line_edit("")
         email = self._bindings.q_line_edit("")
@@ -377,10 +388,11 @@ class CertificateCreationDialog:
         save_password = self._bindings.q_check_box("Save password securely")
         create_button = self._bindings.q_push_button("Create")
         cancel_button = self._bindings.q_push_button("Cancel")
+        display_name_label = self._bindings.q_label("Display name (optional)")
 
         layout.addRow("", introduction_label)
         layout.addRow("Full name", common_name)
-        layout.addRow("Display name", display_name)
+        layout.addRow(display_name_label, display_name)
         layout.addRow("Email (optional)", email)
         layout.addRow("Title (optional)", title)
         layout.addRow("Organization (optional)", organization)
@@ -398,8 +410,10 @@ class CertificateCreationDialog:
 
         return CertificateCreationDialogControls(
             dialog=dialog,
+            introduction_label=introduction_label,
             common_name=common_name,
             display_name=display_name,
+            display_name_label=display_name_label,
             email=email,
             title=title,
             organization=organization,

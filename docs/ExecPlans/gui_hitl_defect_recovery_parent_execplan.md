@@ -68,12 +68,21 @@ change classes.
   `certificate_readiness.py`, `signing_material_resolver.py`, `appearance_profile_editor_widget.py`,
   `app_frame_profile_library.py`, `signing_workspace_composition.py`, `app_frame.py`,
   `signing_workspace_runtime.py`, and `viewer_widget.py`.
-- [ ] Complete Child 1: certificate creation clarity and password recovery.
-- [ ] Complete Child 2: Appearance editor preview/geometry and signing-rail width.
-- [ ] Complete Child 3: placement crash, CPU behavior, and keyboard affordance.
+- [x] (2026-08-20) Completed the required explorer review. It confirmed that certificate recovery
+  clears the selected name and only prompts once, the rail already enforces a 280–640 pixel splitter
+  range and therefore needs measurement before geometry changes, the Appearance editor has a text-only
+  synthetic preview, and command-boundary coverage belongs in `tests/unit/test_qt_app_frame.py`.
+- [x] (2026-08-20) Complete Child 1 implementation: readable certificate creation geometry/copy,
+  preserved certificate selection, bounded invalid-password retries, and focused regression coverage.
+- [x] (2026-08-20) Complete Child 2 implementation: explicit Library/editor minimum geometry, image-aware
+  synthetic preview, Library geometry clamping, and existing rail persistence/offscreen proof retained.
+- [x] (2026-08-20) Complete Child 3 implementation: controlled disposed-viewer error boundary, visible
+  keyboard placement guidance, duplicate pointer-update coalescing, and focused regression coverage.
 - [ ] Complete Child 4: installed-package regression matrix, documentation reconciliation, and final
   acceptance record.
-- [ ] Update parent/release status plans and create focused commits for each completed change class.
+- [ ] Run the full suite, compliance review, package validation, and final acceptance work in Child 4.
+- [x] (2026-08-20) Update parent/release status plans and create focused implementation/documentation commits;
+  Child 4 remains open for display-backed and human acceptance evidence.
 
 ## Surprises & Discoveries
 
@@ -102,6 +111,15 @@ change classes.
   failures are visible GUI behavior and must be corrected even if no accessibility bridge warning is
   emitted.
   Evidence: the minimal PySide6 Orca baseline remained usable while producing the same Qt warnings.
+- Observation: the password dead end has two cooperating causes: coordinator error handling clears
+  `_selected_certificate_configuration_name`, and `SigningSetupSession._run_with_manual_certificate_password_retry`
+  prompts only once; the invalid-password message is not recognized by
+  `_should_prompt_for_certificate_password`.
+  Evidence: `signature_properties_coordinator.py` and `signing_setup_session.py`.
+- Observation: the rail cannot normally shrink below 280 pixels in the splitter path, so the HITL
+  report may describe clipped inner controls or a 280-pixel rail rather than an actual zero-width rail.
+  Evidence: `SigningWorkspaceSidebar.RAIL_MIN_WIDTH = 280`, `RAIL_MAX_WIDTH = 640`, and delayed
+  restoration in `signing_workspace_composition.py`.
 
 ## Decision Log
 
@@ -129,6 +147,11 @@ change classes.
   Rationale: unit/offscreen evidence cannot substitute for installed-package observation, and a human
   must still exercise Orca, high contrast, monitor movement, and the full signing story.
   Date/Author: 2026-08-20 / Codex.
+
+## Revision Note
+
+Revised on 2026-08-20 after the required explorer review to record the concrete coordinator/session
+password failure, the rail measurement prerequisite, and the existing AppFrame test owner.
 
 ## Outcomes & Retrospective
 

@@ -1511,9 +1511,27 @@ class FoliaSealAppFrame:
         self._sync_signing_placement_actions()
 
     def _adjust_placement(self) -> None:
-        self._with_current_session_port(
-            lambda session: session.set_viewer_interaction_mode("signature")
-        )
+        try:
+            self._with_current_session_port(
+                lambda session: session.set_viewer_interaction_mode("signature")
+            )
+        except RuntimeError as exc:
+            message = str(exc).lower()
+            if not any(
+                marker in message
+                for marker in (
+                    "not bound to a viewer widget",
+                    "wrapped c/c++ object",
+                    "internal c++ object",
+                    "already deleted",
+                )
+            ):
+                raise
+            self._emit_error(
+                "Unable to adjust the signature placement because the active viewer "
+                "is no longer available. Reopen the PDF and try again. "
+                f"(details: {exc})"
+            )
         self._sync_signing_placement_actions()
 
     def _remove_placement(self) -> None:

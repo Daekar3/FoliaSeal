@@ -225,29 +225,37 @@ class SigningSetupSession:
             if cache_key is not None
             else None
         )
-        try:
-            state = action(cached_passphrase)
-            return SigningSetupSelectionOutcome(state=state, applied=True)
-        except SignaturePropertiesCoordinatorError as exc:
-            if not _should_prompt_for_certificate_password(str(exc)):
-                raise
-        if self.passphrase_prompter is None:
-            return SigningSetupSelectionOutcome(
-                state=self.load(control_issue=control_issue),
-                applied=False,
-            )
-        prompted_passphrase = self.passphrase_prompter.prompt(prompt_label)
-        if prompted_passphrase is None:
-            return SigningSetupSelectionOutcome(
-                state=self.load(control_issue=control_issue),
-                applied=False,
-            )
-        state = action(prompted_passphrase)
-        if cache_key is not None and prompted_passphrase:
-            self._session_certificate_passphrases[cache_key] = prompted_passphrase
-        return SigningSetupSelectionOutcome(state=state, applied=True)
+        prompted_attempts = 0
+        max_prompted_attempts = 3
+        passphrase = cached_passphrase
+        while True:
+            try:
+                state = action(passphrase)
+                if cache_key is not None and passphrase:
+                    self._session_certificate_passphrases[cache_key] = passphrase
+                return SigningSetupSelectionOutcome(state=state, applied=True)
+            except SignaturePropertiesCoordinatorError as exc:
+                if not _should_prompt_for_certificate_password(str(exc)):
+                    raise
+            if self.passphrase_prompter is None or prompted_attempts >= max_prompted_attempts:
+                return SigningSetupSelectionOutcome(
+                    state=self.load(control_issue=control_issue),
+                    applied=False,
+                )
+            prompted_passphrase = self.passphrase_prompter.prompt(prompt_label)
+            prompted_attempts += 1
+            if prompted_passphrase is None:
+                return SigningSetupSelectionOutcome(
+                    state=self.load(control_issue=control_issue),
+                    applied=False,
+                )
+            passphrase = prompted_passphrase
 
 
 def _should_prompt_for_certificate_password(message: str) -> bool:
     lowered = message.lower()
-    return "enter the password" in lowered or "enter the certificate password" in lowered
+    return (
+        "enter the password" in lowered
+        or "enter the certificate password" in lowered
+        or "the selected certificate could not be read" in lowered
+    )

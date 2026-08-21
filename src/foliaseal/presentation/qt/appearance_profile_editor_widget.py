@@ -35,6 +35,7 @@ class AppearanceProfileEditorWidgetControls:
     container: Any
     breadcrumb_label: Any
     sample_preview_label: Any
+    sample_preview_image: Any
     name_input: Any
     setup_form: QtVisibleSignatureSetupForm
     save_button: Any
@@ -196,6 +197,9 @@ class AppearanceProfileEditorWidget:
     def _build_controls(self, parent: Any) -> AppearanceProfileEditorWidgetControls:
         bindings = self._bindings
         container = bindings.q_widget(parent)
+        set_minimum_size = getattr(container, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(420, 520)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -217,6 +221,18 @@ class AppearanceProfileEditorWidget:
                 "border: 1px solid #9ca3af; padding: 8px; background: #ffffff;"
             )
         layout.addWidget(sample_preview)
+        sample_preview_image = bindings.q_label("")
+        if hasattr(sample_preview_image, "setFixedSize"):
+            sample_preview_image.setFixedSize(240, 96)
+        if hasattr(sample_preview_image, "setAlignment"):
+            alignment = getattr(getattr(bindings, "qt", None), "AlignCenter", None)
+            if alignment is not None:
+                sample_preview_image.setAlignment(alignment)
+        if hasattr(sample_preview_image, "setStyleSheet"):
+            sample_preview_image.setStyleSheet(
+                "border: 1px solid #9ca3af; padding: 4px; background: #ffffff;"
+            )
+        layout.addWidget(sample_preview_image)
 
         name_input = bindings.q_line_edit()
         name_input.setPlaceholderText("Appearance name")
@@ -268,6 +284,7 @@ class AppearanceProfileEditorWidget:
             container=container,
             breadcrumb_label=breadcrumb,
             sample_preview_label=sample_preview,
+            sample_preview_image=sample_preview_image,
             name_input=name_input,
             setup_form=setup_form,
             save_button=save_button,
@@ -370,14 +387,47 @@ class AppearanceProfileEditorWidget:
         signer_label = appearance.signer_label_prefix or "Digitally signed by"
         layout = appearance.layout_template.value.replace("_", " ").title()
         stamp = appearance.stamp_position.value.replace("_", " ").title()
+        has_image = appearance.image_stamp_path is not None
         _set_text(
             self.controls.sample_preview_label,
             "Sample preview (synthetic data — never saved)\n"
             "Sample signer: Ada Example\n"
             f"{signer_label} Ada Example\n"
             f"Layout: {layout} · Image position: {stamp}\n"
+            f"Image: {'selected' if has_image else 'none'}\n"
             "This preview uses synthetic data and is never persisted.",
         )
+        self._refresh_preview_image(appearance.image_stamp_path)
+
+    def _refresh_preview_image(self, image_path: str | None) -> None:
+        preview_image = self.controls.sample_preview_image
+        pixmap_factory = getattr(self._bindings, "q_pixmap", None)
+        if not callable(pixmap_factory):
+            return
+        pixmap = pixmap_factory(image_path or "")
+        is_null = getattr(pixmap, "isNull", None)
+        if image_path and callable(is_null) and not is_null():
+            scaled = getattr(pixmap, "scaled", None)
+            if callable(scaled):
+                qt = getattr(self._bindings, "qt", None)
+                aspect = getattr(qt, "KeepAspectRatio", None)
+                transform = getattr(qt, "SmoothTransformation", None)
+                args = [240, 96]
+                if aspect is not None:
+                    args.append(aspect)
+                if transform is not None:
+                    args.append(transform)
+                pixmap = scaled(*args)
+            set_pixmap = getattr(preview_image, "setPixmap", None)
+            if callable(set_pixmap):
+                set_pixmap(pixmap)
+            set_visible = getattr(preview_image, "setVisible", None)
+            if callable(set_visible):
+                set_visible(True)
+            return
+        set_visible = getattr(preview_image, "setVisible", None)
+        if callable(set_visible):
+            set_visible(False)
 
 
 def _set_text(widget: Any, value: str) -> None:

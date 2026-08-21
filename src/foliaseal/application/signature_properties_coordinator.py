@@ -761,7 +761,6 @@ class DefaultSignaturePropertiesCoordinator:
                 passphrase=passphrase,
             )
         except (SigningMaterialResolutionError, ValueError) as exc:
-            self._selected_certificate_configuration_name = None
             raise SignaturePropertiesCoordinatorError(str(exc)) from exc
 
     def _resolve_selected_certificate_configuration_name(self) -> str | None:

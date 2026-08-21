@@ -266,7 +266,12 @@ class ReusableObjectLibraryDialog:
         if geometry is not None:
             set_geometry = getattr(self.controls.dialog, "setGeometry", None)
             if callable(set_geometry):
-                set_geometry(geometry.x, geometry.y, geometry.width, geometry.height)
+                set_geometry(
+                    geometry.x,
+                    geometry.y,
+                    max(geometry.width, MIN_LIBRARY_WIDTH),
+                    max(geometry.height, MIN_LIBRARY_HEIGHT),
+                )
         self._apply_splitter_sizes()
 
     def _apply_splitter_sizes(self) -> None:
@@ -439,6 +444,9 @@ class ReusableObjectLibraryDialog:
         set_minimum_size = getattr(dialog, "setMinimumSize", None)
         if callable(set_minimum_size):
             set_minimum_size(MIN_LIBRARY_WIDTH, MIN_LIBRARY_HEIGHT)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(1100, 700)
         layout = self._bindings.q_hbox_layout(dialog)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)

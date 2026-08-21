@@ -517,12 +517,16 @@ class PdfViewerWidgetAdapter:
                     current = event.position()
                     if self._overlay_drag_start_view_rect is None:
                         return super().mouseMoveEvent(event)
-                    self._overlay_drag_view_rect = self._overlay_resize_view_rect(
+                    next_rect = self._overlay_resize_view_rect(
                         overlay_rect=self._overlay_drag_start_view_rect,
                         handle=self._overlay_drag_handle,
                         current_x=float(current.x()) - self._overlay_drag_offset_x,
                         current_y=float(current.y()) - self._overlay_drag_offset_y,
                     )
+                    if next_rect == self._overlay_drag_view_rect:
+                        event.accept()
+                        return
+                    self._overlay_drag_view_rect = next_rect
                     self._selection_rect = None
                     self.update()
                     event.accept()
@@ -530,7 +534,11 @@ class PdfViewerWidgetAdapter:
                 if self._drag_origin is None:
                     return super().mouseMoveEvent(event)
                 current = event.position().toPoint()
-                self._selection_rect = bindings.q_rect(self._drag_origin, current)
+                next_rect = bindings.q_rect(self._drag_origin, current)
+                if next_rect == self._selection_rect:
+                    event.accept()
+                    return
+                self._selection_rect = next_rect
                 self.update()
 
             def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)

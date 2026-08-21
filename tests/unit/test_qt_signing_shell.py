@@ -165,6 +165,7 @@ class _FakeWidget:
         self.fixed_size = None
         self.fixed_width = None
         self.maximum_width = None
+        self.minimum_size = None
         self.minimum_width = None
         self.minimum_height = None
         self.properties = {}
@@ -200,6 +201,12 @@ class _FakeWidget:
 
     def setMinimumWidth(self, width):  # noqa: N802
         self.minimum_width = width
+
+    def setMinimumSize(self, width, height):  # noqa: N802
+        self.minimum_size = (width, height)
+
+    def resize(self, width, height):  # noqa: N802
+        self.resize_value = (width, height)
 
     def setMinimumHeight(self, height):  # noqa: N802
         self.minimum_height = height
@@ -2528,7 +2535,9 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
     assert widget.viewer_widget.interaction_mode == "signature"
     assert controls["text_selection_button"].isChecked() is False
     assert controls["interaction_mode_label"].text() == (
-        "Place mode — drag on the page to draw or resize the signature"
+        "Place mode — drag to draw/resize; Enter creates/accepts; arrows move; "
+        "Shift accelerates; Ctrl+arrows resize; Ctrl+Shift resizes faster; "
+        "Delete removes; Escape cancels; Ctrl+Z/Shift+Ctrl+Z undo/redo"
     )
 
     controls["pan_button"].click()

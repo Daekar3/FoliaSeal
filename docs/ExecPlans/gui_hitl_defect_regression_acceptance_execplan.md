@@ -27,11 +27,14 @@ root, and reconciles the governing status plans.
 
 ## Progress
 
-- [ ] Capture the final source/test/package baseline and verify a clean or intentionally documented
-  worktree.
-- [ ] Build a fresh `.deb` and pass offline extraction, private `dpkg --unpack`, and real Cinnamon/X11
-  display-backed audits.
-- [ ] Install the exact package on the approved host using the documented authenticated path and verify
+- [x] (2026-08-20) Capture the source baseline: focused recovery/GUI/package tests pass, full suite is
+  `1603 passed, 20 skipped, 1 warning`, Ruff/compileall/diff checks are clean, and the worktree remains
+  intentionally dirty with this implementation plus its living-plan updates.
+- [x] (2026-08-20) Build a fresh `foliaseal_0.1.0_amd64.deb`; offline extraction and private
+  `dpkg --unpack` audits pass, including corrected relative-wrapper isolation behavior.
+- [ ] Pass the real Cinnamon/X11 display-backed audit; this execution context currently has no
+  reachable `DISPLAY=:0`, so this remains an explicit desktop/HITL gate.
+- [ ] Install the exact corrected package on the approved host using the documented authenticated path and verify
   `dpkg --audit`, installed wrapper, Help, resources, and desktop launcher.
 - [ ] Run the human matrix with special attention to corrected Gates 1–3, then complete Gates 4–12.
 - [ ] Record any remaining product defect as a focused child plan or environment limitation.
@@ -48,6 +51,11 @@ root, and reconciles the governing status plans.
   geometry, Orca speech, high contrast, monitor movement, or human understanding.
   Evidence: the existing package audit checks payload/startup/resources but does not interpret speech or
   drive the full signing story.
+- Observation: the first fresh-package audit exposed a packaging-wrapper isolation bug when an older
+  host installation already exists: the extracted wrapper preferred `/usr/lib/foliaseal/foliaseal`
+  instead of its own relative bundle, causing Help-path validation to escape the extracted package.
+  Correction: the generated wrapper now always resolves its sibling package root relative to its own
+  path, which works both installed and under extraction/private-install audits.
 
 ## Decision Log
 

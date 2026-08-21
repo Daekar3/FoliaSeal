@@ -61,6 +61,58 @@ class _FakeCoordinatorForAppearanceDelegation:
         return self.returned_state
 
 
+class _RetryingCertificateCoordinator:
+    def __init__(self, returned_state: object) -> None:
+        self.returned_state = returned_state
+        self.calls: list[str | None] = []
+
+    def apply_certificate_configuration(
+        self,
+        _selected_name: str,
+        *,
+        passphrase: str | None = None,
+        control_issue=None,
+    ) -> object:
+        del control_issue
+        self.calls.append(passphrase)
+        if passphrase != "correct-secret":
+            raise SignaturePropertiesCoordinatorError(
+                "The selected certificate could not be read. Check the file and password."
+            )
+        return self.returned_state
+
+    def load(self, *, control_issue=None) -> object:
+        del control_issue
+        return self.returned_state
+
+
+def test_signing_setup_session_retries_wrong_certificate_password_without_unbounded_prompting(
+) -> None:
+    returned_state = object()
+    coordinator = _RetryingCertificateCoordinator(returned_state)
+    prompter = _FakePrompter(["wrong-secret", "correct-secret"])
+    session = SigningSetupSession(coordinator=coordinator, passphrase_prompter=prompter)
+
+    outcome = session.select_certificate_configuration("Corporate Records Signing")
+
+    assert outcome.applied is True
+    assert coordinator.calls == [None, "wrong-secret", "correct-secret"]
+    assert len(prompter.calls) == 2
+
+
+def test_signing_setup_session_stops_after_three_wrong_password_prompts() -> None:
+    returned_state = object()
+    coordinator = _RetryingCertificateCoordinator(returned_state)
+    prompter = _FakePrompter(["wrong-1", "wrong-2", "wrong-3", "wrong-4"])
+    session = SigningSetupSession(coordinator=coordinator, passphrase_prompter=prompter)
+
+    outcome = session.select_certificate_configuration("Corporate Records Signing")
+
+    assert outcome.applied is False
+    assert coordinator.calls == [None, "wrong-1", "wrong-2", "wrong-3"]
+    assert len(prompter.calls) == 3
+
+
 def test_signing_setup_session_retries_certificate_selection_and_caches_passphrase(
     tmp_path: Path,
 ) -> None:
