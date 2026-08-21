@@ -440,7 +440,7 @@ class ReusableObjectLibraryDialog:
         dialog = self._bindings.q_dialog(parent)
         set_title = getattr(dialog, "setWindowTitle", None)
         if callable(set_title):
-            set_title("Manage reusable signing objects")
+            set_title("Manage Reusable Signing Objects")
         set_minimum_size = getattr(dialog, "setMinimumSize", None)
         if callable(set_minimum_size):
             set_minimum_size(MIN_LIBRARY_WIDTH, MIN_LIBRARY_HEIGHT)
@@ -493,8 +493,8 @@ class ReusableObjectLibraryDialog:
         pin = self._bindings.q_push_button("Pin")
         create = self._bindings.q_push_button("Create")
         edit = self._bindings.q_push_button("Edit")
-        create_placement = self._bindings.q_push_button("Create placement")
-        edit_placement = self._bindings.q_push_button("Edit selected placement")
+        create_placement = self._bindings.q_push_button("Create Placement")
+        edit_placement = self._bindings.q_push_button("Edit Selected Placement")
         save = self._bindings.q_push_button("Save")
         cancel = self._bindings.q_push_button("Cancel")
         close = self._bindings.q_push_button("Close")
@@ -507,6 +507,9 @@ class ReusableObjectLibraryDialog:
         navigation_layout.addWidget(navigation)
 
         master_column = self._bindings.q_widget()
+        set_master_minimum_width = getattr(master_column, "setMinimumWidth", None)
+        if callable(set_master_minimum_width):
+            set_master_minimum_width(240)
         master_layout = self._bindings.q_vbox_layout(master_column)
         master_layout.setContentsMargins(0, 0, 0, 0)
         master_layout.addWidget(self._bindings.q_label("Saved objects"))
@@ -515,6 +518,9 @@ class ReusableObjectLibraryDialog:
         master_layout.addWidget(selector)
 
         detail = self._bindings.q_widget()
+        set_detail_minimum_width = getattr(detail, "setMinimumWidth", None)
+        if callable(set_detail_minimum_width):
+            set_detail_minimum_width(500)
         detail_layout = self._bindings.q_vbox_layout(detail)
         detail_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -669,7 +675,7 @@ class ReusableObjectLibraryDialog:
             breadcrumb=(
                 "Signature Library / Appearances / "
                 + (
-                    "New appearance"
+                    "New Appearance"
                     if initial_ref is None
                     else self._display_name_for_ref(initial_ref)
                 )
@@ -682,6 +688,8 @@ class ReusableObjectLibraryDialog:
         self._appearance_editor = editor
         object.__setattr__(self.controls, "appearance_editor", editor)
         self.controls.detail_view.setVisible(False)
+        if self.controls.detail_scroll_area is not None:
+            self.controls.detail_scroll_area.setVisible(False)
         self.controls.appearance_editor_host.setVisible(True)
         self._appearance_editor_host_layout.addWidget(editor.controls.container)
         return True
@@ -713,7 +721,7 @@ class ReusableObjectLibraryDialog:
             initial_ref=initial_ref,
             breadcrumb=(
                 "Signature Library / Presets / "
-                + ("New preset" if initial_ref is None else self._display_name_for_ref(initial_ref))
+                + ("New Preset" if initial_ref is None else self._display_name_for_ref(initial_ref))
             ),
             on_saved=self._preset_editor_saved,
             on_reusable_objects_changed=self._notify_reusable_objects_changed,
@@ -729,6 +737,8 @@ class ReusableObjectLibraryDialog:
         self._preset_editor = editor
         object.__setattr__(self.controls, "preset_editor", editor)
         self.controls.detail_view.setVisible(False)
+        if self.controls.detail_scroll_area is not None:
+            self.controls.detail_scroll_area.setVisible(False)
         self.controls.appearance_editor_host.setVisible(True)
         self._appearance_editor_host_layout.addWidget(editor.controls.container)
         return True
@@ -771,6 +781,8 @@ class ReusableObjectLibraryDialog:
         self._preset_editor = None
         object.__setattr__(self.controls, "preset_editor", None)
         self.controls.appearance_editor_host.setVisible(False)
+        if self.controls.detail_scroll_area is not None:
+            self.controls.detail_scroll_area.setVisible(True)
         self.controls.detail_view.setVisible(True)
         if parent_catalog is not None and self._session.catalog is not parent_catalog:
             self._session.select_catalog(parent_catalog)
@@ -870,6 +882,8 @@ class ReusableObjectLibraryDialog:
         self._appearance_editor = None
         object.__setattr__(self.controls, "appearance_editor", None)
         self.controls.appearance_editor_host.setVisible(False)
+        if self.controls.detail_scroll_area is not None:
+            self.controls.detail_scroll_area.setVisible(True)
         self.controls.detail_view.setVisible(True)
         if parent_catalog is not None and self._session.catalog is not parent_catalog:
             self._session.select_catalog(parent_catalog)
@@ -1168,9 +1182,9 @@ class ReusableObjectLibraryDialog:
         if self._nested_editor_active():
             return
         if self._session.catalog is LibraryCatalog.APPEARANCES:
-            _set_text(self.controls.create_button, "Create appearance")
+            _set_text(self.controls.create_button, "Create Appearance")
         elif self._session.catalog is LibraryCatalog.PRESETS:
-            _set_text(self.controls.create_button, "Create preset")
+            _set_text(self.controls.create_button, "Create Preset")
         else:
             _set_text(self.controls.create_button, "Create")
         _set_enabled(
@@ -1236,9 +1250,9 @@ class ReusableObjectLibraryDialog:
         )
         if isinstance(selected.ref, ReusableObjectRef):
             if selected.ref.kind is ReusableObjectKind.APPEARANCE:
-                _set_text(self.controls.edit_button, "Edit appearance")
+                _set_text(self.controls.edit_button, "Edit Appearance")
             elif selected.ref.kind is ReusableObjectKind.PRESET:
-                _set_text(self.controls.edit_button, "Edit preset")
+                _set_text(self.controls.edit_button, "Edit Preset")
         elif (
             isinstance(selected.ref, CertificateLibraryRef)
             and not selected.configured

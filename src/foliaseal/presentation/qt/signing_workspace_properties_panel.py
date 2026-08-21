@@ -956,7 +956,7 @@ class SignaturePropertiesPanel:
     def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
         bindings = self._bindings
         container = bindings.q_group_box("Certificate configuration")
-        layout = bindings.q_form_layout(container)
+        layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
@@ -967,8 +967,9 @@ class SignaturePropertiesPanel:
         )
         helper_label.setWordWrap(True)
 
-        layout.addRow("Certificate configuration", configuration_combo)
-        layout.addRow("", helper_label)
+        layout.addWidget(bindings.q_label("Certificate configuration"))
+        layout.addWidget(configuration_combo)
+        layout.addWidget(helper_label)
 
         configuration_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
             lambda _text: self._on_certificate_configuration_selected()
@@ -982,7 +983,7 @@ class SignaturePropertiesPanel:
     def _build_signature_preset_controls(self) -> SignaturePresetControls:
         bindings = self._bindings
         container = bindings.q_group_box("Signature preset")
-        layout = bindings.q_form_layout(container)
+        layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
@@ -998,9 +999,10 @@ class SignaturePropertiesPanel:
         delete_button = bindings.q_push_button("Delete preset")
         open_library_button = bindings.q_push_button("Create or manage presets…")
 
-        layout.addRow("Signature preset", preset_combo)
-        layout.addRow("", helper_label)
-        layout.addRow("", open_library_button)
+        layout.addWidget(bindings.q_label("Signature preset"))
+        layout.addWidget(preset_combo)
+        layout.addWidget(helper_label)
+        layout.addWidget(open_library_button)
 
         preset_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
             lambda _text: self._on_signature_preset_selected()

@@ -166,6 +166,10 @@ def test_real_qt_keyboard_accessibility_and_support_surfaces(
         ]
         for dialog in support_dialogs:
             assert dialog.dialog.isModal() is False
+            assert dialog.dialog.minimumWidth() >= 520
+            assert dialog.dialog.minimumHeight() >= 360
+            assert dialog.dialog.width() >= dialog.dialog.minimumWidth()
+            assert dialog.dialog.height() >= dialog.dialog.minimumHeight()
             assert dialog.content.isReadOnly()
             assert dialog.content.accessibleName().endswith(" content")
             assert dialog.close_button.accessibleName().startswith("Close ")
@@ -196,6 +200,11 @@ def test_real_qt_keyboard_accessibility_and_support_surfaces(
                 restore = settings_dialog.controls.restore_defaults_button
                 settings_observations["accessible_name"] = restore.accessibleName()
                 settings_observations["tab_focus"] = bool(restore.focusPolicy() & Qt.TabFocus)
+                settings_observations["title"] = settings_dialog.controls.dialog.windowTitle()
+                settings_observations["minimum_size"] = (
+                    settings_dialog.controls.dialog.minimumWidth(),
+                    settings_dialog.controls.dialog.minimumHeight(),
+                )
                 settings_dialog.controls.default_open_directory.setText(
                     str(unicode_root / "changed")
                 )
@@ -214,6 +223,8 @@ def test_real_qt_keyboard_accessibility_and_support_surfaces(
         assert settings_observations == {
             "accessible_name": "Restore application settings defaults",
             "tab_focus": True,
+            "title": "Application Settings",
+            "minimum_size": (560, 280),
             "restored_open": AppSettings.default().default_open_directory,
         }
     finally:

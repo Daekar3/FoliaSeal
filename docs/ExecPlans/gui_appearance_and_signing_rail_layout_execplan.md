@@ -25,7 +25,8 @@ transactional Save/Cancel semantics, and authoritative on-page preview.
   `docs/ExecPlans/ui_rail_divider_persistence_execplan.md` are existing geometry owners; inspect and
   extend them instead of creating a second persistence key.
 - [x] `docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md` records the observed evidence.
-- [ ] Child 1 is not required. Child 4 depends on this child’s completion.
+- [x] Child 1 certificate-surface corrections were completed in the integrated layout slice;
+  Child 4 still depends on this child for installed-package and human acceptance.
 
 ## Progress
 
@@ -44,9 +45,19 @@ transactional Save/Cancel semantics, and authoritative on-page preview.
   and Library geometry clamping without changing the frozen topology.
 - [x] (2026-08-20) Run focused validation: 148 Library/signing-shell tests and 3 real offscreen rail
   integration tests passed.
-- [ ] Run the final full-suite/package and human acceptance checks in Child 4.
-- [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
-  final package and human acceptance remain tracked in Child 4.
+- [x] (2026-08-20) Display-backed source-tree audit at 1920×1048 exposed additional rail defects before
+  menu navigation: the fixed-width rail horizontally clips the preset/certificate rows, the synthetic
+  preview is reduced to a shallow cramped strip, the document-text toolbar truncates button labels, and
+  long status/detail copy wraps into an over-constrained column. These are visible at native capture
+  scale and are not merely screenshot downscaling.
+- [x] (2026-08-20) Added the real-Qt minimum-width rail assertion: at the legal 280-pixel minimum,
+  query/navigation controls and status/detail labels retain non-zero usable widths.
+- [x] (2026-08-20) Source-tree correction validated in the integrated layout slice: 143 focused tests,
+  then 1,605 full-suite tests passed with 20 skips; Ruff, compileall, and diff checks passed. A fresh
+  bounded X11 sweep confirmed the corrected Library/editor and rail surfaces and cleaned its process
+  and temporary root.
+- [x] (2026-08-20) Reconciled this child with the integrated correction plan and architecture map;
+  installed-package and human acceptance remain in Child 4.
 
 ## Surprises & Discoveries
 
@@ -67,6 +78,17 @@ transactional Save/Cancel semantics, and authoritative on-page preview.
   may be an inner-control clipping problem at 280 pixels rather than a collapsed sidebar.
   Evidence: `SigningWorkspaceSidebar.RAIL_MIN_WIDTH = 280`, `RAIL_MAX_WIDTH = 640`, and delayed
   restoration in `signing_workspace_composition.py`.
+- Observation: the maximized source-tree window has a visible 320-ish right rail, but its horizontal
+  child layouts still clip meaningful content: preset/certificate selectors truncate, the synthetic
+  preview is too shallow to communicate the intended signed-PDF comparison, document-text buttons lose
+  their labels, and workflow/status prose is squeezed into narrow wrapped lines.
+  Evidence: native X11 capture `/tmp/foliaseal-dev-hitl-fFnbwy/source-maximized.png` from the isolated
+  source-tree session; no menus were opened for this observation.
+- [x] (2026-08-20) Completed a broader source-tree surface sweep. The Library opens at 1100×700, but
+  its nested Appearance editor compresses controls in the detail column, the Preset editor leaves a
+  large unused upper region while packing its workflow controls into a narrow lower band, and the
+  Edit Placement dialog measures only 236×347 with clipped copy. These surfaces remain within Child 2’s
+  Library/editor geometry ownership and must be corrected without changing the three-column topology.
 
 ## Decision Log
 

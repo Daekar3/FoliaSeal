@@ -199,7 +199,7 @@ class AppearanceProfileEditorWidget:
         container = bindings.q_widget(parent)
         set_minimum_size = getattr(container, "setMinimumSize", None)
         if callable(set_minimum_size):
-            set_minimum_size(420, 520)
+            set_minimum_size(500, 560)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)

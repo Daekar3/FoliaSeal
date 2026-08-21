@@ -47,6 +47,7 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
         on_text_selection_mode_changed=lambda enabled: None,
         on_copy_selected_text=lambda: None,
         on_clear_selected_text=lambda: None,
+        fixed_width=False,
     )
     sidebar.render_signing_action_state(
         SigningActionState(
@@ -74,7 +75,24 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
     app.processEvents()
 
     try:
-        assert sidebar.container.width() == SigningWorkspaceSidebar.RAIL_WIDTH
+        assert sidebar.container.minimumWidth() == SigningWorkspaceSidebar.RAIL_MIN_WIDTH
+        assert sidebar.container.maximumWidth() == SigningWorkspaceSidebar.RAIL_MAX_WIDTH
+        sidebar.container.setMaximumWidth(SigningWorkspaceSidebar.RAIL_MIN_WIDTH)
+        sidebar.container.resize(
+            SigningWorkspaceSidebar.RAIL_MIN_WIDTH,
+            sidebar.container.height(),
+        )
+        app.processEvents()
+        assert sidebar.container.width() == SigningWorkspaceSidebar.RAIL_MIN_WIDTH
+        document_text = sidebar.document_text_controls
+        assert document_text.container.width() >= SigningWorkspaceSidebar.RAIL_MIN_WIDTH - 16
+        assert document_text.query_input.width() > 0
+        assert document_text.find_button.width() > 0
+        assert document_text.previous_button.width() > 0
+        assert document_text.next_button.width() > 0
+        assert document_text.copy_button.width() > 0
+        assert document_text.status_label.width() > 0
+        assert document_text.detail_label.width() > 0
         assert sidebar.status_region.minimumHeight() >= (
             SigningWorkspaceSidebar.STATUS_REGION_MINIMUM_HEIGHT
         )

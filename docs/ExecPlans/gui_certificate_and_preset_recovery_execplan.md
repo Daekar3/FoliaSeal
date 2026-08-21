@@ -22,7 +22,8 @@ change the signed-PDF transaction.
   owns the family boundary.
 - [x] Existing certificate creation/import tests in
   `tests/unit/test_qt_app_frame_certificate_management.py` and application tests are the baseline.
-- [ ] No other child is required to begin. Child 4 depends on this child’s completion.
+- [x] No additional implementation child is required for the audited certificate surfaces; Child 4
+  still depends on this child for installed-package and human acceptance.
 
 ## Progress
 
@@ -39,9 +40,21 @@ change the signed-PDF transaction.
   a three-prompt retry budget.
 - [x] (2026-08-20) Run focused validation: 71 unit tests passed, including coordinator and session
   recovery coverage.
-- [ ] Run the final full-suite/package and human acceptance checks in Child 4.
-- [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
-  final package and human acceptance remain tracked in Child 4.
+- [x] (2026-08-20) Display-backed source-tree audit found the still-unrepaired Import Certificate
+  dialog at 267×284 pixels: its lowercase title, wrapped introduction, source-file controls,
+  inspection guidance, and Display name/Password rows are visibly cramped or truncated, with no
+  explicit minimum/default geometry. This is a separate import-dialog correction inside the same
+  certificate-management owner.
+- [x] (2026-08-20) Corrected Import Certificate title capitalization, explicit 600×460 minimum /
+  680×520 default geometry, grouped inspection/form rows, and stable footer.
+- [x] (2026-08-20) Corrected Manage Certificate Configurations with explicit 560×520 minimum /
+  680×620 default geometry, grouped configuration/managed-certificate actions, and title case.
+- [x] (2026-08-20) Source-tree correction validated in the integrated layout slice: 143 focused tests,
+  then 1,605 full-suite tests passed with 20 skips; Ruff, compileall, and diff checks passed. The
+  bounded X11 sweep confirmed the corrected Import Certificate and certificate-configuration surfaces
+  and cleaned its process and temporary root.
+- [x] (2026-08-20) Reconciled this child with the integrated correction plan and architecture map;
+  installed-package and human acceptance remain in Child 4.
 
 ## Surprises & Discoveries
 
@@ -61,6 +74,12 @@ change the signed-PDF transaction.
   Evidence: `DefaultSignaturePropertiesCoordinator._resolve_signing_material` clears the selected
   configuration before raising, and `SigningSetupSession._run_with_manual_certificate_password_retry`
   executes only one prompted attempt.
+- Observation: the Import Certificate dialog is materially smaller than the supported main-frame
+  minimum and uses a dense form layout that clips user-facing copy. The window title is `Import
+  certificate`, and the file chooser title/command labels use the same sentence-case convention.
+  Evidence: live X11 `xwininfo` reports `Width: 267`, `Height: 284`; source construction in
+  `CertificateImportDialog._build_controls()` sets no dialog minimum/default size and places the
+  Choose/Inspect actions and inspection copy on separate narrow form rows.
 
 ## Decision Log
 

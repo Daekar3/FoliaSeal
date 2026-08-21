@@ -197,6 +197,25 @@ class AppFrameDialogCompatibilityState:
     reusable_object_library_dialog: Any | None = None
 
 
+def _compose_row(bindings: Any, *widgets: Any) -> Any:
+    """Compose a compact horizontal row without leaking layout concerns upward."""
+
+    container = bindings.q_widget()
+    layout_factory = getattr(bindings, "q_hbox_layout", None)
+    if not callable(layout_factory):
+        return widgets[0] if len(widgets) == 1 else container
+    layout = layout_factory(container)
+    set_margins = getattr(layout, "setContentsMargins", None)
+    if callable(set_margins):
+        set_margins(0, 0, 0, 0)
+    set_spacing = getattr(layout, "setSpacing", None)
+    if callable(set_spacing):
+        set_spacing(6)
+    for widget in widgets:
+        layout.addWidget(widget)
+    return container
+
+
 class AppSettingsDialog:
     """Small dialog for editing app-wide directory defaults."""
 
@@ -261,8 +280,26 @@ class AppSettingsDialog:
     def _build_controls(self, *, parent: Any) -> AppSettingsDialogControls:
         dialog = self._bindings.q_dialog(parent)
         if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Application settings")
-        layout = self._bindings.q_form_layout(dialog)
+            dialog.setWindowTitle("Application Settings")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(560, 280)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(680, 340)
+
+        layout_factory = getattr(self._bindings, "q_vbox_layout", None)
+        layout = (
+            layout_factory(dialog)
+            if callable(layout_factory)
+            else self._bindings.q_form_layout(dialog)
+        )
+        set_margins = getattr(layout, "setContentsMargins", None)
+        if callable(set_margins):
+            set_margins(12, 12, 12, 12)
+        set_spacing = getattr(layout, "setSpacing", None)
+        if callable(set_spacing):
+            set_spacing(8)
 
         default_open_directory = self._bindings.q_line_edit(self._settings.default_open_directory)
         default_open_directory_browse_button = self._bindings.q_push_button("Browse...")
@@ -283,14 +320,33 @@ class AppSettingsDialog:
         restore_defaults_button = self._bindings.q_push_button("Restore defaults")
         restore_defaults_button.setAccessibleName("Restore application settings defaults")
 
-        layout.addRow("Default open folder", default_open_directory)
-        layout.addRow("", default_open_directory_browse_button)
-        layout.addRow("Default output folder", default_output_directory)
-        layout.addRow("", default_output_directory_browse_button)
-        layout.addRow("Appearance", appearance_mode)
-        layout.addRow("", save_button)
-        layout.addRow("", cancel_button)
-        layout.addRow("", restore_defaults_button)
+        form_container = self._bindings.q_widget()
+        form_layout = self._bindings.q_form_layout(form_container)
+        form_layout.addRow(
+            "Default open folder",
+            _compose_row(
+                self._bindings,
+                default_open_directory,
+                default_open_directory_browse_button,
+            ),
+        )
+        form_layout.addRow(
+            "Default output folder",
+            _compose_row(
+                self._bindings,
+                default_output_directory,
+                default_output_directory_browse_button,
+            ),
+        )
+        form_layout.addRow("Appearance", appearance_mode)
+        layout.addWidget(form_container)
+        footer = _compose_row(
+            self._bindings,
+            restore_defaults_button,
+            cancel_button,
+            save_button,
+        )
+        layout.addWidget(footer)
 
         default_open_directory_browse_button.clicked.connect(  # type: ignore[attr-defined]
             lambda: self._choose_directory(

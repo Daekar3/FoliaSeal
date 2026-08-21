@@ -282,10 +282,20 @@ def test_certificate_import_choose_button_prefills_path_and_name(
     assert dialog.controls.display_name.text() == "board-secretary"
     assert bindings.q_file_dialog.open_calls[-1] == (
         dialog.controls.dialog,
-        "Import certificate",
+        "Import Certificate",
         "",
         "PKCS#12 files (*.p12 *.pfx);;All files (*)",
     )
+
+
+def test_certificate_import_dialog_has_readable_default_geometry_and_title(tmp_path: Path) -> None:
+    bindings, _, _, _, service = _build_service(tmp_path)
+
+    dialog = service.show_import_dialog().compatibility.import_dialog
+
+    assert dialog.controls.dialog.title == "Import Certificate"
+    assert dialog.controls.dialog.minimum_size == (600, 460)
+    assert dialog.controls.dialog.resize_value == (680, 520)
 
 
 def test_certificate_management_dialog_saves_and_refreshes(tmp_path: Path) -> None:
@@ -333,6 +343,18 @@ def test_certificate_management_dialog_saves_and_refreshes(tmp_path: Path) -> No
         "Certificate configuration",
         "Certificate configuration saved.",
     )
+
+
+def test_certificate_management_dialog_has_readable_default_geometry_and_title(
+    tmp_path: Path,
+) -> None:
+    bindings, _, _, _, service = _build_service(tmp_path)
+
+    dialog = service.show_management_dialog().compatibility.management_dialog
+
+    assert dialog.controls.dialog.title == "Manage Certificate Configurations"
+    assert dialog.controls.dialog.minimum_size == (560, 520)
+    assert dialog.controls.dialog.resize_value == (680, 620)
 
 
 def test_certificate_management_dialog_deletes_configuration_only(

@@ -166,7 +166,7 @@ def test_signing_commands_are_typed_and_keep_placement_actions_truthful() -> Non
         "Place Signature",
         "Adjust Placement",
         "Remove Placement",
-        "Sign and save",
+        "Sign and Save",
     ]
     assert [definition.shortcut for definition in SIGNING_COMMAND_DEFINITIONS] == [
         None,
@@ -2323,7 +2323,7 @@ def test_app_frame_installs_file_and_settings_menu_actions(tmp_path: Path) -> No
 
     frame.window.menu_bar.menus[4].actions[0].trigger()
 
-    assert frame.settings_dialog.controls.dialog.title == "Application settings"
+    assert frame.settings_dialog.controls.dialog.title == "Application Settings"
     assert (
         frame.settings_dialog.controls.default_open_directory.text()
         == str(tmp_path / "source")

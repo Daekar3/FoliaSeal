@@ -81,7 +81,7 @@ class SignatureRefinementDialog:
     def open(self, draft: VisibleSignatureSetupDraft) -> RefinementDialogResult:
         dialog = self._bindings.q_dialog(self._parent)
         if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Refine current PDF setup")
+            dialog.setWindowTitle("Refine Current PDF Setup")
         layout = self._bindings.q_vbox_layout(dialog)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)

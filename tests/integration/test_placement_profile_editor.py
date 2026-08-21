@@ -59,6 +59,11 @@ def test_editor_save_and_cancel_are_observable_offscreen() -> None:
         initial=_state(),
         on_save=saved.append,
     )
+    assert editor.controls.dialog.windowTitle() == "Edit Placement"
+    assert editor.controls.dialog.minimumWidth() == 480
+    assert editor.controls.dialog.minimumHeight() == 430
+    assert editor.controls.dialog.width() >= 560
+    assert editor.controls.dialog.height() >= 500
     editor.controls.name_input.setText("Board approval")
     editor.controls.page_spin.setValue(4)
     editor.controls.top_spin.setValue(700.0)

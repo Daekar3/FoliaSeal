@@ -26,6 +26,9 @@ The external HITL evidence is embedded here so a novice can proceed without need
   Full name.
 - The Appearance editor opened from Manage reusable signing objects too small for its controls and
   its preview did not visibly represent the selected appearance/image.
+- The Import Certificate dialog is also undersized (267×284 in the live source-tree audit), uses the
+  lowercase title `Import certificate`, and clips its introductory, inspection, and certificate-field
+  copy through a dense form layout.
 - Opening a document left the right signing pane too narrow until manually expanded.
 - A wrong password for the selected certificate displayed an error but offered no apparent retry,
   reselect, or cancel recovery.
@@ -43,12 +46,12 @@ The external HITL evidence is embedded here so a novice can proceed without need
   Library work provide the transaction and nested-editor seams consumed by Child 2.
 - [x] Existing placement, rail-divider, and responsive-baseline work provides the seams consumed by
   Child 2 and Child 3; this family corrects observed regressions rather than redesigning the topology.
-- [ ] `docs/ExecPlans/gui_certificate_and_preset_recovery_execplan.md` must pass before the final
-  regression child can certify certificate/password recovery.
-- [ ] `docs/ExecPlans/gui_appearance_and_signing_rail_layout_execplan.md` must pass before the final
-  regression child can certify Library and rail geometry.
-- [ ] `docs/ExecPlans/gui_placement_interaction_stability_execplan.md` must pass before the final
-  regression child can certify placement behavior.
+- [x] `docs/ExecPlans/gui_certificate_and_preset_recovery_execplan.md` passed its source-tree
+  correction slice; the final regression child must still certify the installed package.
+- [x] `docs/ExecPlans/gui_appearance_and_signing_rail_layout_execplan.md` passed its source-tree
+  correction slice; the final regression child must still certify the installed package.
+- [x] `docs/ExecPlans/gui_placement_interaction_stability_execplan.md` passed its source-tree
+  correction slice; the final regression child must still certify placement behavior in the package.
 - [ ] `docs/ExecPlans/gui_hitl_defect_regression_acceptance_execplan.md` is intentionally last; it
   consumes all three correction children and the existing package audit plan.
 
@@ -72,16 +75,27 @@ change classes.
   clears the selected name and only prompts once, the rail already enforces a 280–640 pixel splitter
   range and therefore needs measurement before geometry changes, the Appearance editor has a text-only
   synthetic preview, and command-boundary coverage belongs in `tests/unit/test_qt_app_frame.py`.
-- [x] (2026-08-20) Complete Child 1 implementation: readable certificate creation geometry/copy,
-  preserved certificate selection, bounded invalid-password retries, and focused regression coverage.
+- [x] (2026-08-20) Complete the initial Child 1 implementation: readable certificate creation
+  geometry/copy, preserved certificate selection, bounded invalid-password retries, and focused
+  regression coverage.
+- [x] (2026-08-20) Completed the newly discovered Import Certificate and certificate-configuration
+  dialog correction in `gui_surface_layout_correction_execplan.md` before Child 4 acceptance.
+- [x] (2026-08-20) Completed the cross-surface dialog/menu audit correction pass: title-case
+  consistency, explicit minimum/default geometry, and readable layouts for support, certificate,
+  Library, and nested-editor surfaces before Child 4 acceptance.
 - [x] (2026-08-20) Complete Child 2 implementation: explicit Library/editor minimum geometry, image-aware
   synthetic preview, Library geometry clamping, and existing rail persistence/offscreen proof retained.
 - [x] (2026-08-20) Complete Child 3 implementation: controlled disposed-viewer error boundary, visible
   keyboard placement guidance, duplicate pointer-update coalescing, and focused regression coverage.
+- [x] (2026-08-20) Completed the integrated source-tree GUI surface correction: explicit geometry and
+  title-case conventions for audited dialogs/editors, grouped certificate/settings actions, nested
+  editor spacing, and inner rail layout. Added the real-Qt rail assertion at the legal 280-pixel
+  minimum; 1,605 tests passed with 20 skips and a bounded X11 sweep found no recurrence of the
+  unusable default geometries.
 - [ ] Complete Child 4: installed-package regression matrix, documentation reconciliation, and final
   acceptance record.
 - [ ] Run the full suite, compliance review, package validation, and final acceptance work in Child 4.
-- [x] (2026-08-20) Update parent/release status plans and create focused implementation/documentation commits;
+- [ ] Update parent/release status plans and create the focused implementation/documentation commit;
   Child 4 remains open for display-backed and human acceptance evidence.
 
 ## Surprises & Discoveries
@@ -111,6 +125,42 @@ change classes.
   failures are visible GUI behavior and must be corrected even if no accessibility bridge warning is
   emitted.
   Evidence: the minimal PySide6 Orca baseline remained usable while producing the same Qt warnings.
+- Observation: the live source-tree surface sweep found several dialogs that are materially unusable
+  at their default geometry, beyond the already-tracked Import Certificate and signing-rail defects.
+  Application Settings measured 265×246 and truncates directory paths while stacking Browse controls;
+  Manage certificate configurations measured 371×392 and compresses explanatory copy, fields, and
+  vertically stacked actions; Manage reusable signing objects is 1100×700 but its three-column detail
+  area leaves narrow, low-hierarchy control rows and uses the sentence-case title
+  `Manage reusable signing objects`.
+  Evidence: isolated X11 captures under `/tmp/foliaseal-dev-hitl-fFnbwy/` from the source-tree GUI on
+  2026-08-20.
+- Observation: the Help support dialogs are hard failures under the live theme. Keyboard Shortcuts,
+  Data Locations, and About FoliaSeal each opened at exactly 102×121, clipping their titles and body
+  text to a few characters. The Help viewer itself opened at its intended 760×520 and was usable,
+  while the native Open PDF chooser opened at 1124×822 without a project-specific layout defect.
+  Evidence: `keyboard-shortcuts.png`, `data-locations.png`, `about.png`, `help-viewer2.png`, and
+  `open-file-dialog.png` in the same isolated X11 audit root.
+- Observation: nested editors expose additional density problems. The Appearance editor keeps the
+  synthetic preview and controls in the Library but its detail column is too narrow for several
+  labels/format controls; the Preset editor leaves a large unused upper area while compressing the
+  appearance, placement, certificate, and footer actions into a small lower band; the Edit Placement
+  dialog measured only 236×347 and clips explanatory text/labels. These are layout/readability
+  failures, not evidence that the frozen Library topology should be replaced.
+  Evidence: `appearance-editor.png`, `preset-editor2.png`, and `preset-editor.png` in the isolated
+  X11 audit root.
+- Observation: menu labels are mostly readable, but capitalization is inconsistent with the requested
+  title convention. Settings uses `Application settings`, `Manage reusable signing objects…`,
+  `Create certificate…`, `Import certificate…`, and `Manage certificate configurations…`; Signing
+  uses `Sign and save`; dialog titles also include the sentence-case variants. View and File menus fit
+  their entries and correctly disable document-dependent commands for the unsigned fixture.
+  Evidence: `settings-open2.png`, `signing-menu2.png`, `view-menu2.png`, and the measured dialog titles.
+- Observation: a few workflow surfaces could not be opened with the unsigned one-page fixture because
+  their enablement is correctly state-dependent: View → Document Signatures and Signing → Place
+  Signature/Adjust Placement/Remove Placement/Sign and Save remain disabled until a preset, placement,
+  or signed document exists. The audit therefore records their menu state but does not claim visual
+  acceptance for the enabled states; a later acceptance run with disposable signing material must
+  cover them.
+  Evidence: `view-menu2.png` and `signing-menu2.png` from the same live session.
 - Observation: the password dead end has two cooperating causes: coordinator error handling clears
   `_selected_certificate_configuration_name`, and `SigningSetupSession._run_with_manual_certificate_password_retry`
   prompts only once; the invalid-password message is not recognized by
@@ -155,12 +205,12 @@ password failure, the rail measurement prerequisite, and the existing AppFrame t
 
 ## Outcomes & Retrospective
 
-This parent is newly created and no correction is complete yet. The prior installed session achieved
-useful launch and shell evidence but stopped at the first defects, which is why this family begins with
-reproducible diagnosis rather than another broad acceptance loop. At completion, record which defects
-were fixed, which were confirmed as environment limitations, which UI_SPEC scenarios passed, and any
-remaining product blockers. Do not mark this parent complete while the crash, password dead end, or
-default-layout failures remain unresolved.
+The source-tree correction children are complete: the previously observed recovery, placement, and
+default-layout defects have focused implementation and regression evidence, including the integrated
+1,605-pass suite and bounded X11 sweep. Child 4 remains intentionally open because the installed
+package and human gates still need to exercise enabled signing, Orca, high contrast, DPI/scaling,
+monitor movement, and the complete signing story. Do not mark this parent complete until those package
+acceptance observations are recorded.
 
 ## Context and Orientation
 

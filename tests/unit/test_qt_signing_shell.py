@@ -2945,7 +2945,16 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
         widget.properties_panel.container.layout.items[3][0]
         is widget.properties_panel._refinement_controls.container
     )
-    assert len(widget.properties_panel._certificate_controls.container.layout.rows) == 2
+    certificate_layout = widget.properties_panel._certificate_controls.container.layout
+    assert len(certificate_layout.items) == 3
+    assert (
+        certificate_layout.items[1][0]
+        is widget.properties_panel._certificate_controls.configuration_combo
+    )
+    assert (
+        certificate_layout.items[2][0]
+        is widget.properties_panel._certificate_controls.helper_label
+    )
     assert widget.properties_panel._visible_signature_controls.container.parent is None
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4

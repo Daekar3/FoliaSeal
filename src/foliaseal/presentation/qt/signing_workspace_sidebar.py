@@ -539,21 +539,24 @@ class SigningWorkspaceSidebar:
         find_button = self._bindings.q_push_button("Find")
         previous_button = self._bindings.q_push_button("Previous")
         next_button = self._bindings.q_push_button("Next")
-        copy_button = self._bindings.q_push_button("Copy result")
+        copy_button = self._bindings.q_push_button("Copy Result")
         # Keep a hidden checkbox as a state mirror so existing shell render wiring
         # can stay narrow while the real user-facing mode command moves to Edit.
         select_mode_checkbox = self._bindings.q_check_box("Select text")
-        copy_selection_button = self._bindings.q_push_button("Copy selection")
-        clear_selection_button = self._bindings.q_push_button("Clear selection")
+        copy_selection_button = self._bindings.q_push_button("Copy Selection")
+        clear_selection_button = self._bindings.q_push_button("Clear Selection")
         previous_button.setEnabled(False)
         next_button.setEnabled(False)
         copy_button.setEnabled(False)
         copy_selection_button.setEnabled(False)
         clear_selection_button.setEnabled(False)
-        controls_row = _compose_row(
+        search_row = _compose_row(
             self._bindings,
             query_input,
             find_button,
+        )
+        navigation_row = _compose_row(
+            self._bindings,
             previous_button,
             next_button,
             copy_button,
@@ -603,7 +606,8 @@ class SigningWorkspaceSidebar:
             setattr(query_input, "_foliaseal_previous_search_shortcut", previous_shortcut)
         except Exception:  # pragma: no cover - dynamic Qt/test-double boundary
             pass
-        layout.addWidget(controls_row)
+        layout.addWidget(search_row)
+        layout.addWidget(navigation_row)
         layout.addWidget(selection_row)
         layout.addWidget(status_label)
         layout.addWidget(detail_label)

@@ -26,6 +26,12 @@ class SupportDialog:
         self.dialog = bindings.q_dialog(parent)
         self.dialog.setObjectName(object_name)
         self.dialog.setWindowTitle(title)
+        set_minimum_size = getattr(self.dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(520, 360)
+        resize = getattr(self.dialog, "resize", None)
+        if callable(resize):
+            resize(640, 420)
         set_modal = getattr(self.dialog, "setModal", None)
         if callable(set_modal):
             set_modal(False)
@@ -39,6 +45,9 @@ class SupportDialog:
             self.content.setPlainText(text)
         else:
             self.content.setMarkdown(text)
+        set_minimum_height = getattr(self.content, "setMinimumHeight", None)
+        if callable(set_minimum_height):
+            set_minimum_height(280)
         layout.addWidget(self.content)
         self.close_button = bindings.q_push_button("Close", self.dialog)
         self.close_button.setObjectName(f"{object_name}_close")

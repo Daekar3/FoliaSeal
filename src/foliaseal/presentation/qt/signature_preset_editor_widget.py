@@ -235,6 +235,9 @@ class SignaturePresetEditorWidget:
     def _build_controls(self, parent: Any) -> SignaturePresetEditorWidgetControls:
         bindings = self._bindings
         container = bindings.q_widget(parent)
+        set_minimum_size = getattr(container, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(520, 580)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -257,22 +260,22 @@ class SignaturePresetEditorWidget:
         )
         layout.addWidget(bindings.q_label("Appearance"))
         layout.addWidget(appearance_selector)
-        create_appearance = bindings.q_push_button("Create appearance…")
-        edit_appearance = bindings.q_push_button("Edit appearance…")
+        create_appearance = bindings.q_push_button("Create Appearance…")
+        edit_appearance = bindings.q_push_button("Edit Appearance…")
         layout.addWidget(_compose_row(bindings, create_appearance, edit_appearance))
         layout.addWidget(bindings.q_label("Placement"))
         layout.addWidget(placement_selector)
-        create_placement = bindings.q_push_button("Create placement…")
+        create_placement = bindings.q_push_button("Create Placement…")
         if self._on_create_placement is None:
             create_placement.setEnabled(False)
-        capture_placement = bindings.q_push_button("Capture placement from current PDF…")
+        capture_placement = bindings.q_push_button("Capture Placement from Current PDF…")
         if self._on_capture_placement is None:
             capture_placement.setEnabled(False)
         layout.addWidget(_compose_row(bindings, create_placement, capture_placement))
         layout.addWidget(bindings.q_label("Certificate"))
         layout.addWidget(certificate_selector)
-        create_certificate = bindings.q_push_button("Create certificate…")
-        import_certificate = bindings.q_push_button("Import certificate…")
+        create_certificate = bindings.q_push_button("Create Certificate…")
+        import_certificate = bindings.q_push_button("Import Certificate…")
         if self._on_create_certificate is None:
             create_certificate.setEnabled(False)
         if self._on_import_certificate is None:
@@ -451,7 +454,7 @@ class SignaturePresetEditorWidget:
             breadcrumb=(
                 self._breadcrumb
                 + " / Appearance / "
-                + ("New appearance" if initial_ref is None else "Edit appearance")
+                + ("New Appearance" if initial_ref is None else "Edit Appearance")
             ),
             on_saved=self._appearance_child_saved,
             on_cancel_requested=self._appearance_child_cancel_requested,

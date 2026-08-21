@@ -97,7 +97,7 @@ def test_appearance_editor_exposes_reachable_preview_and_minimum_geometry() -> N
 
     editor = dialog.controls.appearance_editor
     assert editor is not None
-    assert editor.controls.container.minimum_size == (420, 520)
+    assert editor.controls.container.minimum_size == (500, 560)
     assert editor.controls.sample_preview_image.fixed_size == (240, 96)
     assert editor.controls.sample_preview_image.visible is False
     assert "Image: none" in editor.controls.sample_preview_label.text()
@@ -343,7 +343,7 @@ def test_library_owns_nested_appearance_editor_and_discards_dirty_child() -> Non
     assert dialog.controls.detail_view.visible is False
     assert dialog.controls.appearance_editor_host.visible is True
     assert (
-        "Signature Library / Appearances / New appearance"
+        "Signature Library / Appearances / New Appearance"
         in editor.controls.breadcrumb_label.text()
     )
     assert "Sample preview (synthetic data" in editor.controls.sample_preview_label.text()
@@ -480,7 +480,7 @@ def test_nested_preset_editor_creates_appearance_and_returns_stable_reference() 
     preset_editor = dialog.controls.preset_editor
     assert preset_editor is not None
     assert (
-        "Signature Library / Presets / New preset"
+        "Signature Library / Presets / New Preset"
         in preset_editor.controls.breadcrumb_label.text()
     )
 
@@ -488,7 +488,7 @@ def test_nested_preset_editor_creates_appearance_and_returns_stable_reference() 
     preset_editor.controls.create_appearance_button.click()
     appearance_editor = preset_editor.appearance_child
     assert appearance_editor is not None
-    assert "Appearance / New appearance" in appearance_editor.controls.breadcrumb_label.text()
+    assert "Appearance / New Appearance" in appearance_editor.controls.breadcrumb_label.text()
     appearance_editor.controls.name_input.setText("Board appearance")
     appearance_editor.controls.save_button.click()
 

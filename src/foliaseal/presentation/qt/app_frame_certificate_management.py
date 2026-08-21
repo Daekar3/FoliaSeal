@@ -28,6 +28,25 @@ def _accepted_dialog_code(bindings: Any) -> Any:
     return 1
 
 
+def _compose_row(bindings: Any, *widgets: Any) -> Any:
+    """Keep related certificate controls together on one readable row."""
+
+    container = bindings.q_widget()
+    layout_factory = getattr(bindings, "q_hbox_layout", None)
+    if not callable(layout_factory):
+        return widgets[0] if len(widgets) == 1 else container
+    layout = layout_factory(container)
+    set_margins = getattr(layout, "setContentsMargins", None)
+    if callable(set_margins):
+        set_margins(0, 0, 0, 0)
+    set_spacing = getattr(layout, "setSpacing", None)
+    if callable(set_spacing):
+        set_spacing(6)
+    for widget in widgets:
+        layout.addWidget(widget)
+    return container
+
+
 @dataclass(frozen=True)
 class CertificateImportDialogControls:
     """Controls used by the certificate import dialog."""
@@ -140,7 +159,7 @@ class CertificateImportDialog:
     def choose_certificate_file(self) -> str | None:
         selected = self._bindings.q_file_dialog.getOpenFileName(
             self.controls.dialog,
-            "Import certificate",
+            "Import Certificate",
             "",
             "PKCS#12 files (*.p12 *.pfx);;All files (*)",
         )
@@ -222,8 +241,25 @@ class CertificateImportDialog:
     def _build_controls(self, *, parent: Any) -> CertificateImportDialogControls:
         dialog = self._bindings.q_dialog(parent)
         if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Import certificate")
-        layout = self._bindings.q_form_layout(dialog)
+            dialog.setWindowTitle("Import Certificate")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(600, 460)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(680, 520)
+        layout_factory = getattr(self._bindings, "q_vbox_layout", None)
+        layout = (
+            layout_factory(dialog)
+            if callable(layout_factory)
+            else self._bindings.q_form_layout(dialog)
+        )
+        set_margins = getattr(layout, "setContentsMargins", None)
+        if callable(set_margins):
+            set_margins(12, 12, 12, 12)
+        set_spacing = getattr(layout, "setSpacing", None)
+        if callable(set_spacing):
+            set_spacing(8)
 
         introduction_label = self._bindings.q_label(
             "Import a PKCS#12 file to store it as a managed certificate and "
@@ -243,16 +279,27 @@ class CertificateImportDialog:
         import_button = self._bindings.q_push_button("Import")
         cancel_button = self._bindings.q_push_button("Cancel")
 
-        layout.addRow("", introduction_label)
-        layout.addRow("PKCS#12 file", certificate_path)
-        layout.addRow("", choose_button)
-        layout.addRow("", inspect_button)
-        layout.addRow("", inspection_label)
-        layout.addRow("Display name", display_name)
-        layout.addRow("Password", passphrase)
-        layout.addRow("", save_password)
-        layout.addRow("", import_button)
-        layout.addRow("", cancel_button)
+        layout.addWidget(introduction_label)
+        file_container = self._bindings.q_widget()
+        file_layout = self._bindings.q_form_layout(file_container)
+        file_layout.addRow(
+            "PKCS#12 file",
+            _compose_row(self._bindings, certificate_path, choose_button),
+        )
+        layout.addWidget(file_container)
+        layout.addWidget(_compose_row(self._bindings, inspect_button))
+        inspection_container = self._bindings.q_widget()
+        inspection_layout = self._bindings.q_vbox_layout(inspection_container)
+        inspection_layout.addWidget(self._bindings.q_label("Inspection"))
+        inspection_layout.addWidget(inspection_label)
+        layout.addWidget(inspection_container)
+        form_container = self._bindings.q_widget()
+        form_layout = self._bindings.q_form_layout(form_container)
+        form_layout.addRow("Display name", display_name)
+        form_layout.addRow("Password", passphrase)
+        form_layout.addRow("", save_password)
+        layout.addWidget(form_container)
+        layout.addWidget(_compose_row(self._bindings, cancel_button, import_button))
 
         choose_button.clicked.connect(self.choose_certificate_file)  # type: ignore[attr-defined]
         inspect_button.clicked.connect(self.inspect_certificate)  # type: ignore[attr-defined]
@@ -723,8 +770,25 @@ class CertificateConfigurationManagementDialog:
     ) -> CertificateConfigurationManagementDialogControls:
         dialog = self._bindings.q_dialog(parent)
         if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Manage certificate configurations")
-        layout = self._bindings.q_form_layout(dialog)
+            dialog.setWindowTitle("Manage Certificate Configurations")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(560, 520)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(680, 620)
+        layout_factory = getattr(self._bindings, "q_vbox_layout", None)
+        layout = (
+            layout_factory(dialog)
+            if callable(layout_factory)
+            else self._bindings.q_form_layout(dialog)
+        )
+        set_margins = getattr(layout, "setContentsMargins", None)
+        if callable(set_margins):
+            set_margins(12, 12, 12, 12)
+        set_spacing = getattr(layout, "setSpacing", None)
+        if callable(set_spacing):
+            set_spacing(8)
 
         introduction_label = self._bindings.q_label(
             "Certificate configurations are the reusable signing identities "
@@ -748,20 +812,26 @@ class CertificateConfigurationManagementDialog:
         delete_certificate_button = self._bindings.q_push_button("Delete certificate")
         cancel_button = self._bindings.q_push_button("Cancel")
 
-        layout.addRow("", introduction_label)
-        layout.addRow("Certificate configuration", configuration_selector)
-        layout.addRow("", configuration_helper_label)
-        layout.addRow("Display name", display_name)
-        layout.addRow("Notes", notes)
-        layout.addRow("", remember_password)
-        layout.addRow("Password", password)
-        layout.addRow("Managed certificate", managed_certificate_selector)
-        layout.addRow("", managed_certificate_helper_label)
-        layout.addRow("", save_button)
-        layout.addRow("", delete_button)
-        layout.addRow("", export_certificate_button)
-        layout.addRow("", delete_certificate_button)
-        layout.addRow("", cancel_button)
+        layout.addWidget(introduction_label)
+        configuration_container = self._bindings.q_widget()
+        configuration_layout = self._bindings.q_form_layout(configuration_container)
+        configuration_layout.addRow("Certificate configuration", configuration_selector)
+        configuration_layout.addRow("", configuration_helper_label)
+        configuration_layout.addRow("Display name", display_name)
+        configuration_layout.addRow("Notes", notes)
+        configuration_layout.addRow("", remember_password)
+        configuration_layout.addRow("Password", password)
+        layout.addWidget(configuration_container)
+        layout.addWidget(_compose_row(self._bindings, save_button, delete_button))
+        certificate_container = self._bindings.q_widget()
+        certificate_layout = self._bindings.q_form_layout(certificate_container)
+        certificate_layout.addRow("Managed certificate", managed_certificate_selector)
+        certificate_layout.addRow("", managed_certificate_helper_label)
+        layout.addWidget(certificate_container)
+        layout.addWidget(
+            _compose_row(self._bindings, export_certificate_button, delete_certificate_button)
+        )
+        layout.addWidget(_compose_row(self._bindings, cancel_button))
 
         index_changed = getattr(configuration_selector, "currentIndexChanged", None)
         if hasattr(index_changed, "connect"):

@@ -197,7 +197,7 @@ def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None
 
     editor = library.controls.appearance_editor
     assert editor is not None
-    assert editor.controls.breadcrumb_label.text().endswith("New appearance")
+    assert editor.controls.breadcrumb_label.text().endswith("New Appearance")
     assert "Sample preview (synthetic data" in editor.controls.sample_preview_label.text()
 
     editor.controls.name_input.setText("Offscreen appearance")
@@ -378,7 +378,7 @@ def test_library_real_qt_returns_from_appearance_child_to_preset_editor(tmp_path
     app.processEvents()
     appearance_editor = preset_editor.appearance_child
     assert appearance_editor is not None
-    assert "Appearance / New appearance" in appearance_editor.controls.breadcrumb_label.text()
+    assert "Appearance / New Appearance" in appearance_editor.controls.breadcrumb_label.text()
     appearance_editor.controls.name_input.setText("Offscreen appearance")
     appearance_editor.controls.save_button.click()
     app.processEvents()

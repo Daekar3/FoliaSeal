@@ -59,7 +59,13 @@ class SignaturePresetEditorDialog:
 
     def _build_controls(self, parent: Any) -> SignaturePresetEditorControls:
         dialog = self._bindings.q_dialog(parent)
-        dialog.setWindowTitle("Edit signature preset")
+        dialog.setWindowTitle("Edit Signature Preset")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(600, 640)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(720, 740)
         layout = self._bindings.q_vbox_layout(dialog)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)

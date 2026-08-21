@@ -59,8 +59,14 @@ class AppearanceProfileEditorDialog:
     def _build_controls(self, parent: Any) -> AppearanceProfileEditorControls:
         dialog = self._bindings.q_dialog(parent)
         dialog.setWindowTitle(
-            "Create appearance" if self._initial_ref is None else "Edit appearance"
+            "Create Appearance" if self._initial_ref is None else "Edit Appearance"
         )
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(560, 620)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(680, 720)
         layout = self._bindings.q_vbox_layout(dialog)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)

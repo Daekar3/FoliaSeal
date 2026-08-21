@@ -57,7 +57,13 @@ class PlacementProfileEditorDialog:
 
     def _build_controls(self, parent: Any) -> PlacementProfileEditorControls:
         dialog = self._bindings.q_dialog(parent)
-        dialog.setWindowTitle("Edit placement")
+        dialog.setWindowTitle("Edit Placement")
+        set_minimum_size = getattr(dialog, "setMinimumSize", None)
+        if callable(set_minimum_size):
+            set_minimum_size(480, 430)
+        resize = getattr(dialog, "resize", None)
+        if callable(resize):
+            resize(560, 500)
         layout = self._bindings.q_vbox_layout(dialog)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
@@ -100,10 +106,18 @@ class PlacementProfileEditorDialog:
             (height_spin, self._initial.rect.height_pt),
         ):
             spin.setValue(value)
-        layout.addWidget(self._row("Left (pt)", left_spin))
-        layout.addWidget(self._row("Top (pt)", top_spin))
-        layout.addWidget(self._row("Width (pt)", width_spin))
-        layout.addWidget(self._row("Height (pt)", height_spin))
+        layout.addWidget(
+            self._compose_row(
+                self._row("Left (pt)", left_spin),
+                self._row("Top (pt)", top_spin),
+            )
+        )
+        layout.addWidget(
+            self._compose_row(
+                self._row("Width (pt)", width_spin),
+                self._row("Height (pt)", height_spin),
+            )
+        )
 
         hint = self._bindings.q_label(
             "Coordinates use the visible page's upper-left origin. Numeric edits are exact."
@@ -172,6 +186,15 @@ class PlacementProfileEditorDialog:
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self._bindings.q_label(label))
         row.addWidget(widget)
+        return container
+
+    def _compose_row(self, *widgets: Any) -> Any:
+        container = self._bindings.q_widget()
+        row = self._bindings.q_hbox_layout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        for widget in widgets:
+            row.addWidget(widget)
         return container
 
     def _spin(
