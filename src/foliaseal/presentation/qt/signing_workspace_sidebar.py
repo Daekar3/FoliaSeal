@@ -264,6 +264,10 @@ class SigningWorkspaceSidebar:
             _panel_available_width(self.container),
         )
         self.result_label.setText(state.result_text)
+        _set_wrapped_label_minimum_height(
+            self.result_label,
+            fallback_width=_panel_available_width(self.container),
+        )
         self._mark_recommended_action(state.recommended_action)
         if hasattr(self.result_label, "setStyleSheet"):
             if state.result_kind == "success":
@@ -678,6 +682,19 @@ def _set_widget_width_limit(widget: Any, width: int) -> None:
         max_width(width)
 
 
+def _set_wrapped_label_minimum_height(widget: Any, *, fallback_width: int) -> None:
+    """Reserve the full wrapped result message inside the status card."""
+
+    set_minimum_height = getattr(widget, "setMinimumHeight", None)
+    height_for_width = getattr(widget, "heightForWidth", None)
+    width_getter = getattr(widget, "width", None)
+    if not callable(set_minimum_height) or not callable(height_for_width):
+        return
+    width = int(width_getter()) if callable(width_getter) else 0
+    width = width if width > 0 else fallback_width
+    set_minimum_height(max(0, int(height_for_width(width))))
+
+
 def _panel_available_width(widget: Any) -> int:
     width_getter = getattr(widget, "width", None)
     if not callable(width_getter):
@@ -687,5 +704,9 @@ def _panel_available_width(widget: Any) -> int:
     except TypeError:
         return 520
     if width > 0:
-        return max(1, width - 16)
+        # The status card contributes six-pixel contents margins on each side
+        # and the sidebar layout reserves eight pixels of breathing room. Keep
+        # the wrapped detail label inside that real inner width instead of
+        # letting a fixed width extend beneath the card border.
+        return max(1, width - 28)
     return 520

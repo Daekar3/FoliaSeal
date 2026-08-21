@@ -150,6 +150,47 @@ def _compose_row(bindings: Any, *widgets: Any) -> Any:
     return container
 
 
+def _compact_combo_for_rail(combo: Any) -> None:
+    """Keep long selector values from imposing a horizontal rail minimum."""
+
+    set_minimum_contents_length = getattr(combo, "setMinimumContentsLength", None)
+    if callable(set_minimum_contents_length):
+        set_minimum_contents_length(0)
+    set_minimum_width = getattr(combo, "setMinimumWidth", None)
+    if callable(set_minimum_width):
+        set_minimum_width(0)
+    set_size_adjust_policy = getattr(combo, "setSizeAdjustPolicy", None)
+    if callable(set_size_adjust_policy):
+        policy = getattr(combo, "AdjustToMinimumContentsLengthWithIcon", None)
+        if policy is None:
+            policy_type = getattr(combo, "SizeAdjustPolicy", None)
+            policy = getattr(policy_type, "AdjustToMinimumContentsLengthWithIcon", None)
+        if policy is not None:
+            set_size_adjust_policy(policy)
+
+
+def _shrink_to_rail_width(widget: Any) -> None:
+    """Allow a rail-owned group to follow its scroll-area viewport width."""
+
+    set_minimum_width = getattr(widget, "setMinimumWidth", None)
+    if callable(set_minimum_width):
+        set_minimum_width(0)
+    policy_getter = getattr(widget, "sizePolicy", None)
+    set_policy = getattr(widget, "setSizePolicy", None)
+    if not callable(policy_getter) or not callable(set_policy):
+        return
+    policy = policy_getter()
+    horizontal_policy = getattr(policy, "horizontalPolicy", None)
+    set_horizontal_policy = getattr(policy, "setHorizontalPolicy", None)
+    if not callable(horizontal_policy) or not callable(set_horizontal_policy):
+        return
+    policy_type = type(horizontal_policy())
+    ignored = getattr(policy_type, "Ignored", None)
+    if ignored is not None:
+        set_horizontal_policy(ignored)
+        set_policy(policy)
+
+
 def _compose_preview_column(bindings: Any, *widgets: Any) -> Any:
     container = bindings.q_widget()
     if hasattr(container, "setStyleSheet"):
@@ -296,6 +337,7 @@ def _build_close_aware_widget(
     widget_cls: type[Any],
     *,
     on_close: Callable[[], None],
+    on_resize: Callable[[], None] | None = None,
 ) -> Any:
     close_handled = False
 
@@ -319,6 +361,13 @@ def _build_close_aware_widget(
             close_event = getattr(super(), "closeEvent", None)
             if callable(close_event):
                 close_event(event)
+
+        def resizeEvent(self, event: Any) -> None:  # noqa: N802
+            if on_resize is not None:
+                on_resize()
+            resize_event = getattr(super(), "resizeEvent", None)
+            if callable(resize_event):
+                resize_event(event)
 
     return _CloseAwareWidget()
 
@@ -375,9 +424,11 @@ class SignaturePropertiesPanel:
             qt=bindings.qt,
         )
         self._preview_layout = QtSignaturePreviewLayout(bindings=bindings)
+        self._last_preview: SigningDraftPreview | None = None
         self.widget = _build_close_aware_widget(
             bindings.q_widget,
             on_close=self.dispose,
+            on_resize=self._refresh_preview_for_resize,
         )
         self._setup_session = SigningSetupSession(
             coordinator=self._coordinator,
@@ -653,6 +704,7 @@ class SignaturePropertiesPanel:
     def _build_preview_controls(self) -> PreviewControls:
         bindings = self._bindings
         container = bindings.q_group_box("Signed appearance preview")
+        _shrink_to_rail_width(container)
         if hasattr(container, "setStyleSheet"):
             container.setStyleSheet(
                 "QGroupBox {"
@@ -774,6 +826,7 @@ class SignaturePropertiesPanel:
     def _build_refinement_controls(self) -> RefinementControls:
         bindings = self._bindings
         container = bindings.q_group_box("Manual refinement")
+        _shrink_to_rail_width(container)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
@@ -956,11 +1009,13 @@ class SignaturePropertiesPanel:
     def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
         bindings = self._bindings
         container = bindings.q_group_box("Certificate configuration")
+        _shrink_to_rail_width(container)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
         configuration_combo = bindings.q_combo_box()
+        _compact_combo_for_rail(configuration_combo)
         helper_label = bindings.q_label(
             "Certificate configurations are saved signing identities. "
             "Choosing one immediately activates its managed certificate for this PDF."
@@ -983,11 +1038,13 @@ class SignaturePropertiesPanel:
     def _build_signature_preset_controls(self) -> SignaturePresetControls:
         bindings = self._bindings
         container = bindings.q_group_box("Signature preset")
+        _shrink_to_rail_width(container)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
         preset_combo = bindings.q_combo_box()
+        _compact_combo_for_rail(preset_combo)
         helper_label = bindings.q_label(
             "Signature presets reuse saved appearance and placement choices. "
             "A preset may leave the current certificate unchanged."
@@ -1151,6 +1208,7 @@ class SignaturePropertiesPanel:
             self._notify_change()
 
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
+        self._last_preview = preview
         layout_state = self._preview_layout.plan(
             preview=preview,
             controls=self._preview_controls,
@@ -1168,6 +1226,14 @@ class SignaturePropertiesPanel:
             state=layout_state,
             canonical_render_state=canonical_render_state,
         )
+
+    def _refresh_preview_for_resize(self) -> None:
+        """Reflow the fixed-size preview when the signing rail receives its real width."""
+
+        preview = self._last_preview
+        if preview is None or not hasattr(self, "_preview_controls"):
+            return
+        self._update_preview_controls(preview)
 
     def _apply_coordinator_state(
         self,

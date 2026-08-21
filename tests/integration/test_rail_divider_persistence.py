@@ -93,6 +93,16 @@ def test_real_qt_signing_rail_divider_moves_and_round_trips(tmp_path: Path) -> N
         assert first.sidebar.width() == 320
         assert isinstance(first.viewer_widget, QScrollArea)
         assert isinstance(first.properties_scroll, QScrollArea)
+        assert not first.properties_scroll.horizontalScrollBar().isVisible()
+
+        total_splitter_width = sum(first_splitter.sizes())
+        first_splitter.setSizes([total_splitter_width - 280, 280])
+        app.processEvents()
+        assert first.sidebar.width() == 280
+        assert not first.properties_scroll.horizontalScrollBar().isVisible()
+        first_splitter.setSizes([total_splitter_width - 320, 320])
+        app.processEvents()
+        assert first.sidebar.width() == 320
 
         initial_width = first.sidebar.width()
         first_splitter.setSizes([500, 400])

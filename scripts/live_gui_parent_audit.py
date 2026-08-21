@@ -14,7 +14,7 @@ Run under a graphical Qt session, for example::
 
 The audit uses a temporary copy of the representative PDF and temporary
 settings/certificate/profile stores.  It creates a managed self-signed
-certificate through the visible Create certificate dialog, selects it, places
+certificate through the visible Create Certificate dialog, selects it, places
 a visible signature, accepts the confirmation dialog, signs, and reopens the
 result.  No user profile or source fixture is modified.
 """
@@ -195,19 +195,27 @@ def _widget_root(root: Any) -> Any:
 
 
 def _line_edit_for_form_label(dialog: Any, label_text: str) -> Any:
-    """Find an editor by its ``QFormLayout`` label, not insertion order."""
-    from PySide6.QtWidgets import QFormLayout
+    """Find a line editor by its visible form label across nested Qt layouts."""
+    from PySide6.QtWidgets import QFormLayout, QLineEdit
 
-    layout = dialog.layout()
-    if not isinstance(layout, QFormLayout):
-        raise RuntimeError(f"Expected a form layout in {dialog.windowTitle()!r}.")
-    for row in range(layout.rowCount()):
-        label_item = layout.itemAt(row, QFormLayout.ItemRole.LabelRole)
-        field_item = layout.itemAt(row, QFormLayout.ItemRole.FieldRole)
-        label = label_item.widget() if label_item is not None else None
-        field = field_item.widget() if field_item is not None else None
-        if label is not None and label.text().strip() == label_text and field is not None:
-            return field
+    layouts = []
+    root_layout = dialog.layout()
+    if isinstance(root_layout, QFormLayout):
+        layouts.append(root_layout)
+    layouts.extend(dialog.findChildren(QFormLayout))
+    for layout in layouts:
+        for row in range(layout.rowCount()):
+            label_item = layout.itemAt(row, QFormLayout.ItemRole.LabelRole)
+            field_item = layout.itemAt(row, QFormLayout.ItemRole.FieldRole)
+            label = label_item.widget() if label_item is not None else None
+            field = field_item.widget() if field_item is not None else None
+            if label is None or label.text().strip() != label_text or field is None:
+                continue
+            if isinstance(field, QLineEdit):
+                return field
+            editors = field.findChildren(QLineEdit)
+            if len(editors) == 1:
+                return editors[0]
     raise RuntimeError(f"Could not find form field labelled {label_text!r}.")
 
 
@@ -351,13 +359,15 @@ def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
 
     def drive(app: Any) -> bool:
         nonlocal clicked
-        dialog = _active_modal(app, "Create certificate")
+        dialog = _active_modal(app, "Create Certificate")
         if dialog is None:
             return False
         if clicked:
             return True
         _line_edit_for_form_label(dialog, "Full name").setText("FoliaSeal Live Audit")
-        _line_edit_for_form_label(dialog, "Display name").setText(AUDIT_CERTIFICATE_NAME)
+        _line_edit_for_form_label(dialog, "Display name (optional)").setText(
+            AUDIT_CERTIFICATE_NAME
+        )
         _line_edit_for_form_label(dialog, "Password").setText(AUDIT_PASSPHRASE)
         _line_edit_for_form_label(dialog, "Confirm password").setText(AUDIT_PASSPHRASE)
         checkboxes = dialog.findChildren(QCheckBox)
@@ -368,6 +378,11 @@ def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
         if save_password is None:
             raise RuntimeError("Certificate dialog has no saved-password checkbox.")
         save_password.setChecked(True)
+        audit.checkpoint_widget(
+            "create-certificate-dialog",
+            "Settings > Create Certificate",
+            dialog,
+        )
         _button_with_text(dialog, "Create").click()
         clicked = True
         return True
@@ -481,10 +496,19 @@ def _audit_preset_first_shell(shell: Any, audit: _Audit) -> None:
         for editor in _widget_root(shell).findChildren(QLineEdit)
     ):
         raise RuntimeError("Default shell leaked the inline preset-name editor.")
+    detail_label = getattr(getattr(shell, "sidebar_surface", None), "flow_detail_label", None)
+    height_for_width = getattr(detail_label, "heightForWidth", None)
+    if detail_label is not None and callable(height_for_width):
+        required_height = int(height_for_width(detail_label.width()))
+        if required_height > detail_label.height():
+            raise RuntimeError(
+                "Signing-status detail text is vertically clipped: "
+                f"required={required_height}, actual={detail_label.height()}."
+            )
     audit.checkpoint("preset-first-default-shell", "Step 2 of 6 — Choose signing setup")
 
     def drive(app: Any) -> bool:
-        dialog = _active_modal(app, "Refine current PDF setup")
+        dialog = _active_modal(app, "Refine Current PDF Setup")
         if dialog is None:
             return False
         dialog_groups = _visible_group_titles(dialog)
@@ -528,6 +552,11 @@ def _audit_profile_library(frame: Any, audit: _Audit) -> None:
         for selector in selectors
     ):
         raise RuntimeError("Profile library did not visibly list the saved signature preset.")
+    audit.checkpoint_widget(
+        "profile-library-dialog",
+        "Signing > Signature Library",
+        widget,
+    )
     _button_with_text(widget, "Close").click()
     audit.checkpoint("profile-library-clarity", "Step 4 of 6 — Review reusable signing objects")
 
@@ -554,12 +583,20 @@ def _audit_settings_directory_browsing(
     )
     frame._bindings = replace(original_bindings, q_file_dialog=directory_dialog)
     phase = "open"
+    captured = False
     try:
         def drive(app: Any) -> bool:
-            nonlocal phase
-            dialog = _active_modal(app, "Application settings")
+            nonlocal captured, phase
+            dialog = _active_modal(app, "Application Settings")
             if dialog is None:
                 return False
+            if not captured:
+                audit.checkpoint_widget(
+                    "application-settings-dialog",
+                    "Settings > Application Settings",
+                    dialog,
+                )
+                captured = True
             open_edit = _line_edit_for_form_label(dialog, "Default open folder")
             output_edit = _line_edit_for_form_label(dialog, "Default output folder")
             from PySide6.QtWidgets import QPushButton
@@ -617,7 +654,7 @@ def _save_appearance_profile(shell: Any, audit: _Audit) -> None:
 
     def drive(app: Any) -> bool:
         nonlocal saved
-        modal = _active_modal(app, "Refine current PDF setup")
+        modal = _active_modal(app, "Refine Current PDF Setup")
         if modal is None:
             return False
         if not saved:
@@ -651,7 +688,7 @@ def _save_and_reselect_signature_preset(
 
     def drive(app: Any) -> bool:
         nonlocal phase
-        modal = _active_modal(app, "Refine current PDF setup")
+        modal = _active_modal(app, "Refine Current PDF Setup")
         if modal is None:
             for title in (
                 "Save placement profile",
@@ -663,7 +700,7 @@ def _save_and_reselect_signature_preset(
         if modal is None:
             return False
         title = modal.windowTitle()
-        if title == "Refine current PDF setup":
+        if title == "Refine Current PDF Setup":
             if phase == "placement-button":
                 if _combo_with_item(modal, AUDIT_APPEARANCE_PROFILE) is None:
                     raise RuntimeError(
@@ -836,6 +873,92 @@ def _place_signature_with_viewer_drag(
     _assert_on_page_preview(shell, require_signature_overlay=True)
 
 
+def _audit_keyboard_surface(frame: Any, shell: Any, audit: _Audit) -> None:
+    """Exercise the mounted X11 Qt surface through keyboard event dispatch."""
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    menu_bar = frame.window.menuBar()
+    menu_actions = [action for action in menu_bar.actions() if action.text().strip()]
+    if not menu_actions:
+        raise RuntimeError("The mounted application menu bar exposed no keyboard menus.")
+    for action in menu_actions:
+        menu = action.menu()
+        if menu is None:
+            raise RuntimeError(f"Menu action {action.text()!r} has no attached menu.")
+        raw_title = action.text().strip()
+        marker = raw_title.find("&")
+        mnemonic = (
+            raw_title[marker + 1]
+            if marker >= 0 and marker + 1 < len(raw_title)
+            else raw_title[:1]
+        )
+        if not mnemonic:
+            raise RuntimeError(f"Menu action {action.text()!r} has no mnemonic candidate.")
+        QTest.keyClick(frame.window, ord(mnemonic.upper()), Qt.KeyboardModifier.AltModifier)
+        audit.process_events()
+        if not menu.isVisible():
+            raise RuntimeError(f"Alt+{mnemonic.upper()} did not open {action.text()!r}.")
+        QTest.keyClick(menu, Qt.Key_Escape)
+        audit.process_events()
+        if menu.isVisible():
+            raise RuntimeError(f"Escape did not dismiss {action.text()!r}.")
+
+    surface = getattr(shell, "sidebar_surface", None)
+    query_input = getattr(surface, "document_text_query_input", None)
+    if query_input is None:
+        raise RuntimeError("The mounted sidebar exposed no document-text query input.")
+    frame.window.setFocus()
+    QTest.keyClick(frame.window, Qt.Key_F, Qt.KeyboardModifier.ControlModifier)
+    audit.process_events()
+    if QApplication.focusWidget() is not query_input:
+        raise RuntimeError("Ctrl+F did not focus the document-text query input.")
+    query_input.setFocus()
+    QTest.keyClick(query_input, Qt.Key_Tab)
+    audit.process_events()
+    next_focus = QApplication.focusWidget()
+    if next_focus is None or next_focus is query_input or not next_focus.isVisible():
+        raise RuntimeError("Tab did not advance to a visible keyboard-reachable control.")
+    QTest.keyClick(next_focus, Qt.Key_Tab, Qt.KeyboardModifier.ShiftModifier)
+    audit.process_events()
+    if QApplication.focusWidget() is not query_input:
+        raise RuntimeError("Shift+Tab did not return to the query input.")
+
+    canvas = shell.viewer_widget.widget()
+    shell.set_viewer_interaction_mode("signature")
+    canvas.setFocus()
+    QTest.keyClick(canvas, Qt.Key_Return)
+    audit.process_events()
+    initial_rect = shell.signature_rect()
+    if initial_rect is None:
+        raise RuntimeError("Enter did not create a keyboard signature placement.")
+    QTest.keyClick(canvas, Qt.Key_Right, Qt.KeyboardModifier.ShiftModifier)
+    audit.process_events()
+    moved_rect = shell.signature_rect()
+    if moved_rect is None or moved_rect.left_pt <= initial_rect.left_pt:
+        raise RuntimeError("Shift+Right did not move the keyboard placement.")
+    QTest.keyClick(canvas, Qt.Key_Right, Qt.KeyboardModifier.ControlModifier)
+    audit.process_events()
+    resized_rect = shell.signature_rect()
+    if resized_rect is None or resized_rect.width_pt <= moved_rect.width_pt:
+        raise RuntimeError("Ctrl+Right did not resize the keyboard placement.")
+    QTest.keyClick(canvas, Qt.Key_Delete)
+    audit.process_events()
+    if shell.signature_rect() is not None:
+        raise RuntimeError("Delete did not remove the keyboard placement.")
+    shell.set_viewer_interaction_mode("signature")
+    canvas.setFocus()
+    QTest.keyClick(canvas, Qt.Key_Return)
+    QTest.keyClick(canvas, Qt.Key_Escape)
+    audit.process_events()
+    if shell.viewer_widget.widget()._interaction_mode != "pan":
+        raise RuntimeError("Escape did not leave keyboard placement mode.")
+    shell.remove_signature_placement()
+    audit.process_events()
+
+
 def _assert_on_page_preview(
     shell: Any,
     *,
@@ -870,6 +993,19 @@ def _assert_on_page_preview(
     if require_visible_signed_content and not _canvas_has_visible_ink(canvas):
         raise RuntimeError(
             "Reopened signed-PDF Qt canvas did not paint the visible signature appearance."
+        )
+
+
+def _assert_wrapped_label_fits(label: Any, *, context: str) -> None:
+    """Detect a wrapped Qt label whose parent card clips its vertical content."""
+
+    height_for_width = getattr(label, "heightForWidth", None)
+    if not callable(height_for_width):
+        return
+    required_height = int(height_for_width(label.width()))
+    if required_height > label.height():
+        raise RuntimeError(
+            f"{context} is vertically clipped: required={required_height}, actual={label.height()}."
         )
 
 
@@ -985,6 +1121,10 @@ def _sign_current_shell(
         ),
     )
     _wait_for_signed_output(frame, audit, output_path)
+    _assert_wrapped_label_fits(
+        getattr(shell.sidebar_surface, "sign_result_label", None),
+        context=f"{checkpoint_prefix} signing result",
+    )
     actual_output = Path(frame.current_signing_workflow.output_pdf_path)
     if not actual_output.is_file():
         raise RuntimeError(f"{checkpoint_prefix} signing did not create {actual_output}.")
@@ -1118,6 +1258,7 @@ def run_audit(
             raise RuntimeError("FoliaSeal did not open the representative PDF.")
         audit.checkpoint("document-review", "Step 2 of 6 — Choose signing setup")
         _audit_preset_first_shell(shell, audit)
+        _audit_keyboard_surface(frame, shell, audit)
         _audit_certificate_and_preset_clarity(shell, audit)
         _audit_settings_directory_browsing(
             frame,
@@ -1196,6 +1337,10 @@ def run_audit(
             lambda app: _accept_confirm_signing_with_assertion(app, selected_output),
         )
         _wait_for_signed_output(frame, audit, selected_output)
+        _assert_wrapped_label_fits(
+            getattr(shell.sidebar_surface, "sign_result_label", None),
+            context="first signing result",
+        )
         output_path = Path(frame.current_signing_workflow.output_pdf_path)
         if not output_path.is_file():
             raise RuntimeError(f"Signing did not create the expected output: {output_path}")

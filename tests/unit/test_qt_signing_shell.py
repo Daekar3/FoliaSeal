@@ -3709,7 +3709,7 @@ def test_signing_shell_readiness_detail_is_width_limited_to_action_panel(
 
     assert not hasattr(panel, "_validation_label")
     assert widget.sidebar_surface.flow_detail_label.fixed_width == (
-        SigningWorkspaceSidebar.RAIL_WIDTH - 16
+        SigningWorkspaceSidebar.RAIL_WIDTH - 28
     )
     assert widget.sidebar_surface.flow_stage_label.text() == "Step 4 of 6 — Review readiness"
     assert widget.sidebar_surface.flow_detail_label.text().startswith("Will fail to sign:")
