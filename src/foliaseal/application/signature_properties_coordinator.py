@@ -483,7 +483,7 @@ class DefaultSignaturePropertiesCoordinator:
     def _apply_certificate_configuration(self, command: ApplyCertificateConfiguration) -> None:
         selected_name = _require_name(
             command.selected_name,
-            "Select a certificate configuration before applying it.",
+            "Select a certificate before applying it.",
         )
         try:
             configuration = self.certificate_catalog.configuration_named(selected_name)
@@ -577,11 +577,11 @@ class DefaultSignaturePropertiesCoordinator:
         self._selected_signature_preset_name = preset.name
 
     def _save_current_appearance_profile(self, command: SaveCurrentAppearanceProfile) -> None:
-        name = _require_name(command.name, "Appearance profile name is required before saving.")
+        name = _require_name(command.name, "Appearance name is required before saving.")
         appearance = command.appearance or self.workflow.current_signature_appearance
         if appearance is None:
             raise SignaturePropertiesCoordinatorError(
-                "A signature appearance must exist before saving an appearance profile."
+                "A signature appearance must exist before saving an appearance."
             )
         try:
             self.reusable_objects.execute(
@@ -607,17 +607,17 @@ class DefaultSignaturePropertiesCoordinator:
         self._selected_signature_preset_name = name
 
     def _save_current_placement_profile(self, command: SaveCurrentPlacementProfile) -> None:
-        name = _require_name(command.name, "Placement profile name is required before saving.")
+        name = _require_name(command.name, "Placement name is required before saving.")
         placement = command.placement
         if not placement.enabled:
             raise SignaturePropertiesCoordinatorError(
-                "Place a signature on the page before saving a placement profile."
+                "Place a signature on the page before saving a placement."
             )
         try:
             context = self.workflow.placement_context
             if context is None:
                 raise SignaturePropertiesCoordinatorError(
-                    "A visible page context is required before saving a placement profile."
+                    "A visible page context is required before saving a placement."
                 )
             visible_width_pt, visible_height_pt = visible_page_dimensions(
                 context.page_box, context.rotation
@@ -729,7 +729,7 @@ class DefaultSignaturePropertiesCoordinator:
             return None
         return (
             f"Selected preset '{preset.name}' does not define a certificate; "
-            "choose a certificate configuration before signing."
+            "choose a certificate before signing."
         )
 
     def _selected_preset_missing_inputs(self) -> tuple[bool, bool]:

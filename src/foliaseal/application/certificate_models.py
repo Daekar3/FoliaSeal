@@ -349,8 +349,8 @@ class CertificateCatalog:
         for configuration in self.certificate_configurations:
             if configuration.managed_certificate_id == normalized_id:
                 raise ConfigValidationError(
-                    "Managed certificate is still used by a certificate configuration; "
-                    "delete the configuration first."
+                    "This certificate file is still used by a signing identity. "
+                    "Remove that identity first."
                 )
         updated_certificates = tuple(
             certificate

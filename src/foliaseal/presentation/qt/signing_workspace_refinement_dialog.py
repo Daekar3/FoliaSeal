@@ -103,14 +103,14 @@ class SignatureRefinementDialog:
         appearance_profile_combo = self._bindings.q_combo_box()
         appearance_profile_combo.addItems(profile_state.appearance_profile_names)
         placement_profile_combo = self._bindings.q_combo_box()
-        placement_profile_combo.addItem("No saved placement profile")
+        placement_profile_combo.addItem("No saved placement")
         placement_profile_combo.addItems(profile_state.placement_profile_names)
         layout.addWidget(
             _compose_row(
                 self._bindings,
-                self._bindings.q_label("Appearance profile"),
+                self._bindings.q_label("Appearance"),
                 appearance_profile_combo,
-                self._bindings.q_label("Placement profile"),
+                self._bindings.q_label("Placement"),
                 placement_profile_combo,
             )
         )
@@ -119,7 +119,7 @@ class SignatureRefinementDialog:
             appearance_profile_combo.clear()
             appearance_profile_combo.addItems(state.appearance_profile_names)
             placement_profile_combo.clear()
-            placement_profile_combo.addItem("No saved placement profile")
+            placement_profile_combo.addItem("No saved placement")
             placement_profile_combo.addItems(state.placement_profile_names)
 
         apply_button = self._bindings.q_push_button("Apply")
@@ -159,7 +159,7 @@ class SignatureRefinementDialog:
             return str(name) if accepted else None
 
         def _save_appearance() -> None:
-            name = _profile_name("Save appearance profile")
+            name = _profile_name("Save appearance")
             if name is None:
                 return
             try:
@@ -173,7 +173,7 @@ class SignatureRefinementDialog:
                 self._on_error(str(exc))
 
         def _save_placement() -> None:
-            name = _profile_name("Save placement profile")
+            name = _profile_name("Save placement")
             if name is None:
                 return
             try:
@@ -190,14 +190,14 @@ class SignatureRefinementDialog:
             appearance_name = _combo_text(appearance_profile_combo).strip()
             if not appearance_name:
                 self._on_error(
-                    "Save an appearance profile before composing a signature preset."
+                    "Save an Appearance before composing a signature preset."
                 )
                 return
             name = _profile_name("Save signature preset")
             if name is None:
                 return
             placement_name = _combo_text(placement_profile_combo).strip()
-            if placement_name == "No saved placement profile":
+            if placement_name == "No saved placement":
                 placement_name = ""
             try:
                 state = self._setup_session.compose_signature_preset(

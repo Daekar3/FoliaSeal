@@ -316,13 +316,13 @@ def test_certificate_management_dialog_saves_and_refreshes(tmp_path: Path) -> No
     assert "reusable signing identities" in dialog.controls.introduction_label.text
     assert (
         dialog.controls.configuration_helper_label.text
-        == "Certificate configurations are the saved signing identities shown "
+        == "Certificates are the saved signing identities shown "
         "in the main window."
     )
     assert (
         dialog.controls.managed_certificate_helper_label.text
-        == "Managed certificates are the stored certificate files used by "
-        "those configurations."
+        == "Certificate files are the stored files used by "
+            "those signing identities."
     )
     assert dialog.controls.display_name.text() == "Corporate Records Signing"
     assert dialog.controls.notes.text() == "Default signing identity"
@@ -340,8 +340,8 @@ def test_certificate_management_dialog_saves_and_refreshes(tmp_path: Path) -> No
     assert refresh_log == ["refresh"]
     assert bindings.q_message_box.information_calls[-1] == (
         dialog.controls.dialog,
-        "Certificate configuration",
-        "Certificate configuration saved.",
+        "Certificate",
+        "Certificate saved.",
     )
 
 
@@ -352,7 +352,7 @@ def test_certificate_management_dialog_has_readable_default_geometry_and_title(
 
     dialog = service.show_management_dialog().compatibility.management_dialog
 
-    assert dialog.controls.dialog.title == "Manage Certificate Configurations"
+    assert dialog.controls.dialog.title == "Manage Certificates"
     assert dialog.controls.dialog.minimum_size == (560, 520)
     assert dialog.controls.dialog.resize_value == (680, 620)
 
@@ -424,9 +424,9 @@ def test_certificate_management_dialog_blocks_referenced_certificate_delete(
     )
     assert bindings.q_message_box.warning_calls[-1] == (
         dialog.controls.dialog,
-        "Certificate configuration error",
-        "Managed certificate is still used by a certificate configuration; "
-        "delete the configuration first.",
+        "Certificate error",
+        "This certificate file is still used by a signing identity. "
+        "Remove that identity first.",
     )
 
 
@@ -473,8 +473,8 @@ def test_certificate_management_dialog_deletes_unreferenced_certificate(
     assert refresh_log == ["refresh"]
     assert bindings.q_message_box.information_calls[-1] == (
         dialog.controls.dialog,
-        "Certificate configuration",
-        "Managed certificate deleted.",
+        "Certificate",
+        "Certificate file deleted.",
     )
 
 
@@ -501,14 +501,14 @@ def test_certificate_management_dialog_exports_selected_certificate(
     assert refresh_log == []
     assert bindings.q_file_dialog.save_calls[-1] == (
         dialog.controls.dialog,
-        "Export managed certificate",
+        "Export certificate file",
         "cert_default.p12",
         "PKCS#12 files (*.p12 *.pfx);;All files (*)",
     )
     assert bindings.q_message_box.information_calls[-1] == (
         dialog.controls.dialog,
-        "Certificate configuration",
-        f"Managed certificate exported to {destination}.",
+        "Certificate",
+        f"Certificate file exported to {destination}.",
     )
 
 
@@ -518,13 +518,13 @@ def test_certificate_management_dialog_handles_empty_catalog(tmp_path: Path) -> 
     dialog = service.show_management_dialog().compatibility.management_dialog
     assert (
         dialog.controls.configuration_helper_label.text
-        == "No certificate configurations yet. Create or import a certificate "
+        == "No certificates yet. Create or import a certificate file "
         "to make one available for signing."
     )
     assert (
         dialog.controls.managed_certificate_helper_label.text
-        == "No managed certificates are stored yet. Import or create one to "
-        "back a certificate configuration."
+        == "No certificate files are stored yet. Import or create one to "
+        "back a signing identity."
     )
     saved = dialog.save_selected_configuration()
     deleted = dialog.delete_selected_configuration()
@@ -538,22 +538,22 @@ def test_certificate_management_dialog_handles_empty_catalog(tmp_path: Path) -> 
     assert bindings.q_message_box.warning_calls[-4:] == [
         (
             dialog.controls.dialog,
-            "Certificate configuration error",
-            "Select a certificate configuration to save.",
+            "Certificate error",
+            "Select a Certificate to save.",
         ),
         (
             dialog.controls.dialog,
-            "Certificate configuration error",
-            "Select a certificate configuration to delete.",
+            "Certificate error",
+            "Select a Certificate to delete.",
         ),
         (
             dialog.controls.dialog,
-            "Certificate configuration error",
-            "Select a managed certificate to export.",
+            "Certificate error",
+            "Select a certificate file to export.",
         ),
         (
             dialog.controls.dialog,
-            "Certificate configuration error",
-            "Select a managed certificate to delete.",
+            "Certificate error",
+            "Select a certificate file to delete.",
         ),
     ]

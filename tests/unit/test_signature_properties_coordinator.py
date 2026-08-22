@@ -811,7 +811,7 @@ def test_coordinator_apply_certificate_configuration_reports_missing_file(
 
     with pytest.raises(
         SignaturePropertiesCoordinatorError,
-        match="managed certificate file is missing",
+        match="certificate file is missing",
     ):
         coordinator.reconcile(
             ApplyCertificateConfiguration(
@@ -834,7 +834,7 @@ def test_coordinator_apply_certificate_configuration_wrapper_reports_missing_fil
 
     with pytest.raises(
         SignaturePropertiesCoordinatorError,
-        match="managed certificate file is missing",
+        match="certificate file is missing",
     ):
         coordinator.apply_certificate_configuration(
             "Corporate Records Signing",
@@ -939,7 +939,7 @@ def test_coordinator_apply_signature_preset_wrapper_preserves_control_issue_fold
     assert state.ready_to_sign is True
     assert state.validation_text == (
         "Selected preset 'Compact' does not define a certificate; "
-        "choose a certificate configuration before signing.\nReady to sign."
+        "choose a certificate before signing.\nReady to sign."
     )
 
 

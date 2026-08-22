@@ -1781,7 +1781,7 @@ class FoliaSealAppFrame:
                     for item in catalog.certificate_configurations
                 ):
                     raise ConfigValidationError(
-                        f"Certificate configuration '{normalized}' already exists."
+                        f"Certificate '{normalized}' already exists."
                     )
                 updated = updated.upsert_configuration(
                     replace(configuration, display_name=normalized)
@@ -1801,7 +1801,7 @@ class FoliaSealAppFrame:
                 and ref.configuration_id in self._referenced_preset_configuration_ids()
             ):
                 self._emit_error(
-                    "Certificate configuration is referenced by a signature preset "
+                    "Certificate is referenced by a signature preset "
                     "and cannot be deleted."
                 )
                 return False
@@ -1828,7 +1828,7 @@ class FoliaSealAppFrame:
         input_dialog = getattr(self._bindings, "q_input_dialog", None)
         get_text = getattr(input_dialog, "getText", None)
         if not callable(get_text):
-            self._emit_error("Certificate configuration naming is unavailable.")
+            self._emit_error("Certificate naming is unavailable.")
             return False
         selected = get_text(
             self.window,
@@ -1853,7 +1853,7 @@ class FoliaSealAppFrame:
             return False
         self._refresh_shell_certificate_configurations()
         self._show_information(
-            f"Certificate configuration '{result.certificate_configuration.display_name}' created."
+            f"Certificate '{result.certificate_configuration.display_name}' created."
             if result.certificate_configuration is not None
             else "Certificate configured for signing."
         )

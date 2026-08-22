@@ -93,7 +93,7 @@ from foliaseal.presentation.qt.viewer_widget import (
     build_qt_pdf_viewer_widget as _build_qt_pdf_viewer_widget,
 )
 
-CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate configuration"
+CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate"
 SigningDraftPreview = _SigningDraftPreview
 SignatureFieldKey = _SignatureFieldKey
 SignatureFieldSource = _SignatureFieldSource

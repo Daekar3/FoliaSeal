@@ -262,8 +262,7 @@ class CertificateImportDialog:
             set_spacing(8)
 
         introduction_label = self._bindings.q_label(
-            "Import a PKCS#12 file to store it as a managed certificate and "
-            "create a reusable certificate configuration for signing."
+            "Import a certificate file and create a reusable Certificate for signing."
         )
         introduction_label.setWordWrap(True)
         certificate_path = self._bindings.q_line_edit("")
@@ -326,7 +325,7 @@ class CertificateImportDialog:
 
 
 class CertificateCreationDialog:
-    """Small dialog for creating a self-signed managed certificate."""
+    """Small dialog for creating a self-signed Certificate."""
 
     def __init__(
         self,
@@ -418,8 +417,8 @@ class CertificateCreationDialog:
         layout = self._bindings.q_form_layout(dialog)
 
         introduction_label = self._bindings.q_label(
-            "Create a managed certificate and a matching certificate "
-            "configuration for the main signing workflow."
+            "Create a certificate and matching certificate file for the main "
+            "signing workflow."
         )
         introduction_label.setWordWrap(True)
         set_minimum_height = getattr(introduction_label, "setMinimumHeight", None)
@@ -581,18 +580,18 @@ class CertificateConfigurationManagementDialog:
                 certificate.managed_certificate_id,
             )
         self.controls.configuration_helper_label.setText(
-            "Certificate configurations are the saved signing identities shown "
+            "Certificates are the saved signing identities shown "
             "in the main window."
             if configurations
-            else "No certificate configurations yet. Create or import a "
-            "certificate to make one available for signing."
+            else "No certificates yet. Create or import a certificate file "
+            "to make one available for signing."
         )
         self.controls.managed_certificate_helper_label.setText(
-            "Managed certificates are the stored certificate files used by "
-            "those configurations."
+            "Certificate files are the stored files used by "
+            "those signing identities."
             if managed_certificates
-            else "No managed certificates are stored yet. Import or create one "
-            "to back a certificate configuration."
+            else "No certificate files are stored yet. Import or create one "
+            "to back a signing identity."
         )
         self.load_selected_configuration()
 
@@ -623,7 +622,7 @@ class CertificateConfigurationManagementDialog:
             else None
         )
         if configuration is None:
-            self._show_error("Select a certificate configuration to save.")
+            self._show_error("Select a Certificate to save.")
             return None
         try:
             result = self._certificate_manager.save_configuration(
@@ -642,22 +641,22 @@ class CertificateConfigurationManagementDialog:
         self.reload_configurations()
         updated = result.certificate_configuration
         if updated is None:
-            self._show_error("Certificate configuration was not saved.")
+            self._show_error("Certificate was not saved.")
             return None
         self._select_configuration(updated.certificate_configuration_id)
         self.load_selected_configuration()
         self._emit_changed_if_needed(result.operation != "exported")
-        self._show_information("Certificate configuration saved.")
+        self._show_information("Certificate saved.")
         return updated
 
     def delete_selected_configuration(self) -> bool:
         configuration_id = self._selected_configuration_id()
         if configuration_id is None:
-            self._show_error("Select a certificate configuration to delete.")
+            self._show_error("Select a Certificate to delete.")
             return False
         configuration = self._configurations_by_id.get(configuration_id)
         if configuration is None:
-            self._show_error("Select a certificate configuration to delete.")
+            self._show_error("Select a Certificate to delete.")
             self.reload_configurations()
             return False
         try:
@@ -669,13 +668,13 @@ class CertificateConfigurationManagementDialog:
 
         self.reload_configurations()
         self._emit_changed_if_needed(result.operation != "exported")
-        self._show_information("Certificate configuration deleted.")
+        self._show_information("Certificate deleted.")
         return True
 
     def delete_selected_managed_certificate(self) -> bool:
         certificate_id = self._selected_managed_certificate_id()
         if certificate_id is None:
-            self._show_error("Select a managed certificate to delete.")
+            self._show_error("Select a certificate file to delete.")
             return False
         try:
             result = self._certificate_manager.delete_managed_certificate(certificate_id)
@@ -686,22 +685,22 @@ class CertificateConfigurationManagementDialog:
 
         self.reload_configurations()
         self._emit_changed_if_needed(result.operation != "exported")
-        self._show_information("Managed certificate deleted.")
+        self._show_information("Certificate file deleted.")
         return True
 
     def export_selected_managed_certificate(self) -> Path | None:
         certificate_id = self._selected_managed_certificate_id()
         if certificate_id is None:
-            self._show_error("Select a managed certificate to export.")
+            self._show_error("Select a certificate file to export.")
             return None
         certificate = self._managed_certificates_by_id.get(certificate_id)
         if certificate is None:
-            self._show_error("Select a managed certificate to export.")
+            self._show_error("Select a certificate file to export.")
             self.reload_configurations()
             return None
         selected = self._bindings.q_file_dialog.getSaveFileName(
             self.controls.dialog,
-            "Export managed certificate",
+            "Export certificate file",
             certificate.storage_filename,
             "PKCS#12 files (*.p12 *.pfx);;All files (*)",
         )
@@ -755,7 +754,7 @@ class CertificateConfigurationManagementDialog:
                 return None
 
         self._emit_changed_if_needed(result.operation != "exported")
-        self._show_information(f"Managed certificate exported to {result.exported_path}.")
+        self._show_information(f"Certificate file exported to {result.exported_path}.")
         return result.exported_path
 
     def cancel(self) -> None:
@@ -770,7 +769,7 @@ class CertificateConfigurationManagementDialog:
     ) -> CertificateConfigurationManagementDialogControls:
         dialog = self._bindings.q_dialog(parent)
         if hasattr(dialog, "setWindowTitle"):
-            dialog.setWindowTitle("Manage Certificate Configurations")
+            dialog.setWindowTitle("Manage Certificates")
         set_minimum_size = getattr(dialog, "setMinimumSize", None)
         if callable(set_minimum_size):
             set_minimum_size(560, 520)
@@ -791,9 +790,8 @@ class CertificateConfigurationManagementDialog:
             set_spacing(8)
 
         introduction_label = self._bindings.q_label(
-            "Certificate configurations are the reusable signing identities "
-            "shown in the main window. Each one points to a managed "
-            "certificate stored by the app."
+            "Certificates are the reusable signing identities shown in the "
+            "main window. Each one points to a certificate file stored by the app."
         )
         introduction_label.setWordWrap(True)
         configuration_selector = self._bindings.q_combo_box()
@@ -815,7 +813,7 @@ class CertificateConfigurationManagementDialog:
         layout.addWidget(introduction_label)
         configuration_container = self._bindings.q_widget()
         configuration_layout = self._bindings.q_form_layout(configuration_container)
-        configuration_layout.addRow("Certificate configuration", configuration_selector)
+        configuration_layout.addRow("Certificate", configuration_selector)
         configuration_layout.addRow("", configuration_helper_label)
         configuration_layout.addRow("Display name", display_name)
         configuration_layout.addRow("Notes", notes)
@@ -825,7 +823,7 @@ class CertificateConfigurationManagementDialog:
         layout.addWidget(_compose_row(self._bindings, save_button, delete_button))
         certificate_container = self._bindings.q_widget()
         certificate_layout = self._bindings.q_form_layout(certificate_container)
-        certificate_layout.addRow("Managed certificate", managed_certificate_selector)
+        certificate_layout.addRow("Certificate file", managed_certificate_selector)
         certificate_layout.addRow("", managed_certificate_helper_label)
         layout.addWidget(certificate_container)
         layout.addWidget(
@@ -920,12 +918,12 @@ class CertificateConfigurationManagementDialog:
     def _show_error(self, message: str) -> None:
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
-            warning(self.controls.dialog, "Certificate configuration error", message)
+            warning(self.controls.dialog, "Certificate error", message)
 
     def _show_information(self, message: str) -> None:
         information = getattr(self._bindings.q_message_box, "information", None)
         if callable(information):
-            information(self.controls.dialog, "Certificate configuration", message)
+            information(self.controls.dialog, "Certificate", message)
 
     def _prompt_export_password(self) -> str | None:
         input_dialog = getattr(self._bindings, "q_input_dialog", None)

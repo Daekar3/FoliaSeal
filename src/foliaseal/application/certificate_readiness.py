@@ -60,7 +60,7 @@ class Pkcs12CertificateReadinessReader:
         if not certificate_path.strip():
             return _blocking(
                 CertificateReadinessStatus.NO_CERTIFICATE_SELECTED,
-                "Select a certificate configuration before signing.",
+                "Select a certificate before signing.",
             )
         if not path.is_file():
             return _blocking(

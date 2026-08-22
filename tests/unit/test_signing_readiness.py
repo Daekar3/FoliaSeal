@@ -108,7 +108,7 @@ def test_partial_preset_without_certificate_names_the_per_document_next_step() -
     assert readiness.recommended_action is SigningReadinessAction.COMPLETE_SETUP
     assert readiness.missing_input is SigningReadinessMissingInput.CERTIFICATE
     assert "Travel approval" in readiness.detail
-    assert "certificate configuration for this document" in readiness.detail
+    assert "certificate for this document" in readiness.detail
 
 
 def test_blocking_certificate_error_takes_precedence_over_partial_preset_guidance() -> None:

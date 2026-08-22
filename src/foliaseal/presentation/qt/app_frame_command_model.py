@@ -302,10 +302,10 @@ SETTINGS_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.MANAGE_CERTIFICATE_CONFIGURATIONS,
         menu="Settings",
-        text="Manage Certificate Configurations...",
+        text="Manage Certificates...",
         shortcut=None,
-        accessible_name="Manage certificate configurations",
-        mnemonic_text="Manage Certificate &Configurations...",
+        accessible_name="Manage certificates",
+        mnemonic_text="Manage &Certificates...",
     ),
 )
 

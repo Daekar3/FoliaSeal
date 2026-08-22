@@ -55,7 +55,7 @@ class RepositoryBackedCertificateSigningMaterialPort:
             configuration = catalog.configuration_by_id(certificate_configuration_id)
         except KeyError as exc:
             raise SigningMaterialResolutionError(
-                f"Certificate configuration '{certificate_configuration_id}' was not found."
+                f"Certificate '{certificate_configuration_id}' was not found."
             ) from exc
         try:
             managed_certificate = catalog.managed_certificate_by_id(
@@ -63,24 +63,23 @@ class RepositoryBackedCertificateSigningMaterialPort:
             )
         except KeyError as exc:
             raise SigningMaterialResolutionError(
-                "The selected certificate configuration references a managed certificate "
-                "that no longer exists. Edit the certificate configuration or import the "
-                "certificate again."
+                "The selected signing certificate references a certificate file that no longer "
+                "exists. Edit the signing certificate or import the certificate file again."
             ) from exc
         try:
             material = self.repository.material_for(managed_certificate)
         except (FileNotFoundError, KeyError) as exc:
             raise SigningMaterialResolutionError(
-                "The selected managed certificate file is missing. Edit the certificate "
-                "configuration, restore the certificate from backup, or import it again."
+                "The selected certificate file is missing. Edit the Certificate, restore the "
+                "certificate from backup, or import it again."
             ) from exc
         resolved = passphrase
         if resolved is None and configuration.save_password:
             resolved = self._read_saved_password(configuration)
         if resolved is None:
             raise SigningMaterialResolutionError(
-                "The selected certificate configuration requires a certificate password. "
-                "Enter the password or edit the configuration to save it securely."
+                "The selected signing certificate requires a certificate password. Enter the "
+                "password or edit the signing certificate to save it securely."
             )
         if not isinstance(resolved, str) or not resolved:
             raise SigningMaterialResolutionError("The certificate password cannot be blank.")
@@ -93,13 +92,13 @@ class RepositoryBackedCertificateSigningMaterialPort:
     def _read_saved_password(self, configuration: CertificateConfiguration) -> str | None:
         if configuration.password_secret_ref is None:
             raise SigningMaterialResolutionError(
-                "The selected certificate configuration is marked to save a password, "
-                "but it has no saved-password reference."
+                "The selected signing certificate is marked to save a password, but it has no "
+                "saved-password reference."
             )
         if self.secret_provider is None or not self.secret_provider.is_available():
             raise SigningMaterialResolutionError(
                 "Saved password storage is not available. Enter the certificate password "
-                "manually or edit the certificate configuration."
+                "manually or edit the signing certificate."
             )
         try:
             secret = self.secret_provider.get_secret(configuration.password_secret_ref)

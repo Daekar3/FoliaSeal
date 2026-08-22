@@ -112,7 +112,7 @@ class AppearanceProfileEditorWidget:
 
         name = str(self.controls.name_input.text()).strip()
         if not name:
-            self._on_error("Appearance profile name is required.")
+            self._on_error("Appearance name is required.")
             return False
         overwrite = False
         if self._initial_ref is None:
@@ -190,7 +190,7 @@ class AppearanceProfileEditorWidget:
             return SignatureAppearance()
         resolved = self._library.resolve(self._initial_ref)
         if not isinstance(resolved, AppearanceProfile):
-            raise ConfigValidationError("Select an appearance profile to edit.")
+            raise ConfigValidationError("Select an Appearance to edit.")
         self._original_name = resolved.display_name
         return resolved.appearance
 

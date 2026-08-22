@@ -52,7 +52,7 @@ from foliaseal.presentation.qt.visible_signature_setup_form import (
 )
 
 SIGNATURE_PRESET_PLACEHOLDER = "Current document setup"
-CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate configuration"
+CERTIFICATE_CONFIGURATION_PLACEHOLDER = "Choose a certificate"
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ class SignaturePresetControls:
 
 @dataclass(frozen=True)
 class CertificateConfigurationControls:
-    """Controls used to choose a saved certificate configuration."""
+    """Controls used to choose a saved signing certificate."""
 
     container: Any
     configuration_combo: Any
@@ -1008,7 +1008,7 @@ class SignaturePropertiesPanel:
 
     def _build_certificate_configuration_controls(self) -> CertificateConfigurationControls:
         bindings = self._bindings
-        container = bindings.q_group_box("Certificate configuration")
+        container = bindings.q_group_box("Certificate")
         _shrink_to_rail_width(container)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1017,12 +1017,12 @@ class SignaturePropertiesPanel:
         configuration_combo = bindings.q_combo_box()
         _compact_combo_for_rail(configuration_combo)
         helper_label = bindings.q_label(
-            "Certificate configurations are saved signing identities. "
-            "Choosing one immediately activates its managed certificate for this PDF."
+            "Certificates are saved signing identities. "
+            "Choosing one activates its certificate file for this PDF."
         )
         helper_label.setWordWrap(True)
 
-        layout.addWidget(bindings.q_label("Certificate configuration"))
+        layout.addWidget(bindings.q_label("Certificate"))
         layout.addWidget(configuration_combo)
         layout.addWidget(helper_label)
 
@@ -1296,4 +1296,4 @@ class SignaturePropertiesPanel:
         self._emit_error(message)
         warning = getattr(self._bindings.q_message_box, "warning", None)
         if callable(warning):
-            warning(self.widget, "Certificate configuration error", message)
+            warning(self.widget, "Certificate error", message)

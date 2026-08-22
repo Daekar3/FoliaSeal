@@ -177,7 +177,7 @@ def test_port_rejects_unknown_configuration(tmp_path: Path) -> None:
 
     with pytest.raises(
         SigningMaterialResolutionError,
-        match="^Certificate configuration 'missing' was not found\\.$",
+            match="^Certificate 'missing' was not found\\.$",
     ):
         port.resolve(certificate_configuration_id="missing", passphrase="typed-secret")
 

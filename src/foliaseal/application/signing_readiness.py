@@ -111,7 +111,7 @@ def project_signing_readiness(inputs: SigningReadinessInputs) -> SigningReadines
             heading = "Choose a certificate for this preset"
             detail = (
                 f"Selected preset '{inputs.selected_preset_name}' does not include a certificate. "
-                "Choose a certificate configuration for this document before signing."
+                "Choose a certificate for this document before signing."
             )
         else:
             heading = "Setup required"

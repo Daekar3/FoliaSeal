@@ -396,6 +396,29 @@ def _create_managed_certificate(frame: Any, audit: _Audit) -> Any:
     return result
 
 
+def _audit_certificate_management(frame: Any, audit: _Audit) -> None:
+    """Capture the rendered Certificate management dialog after creation."""
+
+    captured = False
+
+    def drive(app: Any) -> bool:
+        nonlocal captured
+        dialog = _active_modal(app, "Manage Certificates")
+        if dialog is None:
+            return False
+        if not captured:
+            audit.checkpoint_widget(
+                "certificate-management-dialog",
+                "Settings > Manage Certificates",
+                dialog,
+            )
+            captured = True
+        _button_with_text(dialog, "Cancel").click()
+        return True
+
+    _run_modal_action(audit.app, frame.show_certificate_management, drive)
+
+
 def _accept_confirm_signing(app: Any) -> bool:
     """Accept FoliaSeal's actual confirmation QMessageBox by its standard button."""
     from PySide6.QtWidgets import QMessageBox
@@ -430,8 +453,8 @@ def _audit_certificate_and_preset_clarity(shell: Any, audit: _Audit) -> None:
     _assert_visible_text_any(
         shell,
         (
-            "Certificate configurations are saved signing identities.",
-            "Select a certificate configuration before signing.",
+            "Certificates are saved signing identities.",
+            "Select a certificate before signing.",
         ),
     )
     _assert_visible_text_any(
@@ -459,7 +482,7 @@ def _audit_preset_first_shell(shell: Any, audit: _Audit) -> None:
     """Prove the narrow default shell keeps the full editor behind refinement."""
     expected_default_groups = {
         "Signature preset",
-        "Certificate configuration",
+        "Certificate",
         "Signed appearance preview",
         "Manual refinement",
     }
@@ -660,7 +683,7 @@ def _save_appearance_profile(shell: Any, audit: _Audit) -> None:
         if not saved:
             _schedule_input_dialog_accept(
                 app,
-                title="Save appearance profile",
+                title="Save appearance",
                 value=AUDIT_APPEARANCE_PROFILE,
             )
             _button_with_text(modal, "Save appearance for reuse...").click()
@@ -691,7 +714,7 @@ def _save_and_reselect_signature_preset(
         modal = _active_modal(app, "Refine Current PDF Setup")
         if modal is None:
             for title in (
-                "Save placement profile",
+                "Save placement",
                 "Save signature preset",
             ):
                 modal = _active_modal(app, title)
@@ -708,7 +731,7 @@ def _save_and_reselect_signature_preset(
                     )
                 _schedule_input_dialog_accept(
                     app,
-                    title="Save placement profile",
+                    title="Save placement",
                     value=AUDIT_PLACEMENT_PROFILE,
                 )
                 _button_with_text(modal, "Save placement for reuse...").click()
@@ -1268,6 +1291,7 @@ def run_audit(
         )
 
         creation = _create_managed_certificate(frame, audit)
+        _audit_certificate_management(frame, audit)
         catalog = cert_store.load_catalog()
         if len(catalog.certificate_configurations) != 1:
             raise RuntimeError(

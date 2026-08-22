@@ -485,7 +485,7 @@ def test_certificate_catalog_removes_unreferenced_managed_certificate() -> None:
 def test_certificate_catalog_blocks_referenced_managed_certificate_removal() -> None:
     catalog = build_certificate_catalog()
 
-    with pytest.raises(ConfigValidationError, match="delete the configuration first"):
+    with pytest.raises(ConfigValidationError, match="Remove that identity first"):
         catalog.remove_managed_certificate_by_id("managed-cert-default")
 
 

@@ -1264,7 +1264,7 @@ def test_signing_shell_renders_certificate_readiness_detail(
     )
 
     helper = widget.properties_panel._certificate_controls.helper_label
-    assert "Select a certificate configuration" in helper.text()
+    assert "Select a certificate" in helper.text()
 
     fake_bindings.q_input_dialog.next_text = "secret"
     widget.properties_panel._certificate_controls.configuration_combo.setCurrentText(
@@ -1497,8 +1497,8 @@ def test_signing_shell_reports_certificate_configuration_resolution_errors(
     panel = widget.properties_panel
     panel._certificate_controls.configuration_combo.setCurrentText("Corporate Records Signing")
     assert errors
-    assert "managed certificate file is missing" in errors[-1]
-    assert bindings.q_message_box.calls[-1][1] == "Certificate configuration error"
+    assert "certificate file is missing" in errors[-1]
+    assert bindings.q_message_box.calls[-1][1] == "Certificate error"
 
 
 def test_signing_shell_blank_certificate_selection_reports_error(
@@ -1551,10 +1551,10 @@ def test_signing_shell_blank_certificate_selection_reports_error(
 
     assert panel.apply_selected_certificate_configuration() is False
     assert calls == [("", None)]
-    assert errors == ["Select a certificate configuration before applying it."]
+    assert errors == ["Select a certificate before applying it."]
     assert bindings.q_message_box.calls[-1][1:] == (
-        "Certificate configuration error",
-        "Select a certificate configuration before applying it.",
+        "Certificate error",
+        "Select a certificate before applying it.",
     )
     assert bindings.q_input_dialog.calls == []
 
@@ -3117,7 +3117,7 @@ def test_signing_shell_refinement_dialog_saves_appearance_without_applying_draft
         widget.properties_panel._appearance_controls.signer_label_prefix.text() == original_prefix
     )
     assert bindings.q_input_dialog.calls[0][1:3] == (
-        "Save appearance profile",
+        "Save appearance",
         "Profile name",
     )
 
@@ -3169,7 +3169,7 @@ def test_signing_shell_refinement_dialog_saves_placement_profile_without_applyin
     assert saved.rect.width_pt == 130.0
     assert widget.properties_panel._setup_form.build_draft().placement.enabled is False
     assert bindings.q_input_dialog.calls[0][1:3] == (
-        "Save placement profile",
+        "Save placement",
         "Profile name",
     )
     assert (
@@ -3231,7 +3231,7 @@ def test_signing_shell_refinement_dialog_composes_preset_from_selected_profiles(
         assert active is not None
         assert active.appearance_profile_combo._items == ["Approval appearance"]
         assert active.placement_profile_combo._items == [
-            "No saved placement profile",
+                "No saved placement",
             "Bottom right",
         ]
         active.appearance_profile_combo.setCurrentText("Approval appearance")

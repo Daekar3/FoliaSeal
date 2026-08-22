@@ -299,7 +299,7 @@ def test_certificate_catalog_store_blocks_referenced_managed_certificate_delete(
     original = build_certificate_catalog()
     store.save_catalog(original)
 
-    with pytest.raises(ConfigValidationError, match="delete the configuration first"):
+    with pytest.raises(ConfigValidationError, match="Remove that identity first"):
         store.delete_managed_certificate_by_id("managed-cert-default")
 
     assert managed_file.exists()

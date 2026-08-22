@@ -533,6 +533,6 @@ def test_signing_setup_session_surfaces_non_promptable_errors(
     try:
         session.select_certificate_configuration("Corporate Records Signing")
     except SignaturePropertiesCoordinatorError as exc:
-        assert "managed certificate file is missing" in str(exc)
+        assert "certificate file is missing" in str(exc)
     else:  # pragma: no cover - defensive branch
         raise AssertionError("Expected missing managed certificate file error.")
