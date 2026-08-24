@@ -108,8 +108,8 @@ supporting evidence only.
   `gui_document_review_copy_and_rail_density_execplan.md` completed: the duplicate sidebar copy
   surface is retired, unsigned review is compact and explanatory, the rail is content-driven at the
   legal minimum, and primary signing requests Save As before mutation when needed. Commit
-  `45bec3135100777ecc1b732c78fbf0b50fecbe77` was rebuilt as a final `.deb`, SHA-256
-  `764db47dd9c5e2d5169b3b07b1b68745207778d4bee4ae1579c6bc3da5521cf7`; offline, private-install,
+  implementation commit `29b27916fa0cbaa77d8faf3503701b559b074479` was rebuilt as a final `.deb`,
+  SHA-256 `ade4ba16ac25b498c5bb048ebe20f06fff807cf34472ece46984881ef63abc68`; offline, private-install,
   display-backed, authenticated-install, and installed Help checks passed. The remaining work is the
   ordered human release matrix, not AFK correction of this document-open slice.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,

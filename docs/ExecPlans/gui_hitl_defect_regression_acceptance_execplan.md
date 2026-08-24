@@ -47,7 +47,7 @@ root, and reconciles the governing status plans.
 - [ ] Restore theme/scaling, close FoliaSeal and the audit terminal, remove only owned temporary roots,
   and verify no FoliaSeal process/window remains.
 - [x] (2026-08-23) Updated the parent/release plans with the focused-slice completion, final package
-  identity, and remaining HITL boundary. The implementation commit is `45bec3135`; the living-plan
+  identity, and remaining HITL boundary. The implementation commit is `29b27916f`; the living-plan
   reconciliation remains to be committed with the final acceptance documentation.
 
 ## Surprises & Discoveries

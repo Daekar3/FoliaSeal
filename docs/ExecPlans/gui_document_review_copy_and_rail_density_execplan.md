@@ -77,8 +77,9 @@ of the corrected document-open state.
   private-install-root, and display-backed startup checks.
 - [x] (2026-08-23) Added focused regression tests for copy retirement, restricted/unsigned/signed review
   states, 280-pixel rail geometry, readiness wording, chooser ordering, and cancel/accept behavior.
-- [x] (2026-08-23) Rebuilt and audited the final package from commit `45bec3135100777ecc1b732c78fbf0b50fecbe77`.
-  Final `.deb` SHA-256 is `764db47dd9c5e2d5169b3b07b1b68745207778d4bee4ae1579c6bc3da5521cf7`.
+- [x] (2026-08-23) Rebuilt and audited the final package from implementation commit
+  `29b27916fa0cbaa77d8faf3503701b559b074479`. Final `.deb` SHA-256 is
+  `ade4ba16ac25b498c5bb048ebe20f06fff807cf34472ece46984881ef63abc68`.
   Offline extraction, isolated `dpkg --unpack`, Help/resources/dependency checks, and display-backed
   `qt_platform=xcb` startup all passed. The exact package was installed with authenticated `pkexec
   dpkg -i`; host `dpkg --audit` and installed Help passed. A disposable installed no-document frame
@@ -193,8 +194,8 @@ of the corrected document-open state.
 Completed 2026-08-23. The installed document-open surface no longer presents duplicate copy concepts,
 an empty disabled signature selector, or a rail whose lower status/actions hide signing setup. Focused
 and full-suite validation passed (`1607 passed, 20 skipped, 1 warning`); the real source-tree X11 audit
-completed signing, reopen/verify, and a second signature; and the final package from commit
-`45bec3135100777ecc1b732c78fbf0b50fecbe77` passed offline, isolated-install, and display-backed audits.
+completed signing, reopen/verify, and a second signature; and the final package from implementation
+commit `29b27916fa0cbaa77d8faf3503701b559b074479` passed offline, isolated-install, and display-backed audits.
 The exact package was installed and its no-document frame was captured and cleaned up. Orca,
 high-contrast, physical-DPI, monitor movement, and broader restricted/multi-page acceptance remain
 separate release-matrix gates and are not claimed by this slice.
