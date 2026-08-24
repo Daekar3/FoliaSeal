@@ -38,6 +38,7 @@ class DocumentReviewControls:
     headline_label: Any
     detail_label: Any
     signature_items_label: Any
+    signature_selector_label: Any
     signature_selector: Any
     signature_detail_label: Any
 
@@ -51,10 +52,6 @@ class DocumentTextControls:
     find_button: Any
     previous_button: Any
     next_button: Any
-    copy_button: Any
-    select_mode_checkbox: Any
-    copy_selection_button: Any
-    clear_selection_button: Any
     status_label: Any
     detail_label: Any
 
@@ -80,16 +77,13 @@ class SigningWorkspaceSidebarSurface:
     document_review_headline_label: Any
     document_review_detail_label: Any
     document_review_signature_items_label: Any
+    document_review_signature_selector_label: Any
     document_review_signature_selector: Any
     document_review_signature_detail_label: Any
     document_text_query_input: Any
     document_text_find_button: Any
     document_text_previous_button: Any
     document_text_next_button: Any
-    document_text_copy_button: Any
-    document_text_select_mode_checkbox: Any
-    document_text_copy_selection_button: Any
-    document_text_clear_selection_button: Any
     document_text_status_label: Any
     document_text_detail_label: Any
 
@@ -108,7 +102,6 @@ class SigningWorkspaceSidebar:
     RAIL_WIDTH = 320
     RAIL_MIN_WIDTH = 280
     RAIL_MAX_WIDTH = 640
-    STATUS_REGION_MINIMUM_HEIGHT = 200
 
     def __init__(
         self,
@@ -121,11 +114,7 @@ class SigningWorkspaceSidebar:
         on_find_text: Callable[[], Any],
         on_previous_text_match: Callable[[], Any],
         on_next_text_match: Callable[[], Any],
-        on_copy_text_match: Callable[[], Any],
         on_review_signature_selected: Callable[[int], Any],
-        on_text_selection_mode_changed: Callable[[bool], Any],
-        on_copy_selected_text: Callable[[], Any],
-        on_clear_selected_text: Callable[[], Any],
         on_verify_again: Callable[[], Any] | None = None,
         on_return_to_draft: Callable[[], Any] | None = None,
         on_open_preserved_copy: Callable[[], Any] | None = None,
@@ -133,7 +122,6 @@ class SigningWorkspaceSidebar:
     ) -> None:
         self._bindings = bindings
         self._updating_document_review_selector = False
-        self._updating_text_selection_mode_checkbox = False
         self.container = bindings.q_widget()
         if fixed_width:
             set_fixed_width = getattr(self.container, "setFixedWidth", None)
@@ -171,15 +159,8 @@ class SigningWorkspaceSidebar:
             on_find_text=on_find_text,
             on_previous_text_match=on_previous_text_match,
             on_next_text_match=on_next_text_match,
-            on_copy_text_match=on_copy_text_match,
-            on_text_selection_mode_changed=on_text_selection_mode_changed,
-            on_copy_selected_text=on_copy_selected_text,
-            on_clear_selected_text=on_clear_selected_text,
         )
         self.status_region = self.signing_action_controls.status_container
-        set_minimum_height = getattr(self.status_region, "setMinimumHeight", None)
-        if callable(set_minimum_height):
-            set_minimum_height(self.STATUS_REGION_MINIMUM_HEIGHT)
         index_changed = getattr(
             self.document_review_controls.signature_selector,
             "currentIndexChanged",
@@ -221,6 +202,9 @@ class SigningWorkspaceSidebar:
             document_review_signature_items_label=(
                 self.document_review_controls.signature_items_label
             ),
+            document_review_signature_selector_label=(
+                self.document_review_controls.signature_selector_label
+            ),
             document_review_signature_selector=(
                 self.document_review_controls.signature_selector
             ),
@@ -231,16 +215,6 @@ class SigningWorkspaceSidebar:
             document_text_find_button=self.document_text_controls.find_button,
             document_text_previous_button=self.document_text_controls.previous_button,
             document_text_next_button=self.document_text_controls.next_button,
-            document_text_copy_button=self.document_text_controls.copy_button,
-            document_text_select_mode_checkbox=(
-                self.document_text_controls.select_mode_checkbox
-            ),
-            document_text_copy_selection_button=(
-                self.document_text_controls.copy_selection_button
-            ),
-            document_text_clear_selection_button=(
-                self.document_text_controls.clear_selection_button
-            ),
             document_text_status_label=self.document_text_controls.status_label,
             document_text_detail_label=self.document_text_controls.detail_label,
         )
@@ -259,11 +233,14 @@ class SigningWorkspaceSidebar:
         self.open_preserved_copy_button.setEnabled(state.can_open_preserved_copy)
         self.signing_action_controls.stage_label.setText(state.stage_text)
         self.signing_action_controls.detail_label.setText(state.detail_text)
+        _set_visible_when_nonempty(self.signing_action_controls.stage_label, state.stage_text)
+        _set_visible_when_nonempty(self.signing_action_controls.detail_label, state.detail_text)
         _set_widget_width_limit(
             self.signing_action_controls.detail_label,
             _panel_available_width(self.container),
         )
         self.result_label.setText(state.result_text)
+        _set_visible_when_nonempty(self.result_label, state.result_text)
         _set_wrapped_label_minimum_height(
             self.result_label,
             fallback_width=_panel_available_width(self.container),
@@ -326,8 +303,6 @@ class SigningWorkspaceSidebar:
     def apply_document_review_workspace_state(
         self,
         state: DocumentReviewWorkspaceState,
-        *,
-        can_copy_text: bool,
     ) -> None:
         review_state = state.review
         document_text_state = state.document_text
@@ -339,6 +314,10 @@ class SigningWorkspaceSidebar:
         )
         self.document_review_controls.signature_items_label.setText(
             format_document_signature_items(review_state.review_summary.signature_items)
+        )
+        _set_visible_when_nonempty(
+            self.document_review_controls.signature_items_label,
+            format_document_signature_items(review_state.review_summary.signature_items),
         )
         selector = self.document_review_controls.signature_selector
         self._updating_document_review_selector = True
@@ -363,17 +342,15 @@ class SigningWorkspaceSidebar:
         self.document_review_controls.signature_detail_label.setText(
             review_state.selected_signature_detail
         )
-        checkbox = self.document_text_controls.select_mode_checkbox
-        is_checked = getattr(checkbox, "isChecked", None)
-        if (
-            callable(is_checked)
-            and bool(is_checked()) != document_text_state.selection_mode_enabled
+        has_signatures = bool(review_state.signature_labels)
+        for widget in (
+            self.document_review_controls.signature_selector_label,
+            self.document_review_controls.signature_selector,
+            self.document_review_controls.signature_detail_label,
         ):
-            self._updating_text_selection_mode_checkbox = True
-            try:
-                checkbox.setChecked(document_text_state.selection_mode_enabled)
-            finally:
-                self._updating_text_selection_mode_checkbox = False
+            set_visible = getattr(widget, "setVisible", None)
+            if callable(set_visible):
+                set_visible(has_signatures)
         self.document_text_controls.status_label.setText(document_text_state.status_text)
         self.document_text_controls.detail_label.setText(document_text_state.detail_text)
         self.document_text_controls.previous_button.setEnabled(
@@ -381,15 +358,6 @@ class SigningWorkspaceSidebar:
         )
         self.document_text_controls.next_button.setEnabled(
             document_text_state.search_state.can_go_next
-        )
-        self.document_text_controls.copy_button.setEnabled(
-            document_text_state.search_state.can_copy and can_copy_text
-        )
-        self.document_text_controls.copy_selection_button.setEnabled(
-            document_text_state.selection_state.can_copy and can_copy_text
-        )
-        self.document_text_controls.clear_selection_button.setEnabled(
-            document_text_state.selection_state.can_clear
         )
 
     def _build_signing_action_controls(
@@ -417,7 +385,7 @@ class SigningWorkspaceSidebar:
             "Workflow: 1 Review → 2 Setup → 3 Place → 4 Ready → 5 Sign → 6 Verify"
         )
         detail_label = self._bindings.q_label("")
-        choose_output_button = self._bindings.q_push_button("Choose output...")
+        choose_output_button = self._bindings.q_push_button("Save signed PDF as...")
         sign_button = self._bindings.q_push_button("Confirm and sign")
         open_signed_output_button = self._bindings.q_push_button("Open signed PDF")
         open_signed_output_button.setEnabled(False)
@@ -452,10 +420,8 @@ class SigningWorkspaceSidebar:
         open_preserved_copy_button.clicked.connect(on_open_preserved_copy)  # type: ignore[attr-defined]
         layout.addWidget(choose_output_button)
         layout.addWidget(sign_button)
-        layout.addWidget(open_signed_output_button)
-        layout.addWidget(verify_again_button)
-        layout.addWidget(return_to_draft_button)
-        layout.addWidget(open_preserved_copy_button)
+        layout.addWidget(_compose_row(self._bindings, open_signed_output_button, verify_again_button))
+        layout.addWidget(_compose_row(self._bindings, return_to_draft_button, open_preserved_copy_button))
         status_layout.addWidget(journey_label)
         status_layout.addWidget(stage_label)
         status_layout.addWidget(detail_label)
@@ -486,14 +452,19 @@ class SigningWorkspaceSidebar:
         headline_label = self._bindings.q_label("")
         detail_label = self._bindings.q_label("")
         signature_items_label = self._bindings.q_label("")
+        signature_selector_label = self._bindings.q_label("Embedded signature")
         signature_selector = self._bindings.q_combo_box()
         signature_selector.setEnabled(False)
         signature_detail_label = self._bindings.q_label("")
+        _set_visible_when_nonempty(signature_items_label, "")
+        _set_visible_when_nonempty(signature_detail_label, "")
+        _set_visible_when_nonempty(signature_selector_label, "")
         for label in (
             headline_label,
             detail_label,
             signature_items_label,
             signature_detail_label,
+            signature_selector_label,
         ):
             if hasattr(label, "setWordWrap"):
                 label.setWordWrap(True)
@@ -505,9 +476,13 @@ class SigningWorkspaceSidebar:
             signature_items_label.setStyleSheet("color: #1f2937;")
         if hasattr(signature_detail_label, "setStyleSheet"):
             signature_detail_label.setStyleSheet("color: #374151;")
+        set_accessible_name = getattr(signature_selector, "setAccessibleName", None)
+        if callable(set_accessible_name):
+            set_accessible_name("Embedded signature to review")
         layout.addWidget(headline_label)
         layout.addWidget(detail_label)
         layout.addWidget(signature_items_label)
+        layout.addWidget(signature_selector_label)
         layout.addWidget(signature_selector)
         layout.addWidget(signature_detail_label)
         return DocumentReviewControls(
@@ -515,6 +490,7 @@ class SigningWorkspaceSidebar:
             headline_label=headline_label,
             detail_label=detail_label,
             signature_items_label=signature_items_label,
+            signature_selector_label=signature_selector_label,
             signature_selector=signature_selector,
             signature_detail_label=signature_detail_label,
         )
@@ -525,10 +501,6 @@ class SigningWorkspaceSidebar:
         on_find_text: Callable[[], Any],
         on_previous_text_match: Callable[[], Any],
         on_next_text_match: Callable[[], Any],
-        on_copy_text_match: Callable[[], Any],
-        on_text_selection_mode_changed: Callable[[bool], Any],
-        on_copy_selected_text: Callable[[], Any],
-        on_clear_selected_text: Callable[[], Any],
     ) -> DocumentTextControls:
         container = self._bindings.q_group_box("Document text")
         _style_panel(container)
@@ -543,17 +515,8 @@ class SigningWorkspaceSidebar:
         find_button = self._bindings.q_push_button("Find")
         previous_button = self._bindings.q_push_button("Previous")
         next_button = self._bindings.q_push_button("Next")
-        copy_button = self._bindings.q_push_button("Copy Result")
-        # Keep a hidden checkbox as a state mirror so existing shell render wiring
-        # can stay narrow while the real user-facing mode command moves to Edit.
-        select_mode_checkbox = self._bindings.q_check_box("Select text")
-        copy_selection_button = self._bindings.q_push_button("Copy Selection")
-        clear_selection_button = self._bindings.q_push_button("Clear Selection")
         previous_button.setEnabled(False)
         next_button.setEnabled(False)
-        copy_button.setEnabled(False)
-        copy_selection_button.setEnabled(False)
-        clear_selection_button.setEnabled(False)
         search_row = _compose_row(
             self._bindings,
             query_input,
@@ -563,18 +526,6 @@ class SigningWorkspaceSidebar:
             self._bindings,
             previous_button,
             next_button,
-            copy_button,
-        )
-        if hasattr(select_mode_checkbox, "setVisible"):
-            select_mode_checkbox.setVisible(False)
-        if hasattr(copy_selection_button, "setVisible"):
-            copy_selection_button.setVisible(False)
-        if hasattr(clear_selection_button, "setVisible"):
-            clear_selection_button.setVisible(False)
-        selection_row = _compose_row(
-            self._bindings,
-            copy_selection_button,
-            clear_selection_button,
         )
         status_label = self._bindings.q_label("")
         detail_label = self._bindings.q_label("")
@@ -591,15 +542,6 @@ class SigningWorkspaceSidebar:
             return_pressed.connect(on_find_text)
         previous_button.clicked.connect(on_previous_text_match)  # type: ignore[attr-defined]
         next_button.clicked.connect(on_next_text_match)  # type: ignore[attr-defined]
-        copy_button.clicked.connect(on_copy_text_match)  # type: ignore[attr-defined]
-        select_mode_checkbox.stateChanged.connect(  # type: ignore[attr-defined]
-            lambda state: self._handle_text_selection_mode_changed(
-                state,
-                on_text_selection_mode_changed=on_text_selection_mode_changed,
-            )
-        )
-        copy_selection_button.clicked.connect(on_copy_selected_text)  # type: ignore[attr-defined]
-        clear_selection_button.clicked.connect(on_clear_selected_text)  # type: ignore[attr-defined]
         try:
             shortcut_type = getattr(self._bindings, "q_shortcut", None)
             key_sequence_type = getattr(self._bindings, "q_key_sequence", None)
@@ -612,7 +554,6 @@ class SigningWorkspaceSidebar:
             pass
         layout.addWidget(search_row)
         layout.addWidget(navigation_row)
-        layout.addWidget(selection_row)
         layout.addWidget(status_label)
         layout.addWidget(detail_label)
         return DocumentTextControls(
@@ -621,10 +562,6 @@ class SigningWorkspaceSidebar:
             find_button=find_button,
             previous_button=previous_button,
             next_button=next_button,
-            copy_button=copy_button,
-            select_mode_checkbox=select_mode_checkbox,
-            copy_selection_button=copy_selection_button,
-            clear_selection_button=clear_selection_button,
             status_label=status_label,
             detail_label=detail_label,
         )
@@ -639,15 +576,6 @@ class SigningWorkspaceSidebar:
             return
         on_review_signature_selected(index)
 
-    def _handle_text_selection_mode_changed(
-        self,
-        state: Any,
-        *,
-        on_text_selection_mode_changed: Callable[[bool], Any],
-    ) -> None:
-        if self._updating_text_selection_mode_checkbox:
-            return
-        on_text_selection_mode_changed(bool(state))
 
 
 def _compose_row(bindings: Any, *widgets: Any) -> Any:
@@ -680,6 +608,12 @@ def _set_widget_width_limit(widget: Any, width: int) -> None:
     max_width = getattr(widget, "setMaximumWidth", None)
     if callable(max_width):
         max_width(width)
+
+
+def _set_visible_when_nonempty(widget: Any, text: str) -> None:
+    setter = getattr(widget, "setVisible", None)
+    if callable(setter):
+        setter(bool(text.strip()))
 
 
 def _set_wrapped_label_minimum_height(widget: Any, *, fallback_width: int) -> None:

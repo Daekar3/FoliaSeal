@@ -267,9 +267,6 @@ class DocumentReviewWorkspaceSession:
             effects=DocumentReviewWorkspaceViewerEffects(clear_highlights=True),
         )
 
-    def copy_current_text_match(self) -> str | None:
-        return self._document_text_search_session.current_copy_text()
-
     def copy_selected_text(self) -> str | None:
         return self._document_text_selection_session.current_copy_text()
 
@@ -358,6 +355,6 @@ class DocumentReviewWorkspaceSession:
             selected_index,
             selected_item.label,
             selected_item.drill_in_detail,
-            len(signature_items) > 1,
+            True,
             review_signature_labels,
         )

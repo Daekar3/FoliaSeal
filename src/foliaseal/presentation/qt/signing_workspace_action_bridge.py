@@ -61,6 +61,9 @@ class SigningWorkspaceActionBridge:
         )
 
     def submit_sign_request(self) -> SigningRequest | None:
+        if not self._has_explicit_output_pdf_path:
+            if self.choose_output_pdf_path() is None:
+                return None
         if not self._confirm_signing_request():
             return None
         if getattr(self._signing_action_boundary, "supports_async_transaction", False):

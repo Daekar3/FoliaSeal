@@ -50,7 +50,6 @@ def test_document_text_search_session_reports_blank_query_without_engine_call(
     assert state.current_match is None
     assert state.status_text == "Enter text to search this PDF."
     assert state.detail_text == ""
-    assert state.can_copy is False
     assert engine.calls == []
 
 
@@ -86,7 +85,6 @@ def test_document_text_search_session_tracks_hits_and_navigation(tmp_path: Path)
     assert initial.can_go_next is True
     assert initial.status_text == "Found 2 matches for 'Alice'."
     assert "Showing 1 of 2 on page 2" in initial.detail_text
-    assert session.current_copy_text() == "Alice"
 
     assert second.current_match == matches[1]
     assert second.can_go_previous is True
@@ -111,7 +109,6 @@ def test_document_text_search_session_reports_no_matches(tmp_path: Path) -> None
     assert state.current_match is None
     assert state.status_text == "No matches for 'invoice'."
     assert "Try a different phrase" in state.detail_text
-    assert state.can_copy is False
 
 
 def test_document_text_search_session_reports_search_errors(tmp_path: Path) -> None:
@@ -126,7 +123,6 @@ def test_document_text_search_session_reports_search_errors(tmp_path: Path) -> N
     assert state.current_match is None
     assert state.status_text == "Text search unavailable."
     assert "bad pdf" in state.detail_text
-    assert session.current_copy_text() is None
 
 
 def test_qt_pdf_document_text_search_engine_finds_matches(monkeypatch, tmp_path: Path) -> None:

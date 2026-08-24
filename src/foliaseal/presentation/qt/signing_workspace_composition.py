@@ -162,7 +162,6 @@ class QtSigningWorkspaceHostActions:
     search_document_text: Callable[[], Any]
     previous_document_text_match: Callable[[], Any]
     next_document_text_match: Callable[[], Any]
-    copy_current_document_text_match: Callable[[], str | None]
     set_document_text_selection_mode: Callable[[bool], bool]
     copy_selected_document_text: Callable[[], str | None]
     clear_selected_document_text: Callable[[], Any]
@@ -309,7 +308,6 @@ def _assemble_signing_workspace_composition(
     search_document_text = host_actions.search_document_text
     previous_document_text_match = host_actions.previous_document_text_match
     next_document_text_match = host_actions.next_document_text_match
-    copy_current_document_text_match = host_actions.copy_current_document_text_match
     set_document_text_selection_mode = host_actions.set_document_text_selection_mode
     copy_selected_document_text = host_actions.copy_selected_document_text
     clear_selected_document_text = host_actions.clear_selected_document_text
@@ -665,11 +663,7 @@ def _assemble_signing_workspace_composition(
         on_find_text=search_document_text,
         on_previous_text_match=previous_document_text_match,
         on_next_text_match=next_document_text_match,
-        on_copy_text_match=copy_current_document_text_match,
         on_review_signature_selected=runtime.on_document_review_signature_selected,
-        on_text_selection_mode_changed=set_document_text_selection_mode,
-        on_copy_selected_text=copy_selected_document_text,
-        on_clear_selected_text=clear_selected_document_text,
         fixed_width=getattr(bindings, "q_splitter", None) is None,
     )
     document_text_controls = sidebar.document_text_controls
@@ -681,7 +675,6 @@ def _assemble_signing_workspace_composition(
         viewer_widget=viewer_widget,
         document_review_workspace=document_review_workspace,
         on_jump_to_page_index=runtime.refresh_review_jump_to_page_index,
-        can_copy_text=on_copy_text is not None,
         on_document_text_state_changed=refresh_text_selection_toolbar_state,
     )
     transaction_runner = None
@@ -701,6 +694,7 @@ def _assemble_signing_workspace_composition(
         can_open_preserved_copy=on_open_signed_output is not None,
         cleanup_preserved_artifact=lambda path: Path(path).unlink(missing_ok=True),
         untrusted_recovery=request.untrusted_recovery,
+        output_path_confirmed=lambda: action_bridge.has_explicit_output_pdf_path(),
     )
     signing_action_boundary = SigningActionBoundary(
         coordinator=signing_action_coordinator,

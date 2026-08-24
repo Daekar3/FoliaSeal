@@ -274,7 +274,6 @@ class SigningWorkspaceWidget:
                     search_document_text=self.search_document_text,
                     previous_document_text_match=self.previous_document_text_match,
                     next_document_text_match=self.next_document_text_match,
-                    copy_current_document_text_match=self.copy_current_document_text_match,
                     set_document_text_selection_mode=self.set_document_text_selection_mode,
                     copy_selected_document_text=self.copy_selected_document_text,
                     clear_selected_document_text=self.clear_selected_document_text,
@@ -488,9 +487,6 @@ class SigningWorkspaceWidget:
 
     def previous_document_text_match(self) -> DocumentTextSearchState:
         return self._runtime.previous_document_text_match()
-
-    def copy_current_document_text_match(self) -> str | None:
-        return self._runtime.copy_current_document_text_match()
 
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         return self._runtime.set_document_text_selection_mode(enabled)

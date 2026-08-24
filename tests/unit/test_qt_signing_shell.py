@@ -852,6 +852,13 @@ def _viewer_workflow() -> ViewerWorkflow:
     )
 
 
+def _accept_output_path(widget, tmp_path: Path) -> str:
+    selected_path = tmp_path / "accepted-output.pdf"
+    widget._bindings.q_file_dialog.next_save_file_name = str(selected_path)
+    assert widget.choose_output_pdf_path() == str(selected_path)
+    return str(selected_path)
+
+
 def test_production_shell_factory_requires_canonical_reusable_objects() -> None:
     parameter = inspect.signature(_build_qt_signing_shell).parameters["reusable_objects"]
     assert parameter.default is inspect.Parameter.empty
@@ -1188,6 +1195,7 @@ def test_signing_shell_selection_updates_request(monkeypatch, tmp_path: Path) ->
     assert widget.properties_panel.preview.can_submit is False
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
 
     assert errors == []
@@ -1627,6 +1635,7 @@ def test_signing_shell_refresh_certificate_configurations_reapplies_signed_actio
         on_open_signed_output=lambda _path: None,
     )
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     widget.submit_sign_request()
 
     assert widget.sidebar_surface.flow_stage_label.text() == "Step 6 of 6 — Verify signed PDF"
@@ -1781,6 +1790,7 @@ def test_signing_shell_executes_real_sign_flow_when_executor_is_supplied(
     )
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
 
     assert request is not None
@@ -1828,6 +1838,7 @@ def test_signing_shell_owns_async_transaction_timer_and_worker_cleanup(
         sign_executor=executor,
     )
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
 
     assert request is not None
@@ -1906,9 +1917,9 @@ def test_signing_shell_delegates_review_rendering_to_sidebar(
         signing_shell_module.SigningWorkspaceSidebar.apply_document_review_workspace_state
     )
 
-    def _spy_apply(self, state, *, can_copy_text):
-        calls.append((state, can_copy_text))
-        return original_apply(self, state, can_copy_text=can_copy_text)
+    def _spy_apply(self, state):
+        calls.append(state)
+        return original_apply(self, state)
 
     monkeypatch.setattr(
         signing_shell_module.SigningWorkspaceSidebar,
@@ -1932,8 +1943,8 @@ def test_signing_shell_delegates_review_rendering_to_sidebar(
     widget.refresh_document_review()
 
     assert len(calls) == 2
-    assert all(can_copy_text is True for _, can_copy_text in calls)
-    assert calls[-1][0].review.review_summary.headline == "Signature review"
+    assert calls
+    assert calls[-1].review.review_summary.headline == "Signature review"
     assert widget.sidebar_surface.document_review_headline_label.text() == "Signature review"
 
 
@@ -2090,7 +2101,7 @@ def test_signing_shell_updates_drill_in_detail_for_selected_signature(
     )
 
 
-def test_signing_shell_disables_review_selector_for_single_signature_detail(
+def test_signing_shell_enables_review_selector_for_single_signature_detail(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2136,7 +2147,7 @@ def test_signing_shell_disables_review_selector_for_single_signature_detail(
     )
 
     assert widget.sidebar_surface.document_review_signature_selector.count() == 1
-    assert widget.sidebar_surface.document_review_signature_selector.enabled is False
+    assert widget.sidebar_surface.document_review_signature_selector.enabled is True
     assert "Signer: CN=Alice Example." in (
         widget.sidebar_surface.document_review_signature_detail_label.text()
     )
@@ -2344,7 +2355,7 @@ def test_signing_shell_preserves_selected_signature_on_review_refresh(
     )
 
 
-def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
+def test_signing_shell_document_text_search_jumps_pages_without_sidebar_copy_action(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -2379,12 +2390,10 @@ def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
             ),
         }
     )
-    copied_text = []
     widget = build_qt_signing_shell(
         viewer_workflow=_viewer_workflow(),
         signing_workflow=_workflow(tmp_path),
         document_text_search_engine=search_engine,
-        on_copy_text=copied_text.append,
     )
     initial_refresh_count = len(widget.viewer_widget.refresh_calls)
 
@@ -2405,67 +2414,7 @@ def test_signing_shell_document_text_search_jumps_pages_and_copies_current_hit(
     assert widget.logical_page_index() == 2
     assert "Showing 2 of 2 on page 3" in widget.sidebar_surface.document_text_detail_label.text()
 
-    widget.sidebar_surface.document_text_copy_button.click()
-
-    assert copied_text == ["Alice"]
-
-
-def test_signing_shell_document_text_search_uses_default_qt_clipboard_callback(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    monkeypatch.setattr(
-        signing_shell_module,
-        "build_qt_pdf_viewer_widget",
-        lambda **kwargs: _FakeViewerWidget(**kwargs),
-    )
-    monkeypatch.setattr(
-        signing_shell_module.SigningShellAdapter,
-        "_load_bindings",
-        lambda self: _fake_bindings(),
-    )
-    clipboard = _FakeClipboard()
-
-    class _FakeQGuiApplication:
-        @staticmethod
-        def clipboard():
-            return clipboard
-
-    class _FakeQtGuiModule:
-        QGuiApplication = _FakeQGuiApplication
-
-    real_import_module = signing_shell_module.importlib.import_module
-
-    def _fake_import_module(name: str):
-        if name == "PySide6.QtGui":
-            return _FakeQtGuiModule
-        return real_import_module(name)
-
-    monkeypatch.setattr(signing_shell_module.importlib, "import_module", _fake_import_module)
-    search_engine = _FakeDocumentTextSearchEngine(
-        {
-            "Alice": (
-                DocumentTextMatch(
-                    page_index=0,
-                    start_index=0,
-                    end_index=5,
-                    text="Alice",
-                    context="Alice Example",
-                ),
-            ),
-        }
-    )
-    widget = build_qt_signing_shell(
-        viewer_workflow=_viewer_workflow(),
-        signing_workflow=_workflow(tmp_path),
-        document_text_search_engine=search_engine,
-    )
-
-    widget.sidebar_surface.document_text_query_input.setText("Alice")
-    widget.sidebar_surface.document_text_find_button.click()
-    widget.sidebar_surface.document_text_copy_button.click()
-
-    assert clipboard.values == ["Alice"]
+    assert not hasattr(widget.sidebar_surface, "document_text_copy_button")
 
 
 def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
@@ -2804,6 +2753,7 @@ def test_signing_shell_open_signed_output_uses_success_callback(
     )
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
     opened = widget.open_signed_output()
 
@@ -2846,6 +2796,7 @@ def test_signing_shell_disables_open_signed_output_after_sign_failure(
     )
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
     opened = widget.open_signed_output()
 
@@ -2887,6 +2838,7 @@ def test_signing_shell_reports_sign_failure_when_executor_returns_failure(
     )
 
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
 
     assert request is not None
@@ -3457,7 +3409,7 @@ def test_signing_shell_flow_summary_advances_after_signature_placement(
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
 
     assert widget.sidebar_surface.flow_stage_label.text() == "Step 5 of 6 — Confirm and sign"
-    assert "Confirm the output path" in widget.sidebar_surface.flow_detail_label.text()
+    assert "Choose where to save the signed PDF" in widget.sidebar_surface.flow_detail_label.text()
     assert widget.is_sign_action_enabled() is True
 
 
@@ -3479,6 +3431,7 @@ def test_signing_shell_normalizes_selection_rectangles(monkeypatch, tmp_path: Pa
     )
 
     widget.viewer_widget.emit_selection(PdfRect(x1=40.0, y1=30.0, x2=10.0, y2=12.0))
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
 
     assert request is not None
@@ -5578,6 +5531,7 @@ def test_signing_shell_allows_blank_signer_label_prefix_and_frees_title_line(
     assert widget.properties_panel.preview_controls.title_label.visible is False
     assert widget.properties_panel.validation_text().startswith("Ready to sign.")
 
+    _accept_output_path(widget, tmp_path)
     request = widget.submit_sign_request()
 
     assert request is not None

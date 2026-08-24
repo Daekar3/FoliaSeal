@@ -429,13 +429,6 @@ class SigningWorkspaceRuntime:
         self._review_bridge_required().apply_transition(transition)
         return transition.state.document_text.search_state
 
-    def copy_current_document_text_match(self) -> str | None:
-        copy_text = self._document_review_workspace_required().copy_current_text_match()
-        if copy_text is None or self._on_copy_text is None:
-            return None
-        self._on_copy_text(copy_text)
-        return copy_text
-
     def set_document_text_selection_mode(self, enabled: bool) -> bool:
         transition = self._document_review_workspace_required().set_text_selection_mode(enabled)
         self._review_bridge_required().apply_transition(transition)

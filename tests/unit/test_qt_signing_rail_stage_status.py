@@ -19,14 +19,11 @@ def _state(*, recommended_action=None, can_sign=False, can_open=False):
     )
 
 
-def test_sidebar_uses_fixed_rail_and_protected_status_region() -> None:
+def test_sidebar_uses_fixed_rail_and_content_driven_status_region() -> None:
     sidebar = _build_sidebar()
 
     assert sidebar.container.fixed_width == SigningWorkspaceSidebar.RAIL_WIDTH
-    assert (
-        sidebar.status_region.minimum_height
-        == SigningWorkspaceSidebar.STATUS_REGION_MINIMUM_HEIGHT
-    )
+    assert sidebar.status_region.minimum_height != 200
     assert sidebar.signing_action_controls.container.parent is sidebar.container
     assert sidebar.signing_action_controls.status_container is sidebar.status_region
     assert sidebar.status_region.parent is sidebar.container

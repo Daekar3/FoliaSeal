@@ -33,7 +33,6 @@ def _request() -> QtSigningWorkspaceCompositionRequest:
             search_document_text=no_arg,
             previous_document_text_match=no_arg,
             next_document_text_match=no_arg,
-            copy_current_document_text_match=no_arg,
             set_document_text_selection_mode=lambda enabled: enabled,
             copy_selected_document_text=no_arg,
             clear_selected_document_text=no_arg,

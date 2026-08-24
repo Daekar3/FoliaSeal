@@ -83,6 +83,7 @@ class SigningActionCoordinator:
         can_open_preserved_copy: bool = False,
         cleanup_preserved_artifact: Callable[[str], None] | None = None,
         untrusted_recovery: bool = False,
+        output_path_confirmed: Callable[[], bool] | None = None,
     ) -> None:
         self._workflow = workflow
         self._apply_changes = apply_changes
@@ -94,6 +95,7 @@ class SigningActionCoordinator:
         self._can_open_preserved_copy = can_open_preserved_copy
         self._cleanup_preserved_artifact = cleanup_preserved_artifact
         self._untrusted_recovery = untrusted_recovery
+        self._output_path_confirmed = output_path_confirmed or (lambda: True)
         self._recovery_dismissed = False
         self._preserved_artifact_verified = False
         self._recovery_permission_allows = False
@@ -428,10 +430,16 @@ class SigningActionCoordinator:
             )
         elif can_sign:
             stage_text = "Step 5 of 6 — Confirm and sign"
-            detail_text = (
-                "Confirm the output path and review the on-page preview, then use Confirm and sign "
-                "to review the final signing summary."
-            )
+            if self._output_path_confirmed():
+                detail_text = (
+                    "Review the save path and on-page preview, then use Confirm and sign "
+                    "to review the final signing summary."
+                )
+            else:
+                detail_text = (
+                    "Choose where to save the signed PDF, then review the on-page preview and "
+                    "use Confirm and sign."
+                )
         else:
             stage_text = _readiness_stage_text(readiness.stage)
             detail_text = readiness.detail

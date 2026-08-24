@@ -42,11 +42,7 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
         on_find_text=lambda: find_calls.append("find"),
         on_previous_text_match=lambda: previous_calls.append("previous"),
         on_next_text_match=lambda: None,
-        on_copy_text_match=lambda: None,
         on_review_signature_selected=lambda index: None,
-        on_text_selection_mode_changed=lambda enabled: None,
-        on_copy_selected_text=lambda: None,
-        on_clear_selected_text=lambda: None,
         fixed_width=False,
     )
     sidebar.render_signing_action_state(
@@ -90,12 +86,18 @@ def test_real_qt_signing_rail_keeps_status_read_only_and_primary_action_visible(
         assert document_text.find_button.width() > 0
         assert document_text.previous_button.width() > 0
         assert document_text.next_button.width() > 0
-        assert document_text.copy_button.width() > 0
         assert document_text.status_label.width() > 0
         assert document_text.detail_label.width() > 0
-        assert sidebar.status_region.minimumHeight() >= (
-            SigningWorkspaceSidebar.STATUS_REGION_MINIMUM_HEIGHT
-        )
+        assert sidebar.choose_output_button.text() == "Save signed PDF as..."
+        for button in (
+            sidebar.choose_output_button,
+            sidebar.sign_button,
+            sidebar.open_signed_output_button,
+            sidebar.verify_again_button,
+            sidebar.return_to_draft_button,
+            sidebar.open_preserved_copy_button,
+        ):
+            assert button.width() >= button.minimumSizeHint().width()
         assert sidebar.signing_action_controls.container.parentWidget() is sidebar.container
         assert sidebar.signing_action_controls.status_container is sidebar.status_region
         assert sidebar.status_region.parentWidget() is sidebar.container

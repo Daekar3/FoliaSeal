@@ -192,8 +192,10 @@ Normative references: `ui/main-workspace-document-open-exploratory.svg` and
 
 Persistent, signing-only, and approximately 320 logical pixels initially. Its upper controls region
 has pinned preset selection, Manage Library, certificate/details/placement, and a bottom-pinned Sign
-and save action. Its lower read-only status region has protected minimum height. A user-adjustable,
-remembered divider separates them; each interior scrolls as needed. Neither auto-collapses.
+and save action. Its lower read-only status region is content-driven: empty stage/detail/result labels
+collapse, while non-empty recovery guidance remains readable. A user-adjustable, remembered divider
+separates them; each interior scrolls as needed. Neither auto-collapses. The primary signing action
+opens Save As first when no explicit destination has been confirmed; cancel is lossless.
 
 ### SUR03 — Signature Library
 

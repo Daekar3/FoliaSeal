@@ -148,12 +148,19 @@ def _bridge(
     )
 
 
+def _bridge_with_explicit_output(bindings, boundary, **kwargs):
+    bridge = _bridge(bindings, boundary, **kwargs)
+    bindings.q_file_dialog.next_save_file_name = "/tmp/confirmed-output.pdf"
+    assert bridge.choose_output_pdf_path() == "/tmp/confirmed-output.pdf"
+    return bridge
+
+
 def test_sign_confirmation_cancel_is_lossless_and_contains_frozen_summary() -> None:
     bindings = _fake_bindings()
     bindings.q_message_box.next_result = bindings.q_message_box.No
     boundary = _FakeBoundary()
 
-    result = _bridge(bindings, boundary).submit_sign_request()
+    result = _bridge_with_explicit_output(bindings, boundary).submit_sign_request()
 
     assert result is None
     assert boundary.submitted is False
@@ -174,7 +181,7 @@ def test_sign_confirmation_yes_submits_after_summary_review() -> None:
     bindings.q_message_box.next_result = bindings.q_message_box.Yes
     boundary = _FakeBoundary()
 
-    result = _bridge(bindings, boundary).submit_sign_request()
+    result = _bridge_with_explicit_output(bindings, boundary).submit_sign_request()
 
     assert result is not None
     assert boundary.submitted is True
@@ -186,7 +193,7 @@ def test_sign_confirmation_uses_consequence_labeled_buttons_when_available() -> 
     _CustomMessageBox.instances.clear()
     boundary = _FakeBoundary()
 
-    result = _bridge(bindings, boundary).submit_sign_request()
+    result = _bridge_with_explicit_output(bindings, boundary).submit_sign_request()
 
     assert result is not None
     dialog = _CustomMessageBox.instances[-1]
@@ -201,13 +208,37 @@ def test_sign_confirmation_synchronizes_setup_before_preview() -> None:
     boundary = _FakeBoundary()
     applied = []
 
-    assert _bridge(
+    assert _bridge_with_explicit_output(
         bindings,
         boundary,
         apply_changes=lambda: applied.append(True),
     ).submit_sign_request() is None
 
     assert applied == [True]
+
+
+def test_primary_sign_requests_output_before_setup_when_path_is_unconfirmed() -> None:
+    bindings = _fake_bindings()
+    boundary = _FakeBoundary()
+    applied: list[bool] = []
+    bridge = _bridge(bindings, boundary, apply_changes=lambda: applied.append(True))
+
+    assert bridge.submit_sign_request() is None
+    assert bindings.q_file_dialog.save_calls
+    assert applied == []
+    assert boundary.submitted is False
+
+
+def test_primary_sign_reuses_one_accepted_output_path() -> None:
+    bindings = _fake_bindings()
+    bindings.q_file_dialog.next_save_file_name = "/tmp/primary-output.pdf"
+    bindings.q_message_box.next_result = bindings.q_message_box.Yes
+    boundary = _FakeBoundary()
+    bridge = _bridge(bindings, boundary)
+
+    assert bridge.submit_sign_request() is not None
+    assert len(bindings.q_file_dialog.save_calls) == 1
+    assert boundary.accepted_paths == [("/tmp/primary-output.pdf", False)]
 
 
 def test_source_overwrite_requires_cancel_default_warning_and_explicit_authorization(

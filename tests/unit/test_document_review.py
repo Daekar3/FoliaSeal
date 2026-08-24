@@ -29,7 +29,7 @@ def test_document_review_integrity_status_distinguishes_required_states() -> Non
 def test_summarize_document_review_for_unsigned_pdf() -> None:
     summary = summarize_document_review(signature_count=0)
 
-    assert summary.headline == "No signatures found"
+    assert summary.headline == "No embedded signatures"
     assert "does not currently contain embedded signatures" in summary.detail
     assert "place and sign a new visible approval signature" in summary.detail
     assert summary.certification_restricted is False
@@ -114,7 +114,7 @@ def test_document_review_inspector_reports_unsigned_pdf(monkeypatch, tmp_path) -
 
     summary = PyHankoDocumentReviewInspector().inspect(str(pdf_path))
 
-    assert summary.headline == "No signatures found"
+    assert summary.headline == "No embedded signatures"
     assert summary.signature_count == 0
     assert "place and sign a new visible approval signature" in summary.detail
 

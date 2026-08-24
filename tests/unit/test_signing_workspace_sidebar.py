@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from foliaseal.application.coordinate_transform import PdfRect
 from foliaseal.application.document_review import (
     DocumentReviewSummary,
@@ -68,7 +70,6 @@ def _build_workspace_state() -> DocumentReviewWorkspaceState:
                 ),
                 can_go_previous=False,
                 can_go_next=True,
-                can_copy=True,
             ),
             selection_state=DocumentTextSelectionState(
                 status_text="Selected text on page 2.",
@@ -113,7 +114,6 @@ def _build_empty_workspace_state() -> DocumentReviewWorkspaceState:
                 current_match=None,
                 can_go_previous=False,
                 can_go_next=False,
-                can_copy=False,
             ),
             selection_state=DocumentTextSelectionState(
                 status_text="Text selection mode is active.",
@@ -133,7 +133,6 @@ def _build_empty_workspace_state() -> DocumentReviewWorkspaceState:
 def _build_sidebar(
     *,
     on_review_signature_selected=None,
-    on_text_selection_mode_changed=None,
     on_find_text=None,
     on_previous_text_match=None,
 ) -> SigningWorkspaceSidebar:
@@ -145,13 +144,7 @@ def _build_sidebar(
         "on_find_text": on_find_text or (lambda: None),
         "on_previous_text_match": on_previous_text_match or (lambda: None),
         "on_next_text_match": lambda: None,
-        "on_copy_text_match": lambda: None,
         "on_review_signature_selected": on_review_signature_selected or (lambda index: None),
-        "on_text_selection_mode_changed": (
-            on_text_selection_mode_changed or (lambda enabled: None)
-        ),
-        "on_copy_selected_text": lambda: None,
-        "on_clear_selected_text": lambda: None,
     }
     return SigningWorkspaceSidebar(
         bindings=bindings,
@@ -165,7 +158,6 @@ def test_signing_workspace_sidebar_renders_document_review_and_text_state() -> N
 
     sidebar.apply_document_review_workspace_state(
         _build_workspace_state(),
-        can_copy_text=True,
     )
 
     assert sidebar.surface.container is sidebar.container
@@ -203,9 +195,7 @@ def test_signing_workspace_sidebar_renders_document_review_and_text_state() -> N
     )
     assert sidebar.document_text_controls.previous_button._enabled is False
     assert sidebar.document_text_controls.next_button._enabled is True
-    assert sidebar.document_text_controls.copy_button._enabled is True
-    assert sidebar.document_text_controls.copy_selection_button._enabled is True
-    assert sidebar.document_text_controls.clear_selection_button._enabled is True
+    assert not hasattr(sidebar.document_text_controls, "copy_button")
 
 
 def test_signing_workspace_sidebar_ignores_selector_events_during_render() -> None:
@@ -214,63 +204,59 @@ def test_signing_workspace_sidebar_ignores_selector_events_during_render() -> No
 
     sidebar.apply_document_review_workspace_state(
         _build_workspace_state(),
-        can_copy_text=False,
     )
 
     assert calls == []
-    assert sidebar.document_text_controls.copy_button._enabled is False
-    assert sidebar.document_text_controls.copy_selection_button._enabled is False
 
     sidebar.document_review_controls.signature_selector.setCurrentIndex(0)
 
     assert calls == [0]
 
 
-def test_signing_workspace_sidebar_renders_empty_review_state_and_checkbox_state() -> None:
+def test_signing_workspace_sidebar_renders_empty_review_state_without_selector() -> None:
     sidebar = _build_sidebar()
 
     sidebar.apply_document_review_workspace_state(
         _build_empty_workspace_state(),
-        can_copy_text=False,
     )
 
     assert sidebar.document_review_controls.signature_selector.count() == 0
     assert sidebar.document_review_controls.signature_selector.enabled is False
+    assert sidebar.document_review_controls.signature_selector.visible is False
+    assert sidebar.document_review_controls.signature_selector_label.visible is False
     assert sidebar.document_review_controls.signature_detail_label.text() == ""
-    assert sidebar.document_text_controls.select_mode_checkbox.isChecked() is True
     assert sidebar.document_text_controls.status_label.text() == (
         "Text selection mode is active."
     )
     assert sidebar.document_text_controls.detail_label.text() == (
         "Drag over the page to capture text."
     )
-    assert sidebar.document_text_controls.copy_button._enabled is False
-    assert sidebar.document_text_controls.copy_selection_button._enabled is False
-    assert sidebar.document_text_controls.clear_selection_button._enabled is False
 
 
-def test_signing_workspace_sidebar_hides_text_selection_checkbox() -> None:
+def test_signing_workspace_sidebar_preserves_restricted_unsigned_guidance() -> None:
     sidebar = _build_sidebar()
-
-    assert sidebar.document_text_controls.select_mode_checkbox.visible is False
-    assert sidebar.document_text_controls.copy_selection_button.visible is False
-    assert sidebar.document_text_controls.clear_selection_button.visible is False
-
-
-def test_signing_workspace_sidebar_does_not_reemit_hidden_checkbox_sync() -> None:
-    calls = []
-    sidebar = _build_sidebar(on_text_selection_mode_changed=calls.append)
-
-    sidebar.apply_document_review_workspace_state(
-        _build_empty_workspace_state(),
-        can_copy_text=False,
+    state = _build_empty_workspace_state()
+    restricted_summary = replace(
+        state.review.review_summary,
+        headline="No embedded signatures",
+        detail=(
+            "This PDF does not currently contain embedded signatures. Adding a signature may be "
+            "blocked: certification restricts changes."
+        ),
+        certification_restricted=True,
+        restriction_reason="certification restricts changes.",
+    )
+    restricted_state = replace(
+        state,
+        review=replace(state.review, review_summary=restricted_summary),
     )
 
-    assert calls == []
+    sidebar.apply_document_review_workspace_state(restricted_state)
 
-    sidebar._handle_text_selection_mode_changed(1, on_text_selection_mode_changed=calls.append)
-
-    assert calls == [True]
+    assert sidebar.document_review_controls.headline_label.text() == "No embedded signatures"
+    assert "Adding a signature may be blocked" in sidebar.document_review_controls.detail_label.text()
+    assert sidebar.document_review_controls.signature_selector.visible is False
+    assert sidebar.document_review_controls.signature_selector_label.visible is False
 
 
 def test_search_query_return_and_previous_callbacks_are_keyboard_bound() -> None:

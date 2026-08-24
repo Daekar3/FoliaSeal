@@ -87,8 +87,8 @@ def test_document_signatures_window_is_modeless_and_cleans_up(tmp_path: Path) ->
     review_session.load()
 
     class _Sidebar:
-        def apply_document_review_workspace_state(self, _state, *, can_copy_text: bool) -> None:
-            del can_copy_text
+        def apply_document_review_workspace_state(self, _state) -> None:
+            pass
 
     class _Viewer:
         def __init__(self) -> None:
@@ -107,7 +107,6 @@ def test_document_signatures_window_is_modeless_and_cleans_up(tmp_path: Path) ->
         viewer_widget=viewer,
         document_review_workspace=review_session,
         on_jump_to_page_index=jumped_pages.append,
-        can_copy_text=False,
     )
 
     class _Session:

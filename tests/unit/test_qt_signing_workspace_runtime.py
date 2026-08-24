@@ -246,9 +246,6 @@ class _FakeDocumentReviewWorkspace:
     def previous_text_match(self):
         return SimpleNamespace(state=self.search_state)
 
-    def copy_current_text_match(self):
-        return "match"
-
     def set_text_selection_mode(self, enabled: bool):
         self.selection_mode_calls.append(enabled)
         return SimpleNamespace(state=self.selection_state)
@@ -468,7 +465,6 @@ def test_signing_workspace_runtime_applies_review_and_document_text_verbs() -> N
     selection_mode = bound.runtime.set_document_text_selection_mode(True)
     selected_all = bound.runtime.select_all_document_text()
     selected_text = bound.runtime.copy_selected_document_text()
-    current_text = bound.runtime.copy_current_document_text_match()
     cleared = bound.runtime.clear_selected_document_text()
 
     assert summary == "summary"
@@ -478,12 +474,11 @@ def test_signing_workspace_runtime_applies_review_and_document_text_verbs() -> N
     assert selection_mode is True
     assert selected_all == "selection-state"
     assert selected_text == "selected"
-    assert current_text == "match"
     assert cleared == "selection-state"
     assert bound.document_review_workspace.search_queries == ["Alice"]
     assert bound.document_review_workspace.selection_mode_calls == [True]
     assert bound.document_review_workspace.select_all_pages == [1]
-    assert copied == ["selected", "match"]
+    assert copied == ["selected"]
     assert len(bound.review_bridge.states) == 1
     assert len(bound.review_bridge.transitions) == 6
 

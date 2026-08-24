@@ -36,7 +36,6 @@ class DocumentTextSearchState:
     current_match: DocumentTextMatch | None
     can_go_previous: bool
     can_go_next: bool
-    can_copy: bool
 
 
 class DocumentTextSearchEngine(Protocol):
@@ -97,11 +96,6 @@ class DocumentTextSearchSession:
         self._current_index = max(self._current_index - 1, 0)
         return self._build_state()
 
-    def current_copy_text(self) -> str | None:
-        if self._current_index is None or not self._matches:
-            return None
-        return self._matches[self._current_index].text or None
-
     def current_page_index(self) -> int | None:
         if self._current_index is None or not self._matches:
             return None
@@ -126,7 +120,6 @@ class DocumentTextSearchSession:
                 current_match=None,
                 can_go_previous=False,
                 can_go_next=False,
-                can_copy=False,
             )
         if not self._query:
             return DocumentTextSearchState(
@@ -138,7 +131,6 @@ class DocumentTextSearchSession:
                 current_match=None,
                 can_go_previous=False,
                 can_go_next=False,
-                can_copy=False,
             )
         if not self._matches or self._current_index is None:
             return DocumentTextSearchState(
@@ -150,7 +142,6 @@ class DocumentTextSearchSession:
                 current_match=None,
                 can_go_previous=False,
                 can_go_next=False,
-                can_copy=False,
             )
 
         current_match = self._matches[self._current_index]
@@ -166,5 +157,4 @@ class DocumentTextSearchSession:
             current_match=current_match,
             can_go_previous=self._current_index > 0,
             can_go_next=self._current_index < len(self._matches) - 1,
-            can_copy=bool(current_match.text),
         )

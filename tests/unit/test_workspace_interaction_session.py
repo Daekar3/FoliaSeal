@@ -122,7 +122,6 @@ def _workspace_state() -> DocumentReviewWorkspaceState:
                 current_match=None,
                 can_go_previous=False,
                 can_go_next=False,
-                can_copy=False,
             ),
             selection_state=DocumentTextSelectionState(
                 status_text="No document text selected.",

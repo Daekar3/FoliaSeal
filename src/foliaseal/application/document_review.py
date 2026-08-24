@@ -119,7 +119,7 @@ def summarize_document_review(
         else:
             lines.append("You can place and sign a new visible approval signature.")
         return DocumentReviewSummary(
-            headline="No signatures found",
+            headline="No embedded signatures",
             detail=" ".join(lines),
             signature_count=0,
             signature_items=signature_items,

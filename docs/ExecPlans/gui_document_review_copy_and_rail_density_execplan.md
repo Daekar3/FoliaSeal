@@ -52,16 +52,32 @@ of the corrected document-open state.
 - [x] (2026-08-23) Decided that search-match copying and arbitrary selected-text copying are one
   user-facing V1 concept. The visible sidebar `Copy Result` action is therefore retired; the viewer
   toolbar/Edit `Copy selected text` path remains the sole primary copy affordance.
-- [ ] Remove the obsolete sidebar search-copy and hidden selection-mirror widgets, while preserving
-  search navigation/highlighting and the real toolbar/Edit selection-copy path.
-- [ ] Replace the empty signature-review selector row with a compact, accessible no-embedded-signatures
-  state; retain the selector only when actual embedded signatures exist.
-- [ ] Recompose the rail's lower groups so empty labels collapse, status copy does not reserve a fixed
-  200-pixel minimum, secondary actions use a compact two-column arrangement where the 280-pixel rail
-  permits it, and `Confirm and sign` remains the single visually primary action.
-- [ ] Rename the output-path action to `Save signed PDF as...` and make the primary signing path request
-  a destination when none has been explicitly confirmed; cancellation must not start signing.
-- [ ] Add focused regression tests, run the full validation suite, rebuild the package, and repeat the
+- [x] (2026-08-23) Explorer review found that removing the status floor also requires reconciling
+  `UI_SPEC.md` SUR02 and the corresponding `ARCHITECTURE.md` ownership/constraint entries. The
+  review further confirmed that restricted unsigned-document guidance must survive the new headline,
+  populated selectors need an accessible name, the production bindings have no grid layout, and
+  save-path cancellation must precede setup mutation.
+- [x] (2026-08-23) Removed the obsolete sidebar search-copy and hidden selection-mirror widgets,
+  removed the search `can_copy`/current-match-copy seams, and preserved search navigation/highlighting
+  plus toolbar/Edit selected-text copy.
+- [x] (2026-08-23) Replaced the unsigned review selector row with `No embedded signatures` guidance,
+  preserved restricted-document explanation, added an accessible populated selector label, and
+  collapsed empty review/status labels.
+- [x] (2026-08-23) Recomposed the lower rail with content-driven status sizing, full-width primary
+  actions, compact measured secondary rows, and a real 280-pixel minimum-width regression check.
+- [x] (2026-08-23) Renamed the save action and made primary signing request Save As before setup
+  mutation when no explicit path exists; cancellation and accepted-path reuse are covered by tests.
+- [x] (2026-08-23) Reconciled `UI_SPEC.md` SUR02 and `ARCHITECTURE.md` with content-driven status
+  sizing, current copy ownership, and explicit save-path entry. Two compliance explorers confirmed
+  the fixed topology and identified/closed readiness, empty-row, restricted-state, and geometry gaps.
+- [x] (2026-08-23) Full validation passed: `1607 passed, 20 skipped, 1 warning`. The bounded
+  Cinnamon/X11 source audit passed through document review, setup, placement, signing, reopen/verify,
+  and a second signature with screenshots under `/tmp/foliaseal-document-review-audit`; no owned
+  FoliaSeal process remained afterward. A fresh pre-commit package audit also passed offline,
+  private-install-root, and display-backed startup checks.
+- [x] (2026-08-23) Added focused regression tests for copy retirement, restricted/unsigned/signed review
+  states, 280-pixel rail geometry, readiness wording, chooser ordering, and cancel/accept behavior.
+- [ ] Run the full validation suite, rebuild the package, and repeat the
   installed-package document-open review before closing this plan.
 
 ## Surprises & Discoveries
@@ -98,6 +114,17 @@ of the corrected document-open state.
   coordinator without first enforcing an explicitly user-confirmed destination.
   Evidence: `SigningWorkspaceActionBridge.choose_output_pdf_path()`, `has_explicit_output_pdf_path()`,
   `AppFrame._save_document()`, and `SigningWorkspaceActionBridge.submit_sign_request()`.
+
+- Constraint: the production binding surface exposes horizontal layouts but no grid layout. Use
+  measured horizontal rows, or add a typed grid binding and its test seam. At the legal 280-pixel
+  minimum, the save-path action may need to remain full-width while only short recovery actions are
+  paired.
+  Evidence: explorer review of `QtSigningWidgetBindings` and the rail-layout tests.
+
+- Constraint: output-path cancellation must occur before `_confirm_signing_request()` applies setup
+  changes. Tests must prove cancel leaves setup, output path, dirty state, and submit/begin calls
+  unchanged; an accepted path must be consumed exactly once without a duplicate chooser.
+  Evidence: `SigningWorkspaceActionBridge.submit_sign_request()` and `_confirm_signing_request()`.
 
 ## Decision Log
 
@@ -141,6 +168,21 @@ of the corrected document-open state.
   Rationale: visual hierarchy must identify one next action, while compact secondary actions reclaim
   vertical space without changing the fixed right-rail topology.
   Date/Author: 2026-08-23 / Codex.
+
+- Decision: update `UI_SPEC.md` SUR02 and the corresponding `ARCHITECTURE.md` ownership/constraint
+  entries in this slice when the fixed status floor is removed; document the content-driven status
+  region and primary-sign chooser behavior rather than leaving stale protected-region language.
+  Date/Author: 2026-08-23 / Codex, after explorer review.
+
+- Decision: preserve restricted-document explanation and add explicit signed/unsigned selector
+  accessibility assertions. The selector and its label are hidden only when there are no embedded
+  signatures; populated selectors retain an accessible name and enabled state.
+  Date/Author: 2026-08-23 / Codex, after explorer review.
+
+- Decision: keep a populated signature selector enabled even when the document contains one embedded
+  signature. A single-item selector is still an explicit review surface and avoids encoding a hidden
+  special case in accessibility behavior; the empty state alone hides the selector and its label.
+  Date/Author: 2026-08-23 / Codex, after compliance review.
 
 ## Outcomes & Retrospective
 
@@ -195,19 +237,22 @@ with the existing detail behavior. Add state tests for unsigned, signed, and res
 the selector is not accidentally hidden when it has real choices.
 
 Then recompose the lower rail. Make status and detail labels visible only when they contain meaningful
-text, remove the unconditional 200-pixel status minimum, and set content-driven size policies that do
-not force the properties scroll area to collapse at 1100x700. Keep long error/recovery text readable
-and test it explicitly. Arrange `Save signed PDF as...`, `Open signed PDF`, `Verify again`, `Return to
-draft`, and `Open preserved copy` in a compact two-column secondary-action grid where the measured
-button widths remain readable at 280 pixels. Keep `Confirm and sign` full-width and visually primary.
+text, remove the unconditional 200-pixel status minimum, update `UI_SPEC.md` SUR02 and
+`ARCHITECTURE.md` to match, and set content-driven size policies that do not force the properties
+scroll area to collapse at 1100x700. Keep long error/recovery text readable and test it explicitly.
+Arrange `Save signed PDF as...`, `Open signed PDF`, `Verify again`, `Return to draft`, and `Open
+preserved copy` in compact measured horizontal rows (or a newly bound grid) where labels remain
+readable at 280 pixels. Keep `Confirm and sign` full-width and visually primary; keep the save-path
+action full-width if pairing it would clip or elide its label.
 Do not change the rail’s 280–640 bounds, the viewer/rail ownership boundary, or persistence behavior.
 
 Finally correct the output-path workflow. Rename the rail button and its accessible name to
 `Save signed PDF as...`. Ensure the rail’s primary sign callback checks
-`has_explicit_output_pdf_path()` before confirmation/submission; if false, invoke the existing save
-dialog and overwrite/source-safety confirmation. A canceled dialog must return without starting a
-transaction, changing the draft output path, or marking the draft dirty. An accepted path must be
-reused by the subsequent confirmation/sign operation without a second chooser. Update readiness copy
+`has_explicit_output_pdf_path()` before `_confirm_signing_request()` or any setup mutation; if false,
+invoke the existing save dialog and overwrite/source-safety confirmation first. A canceled dialog must
+return without starting a transaction, changing setup or the draft output path, or marking the draft
+dirty. An accepted path must be reused by the subsequent confirmation/sign operation without a second
+chooser. Update readiness copy
 so it says “Choose where to save the signed PDF...” when the path is not confirmed and “Review the save
 path...” once it is.
 

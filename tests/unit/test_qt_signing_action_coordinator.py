@@ -119,6 +119,26 @@ def test_signing_action_coordinator_load_reports_place_signature_when_draft_is_e
     assert state.recommended_action == "place_signature"
 
 
+def test_signing_action_coordinator_describes_unconfirmed_and_confirmed_save_paths(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    confirmed = False
+    coordinator = SigningActionCoordinator(
+        workflow=workflow,
+        apply_changes=lambda: None,
+        readiness=_readiness(workflow, ready=True, text=""),
+        output_path_confirmed=lambda: confirmed,
+    )
+
+    unconfirmed = coordinator.load()
+    assert "Choose where to save the signed PDF" in unconfirmed.detail_text
+
+    confirmed = True
+    confirmed_state = coordinator.load()
+    assert "Review the save path" in confirmed_state.detail_text
+
+
 def test_signing_action_coordinator_prioritizes_missing_signing_setup(
     tmp_path: Path,
 ) -> None:
