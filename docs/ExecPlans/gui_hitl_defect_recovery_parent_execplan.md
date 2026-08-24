@@ -92,6 +92,12 @@ change classes.
   editor spacing, and inner rail layout. Added the real-Qt rail assertion at the legal 280-pixel
   minimum; 1,605 tests passed with 20 skips and a bounded X11 sweep found no recurrence of the
   unusable default geometries.
+- [x] (2026-08-23) The fresh installed-package session passed the no-document frame and keyboard
+  reachability, then exposed a new document-open review slice: `Copy Result` is ambiguous beside the
+  separate text-selection copy command; the unsigned review selector is disabled for the correct
+  reason but lacks enough explanatory hierarchy; and the default right rail hides signing/presentation
+  controls behind a poor scroll allocation with oversized action buttons and an ambiguous `Choose
+  output...` label. These findings are recorded for Child 4 follow-up rather than treated as cosmetic.
 - [ ] Complete Child 4: installed-package regression matrix, documentation reconciliation, and final
   acceptance record.
 - [ ] Run the full suite, compliance review, package validation, and final acceptance work in Child 4.
@@ -170,6 +176,23 @@ change classes.
   report may describe clipped inner controls or a 280-pixel rail rather than an actual zero-width rail.
   Evidence: `SigningWorkspaceSidebar.RAIL_MIN_WIDTH = 280`, `RAIL_MAX_WIDTH = 640`, and delayed
   restoration in `signing_workspace_composition.py`.
+- Observation: the installed review surface needs a focused terminology/affordance and rail-density
+  correction before the remaining release gates can be judged cleanly. `Copy Result` currently means
+  “copy the current search match,” while text-selection mode has a separate toolbar/Edit copy path;
+  the unsigned `No signatures found` state disables its existing-signature selector; and the fixed
+  320-pixel rail reserves too much vertical space for prose/status while making signing/presentation
+  controls hard to discover at the default window size.
+  Evidence: installed-package HITL observation on 2026-08-23, plus
+  `signing_workspace_sidebar.py`, `document_review.py`, and `document_text_search.py`.
+- Observation: output-path wording contributes to the workflow ambiguity. The current `Choose
+  output...` command records a destination before signing, although a first-time user may expect the
+  save destination only after the signing action.
+  Evidence: `SigningActionCoordinator.accept_output_path()` and the installed-package HITL report.
+- Decision candidate from the 2026-08-23 review: treat search-match copy and arbitrary selected-text
+  copy as one V1 user-facing concept. Search-match copying is technically a case-insensitive matched
+  span, while toolbar/Edit copy requires an explicit text selection; nevertheless, two visible copy
+  buttons are not justified until usability evidence shows distinct demand. Child 4 should remove or
+  demote `Copy Result` rather than silently preserve the duplicate affordance.
 
 ## Decision Log
 

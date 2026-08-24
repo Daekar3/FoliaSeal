@@ -1,0 +1,355 @@
+# Consolidate document-review copy actions and restore signing-rail usability
+
+This ExecPlan is a living document and must remain self-contained under
+`/home/daekar/.codex/skills/write-execplan/PLANS.md`. It is a focused presentation-and-workflow
+behavior slice. The implementation must update this file at every stopping point and must not be
+declared complete from unit tests alone.
+
+## Purpose / Big Picture
+
+The installed-package human review found that the document-review area makes several common actions
+hard to understand at the supported default window size. Two copy controls describe overlapping
+ideas, the empty signature-review state consumes space while presenting a confusing disabled selector,
+the fixed right rail hides signing setup behind an unhelpful scroll region, and the output-path action
+sounds like an implementation detail rather than a clear save decision.
+
+After this slice, a user opening an unsigned PDF will see one obvious way to copy selected PDF text,
+will understand that the document simply has no embedded signatures, will be able to reach signing
+preset/certificate/Appearance/Placement controls without fighting the rail layout, and will understand
+when and where the signed PDF will be saved. A user who presses the primary signing action without
+having confirmed a destination will receive the normal save dialog before signing begins; canceling
+that dialog will leave the unsigned draft unchanged.
+
+The result is demonstrated by focused Qt/application tests, a real offscreen 1100x700 rail check, a
+fresh source-tree Cinnamon/X11 visual audit, a fresh package audit, and one installed-package review
+of the corrected document-open state.
+
+## Child ExecPlan Dependencies
+
+- [x] `docs/SPEC.md`, `docs/UI_SPEC.md`, and `docs/SCHEMAS.md` are the governing documents. Product
+  scope comes from `SPEC.md`, persistence semantics from `SCHEMAS.md`, and interaction realization
+  from `UI_SPEC.md`.
+- [x] `docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md` owns the observed installed-GUI
+  defect family and its final regression acceptance child.
+- [x] `docs/ExecPlans/ui_installed_package_hitl_release_matrix_execplan.md` records the fresh package,
+  the host installation, and the human observation that motivates this slice.
+- [x] `docs/ExecPlans/gui_text_selection_mode_execplan.md` established the real user-facing text
+  selection controls in the viewer toolbar and Edit menu; this slice must preserve those controls.
+- [x] `docs/ExecPlans/gui_surface_layout_correction_execplan.md` established the fixed PDF-first
+  topology, adjustable 280–640 pixel rail bounds, and the existing geometry-test seam.
+- [ ] The source-tree and package acceptance plans must be rerun after implementation; their prior
+  green results do not certify this changed surface.
+
+## Progress
+
+- [x] (2026-08-23) Recorded the installed-package observation: no-document layout and keyboard access
+  passed, but the first document-open review exposed duplicate-looking copy actions, an unclear empty
+  signature state, excessive rail whitespace/scroll pressure, oversized action buttons, and ambiguous
+  `Choose output...` wording.
+- [x] (2026-08-23) Traced the current behavior to `signing_workspace_sidebar.py`,
+  `signing_workspace_composition.py`, `signing_workspace_runtime.py`, `document_review.py`,
+  `document_review_workspace.py`, `document_text_search.py`, and `signing_workspace_action_bridge.py`.
+- [x] (2026-08-23) Decided that search-match copying and arbitrary selected-text copying are one
+  user-facing V1 concept. The visible sidebar `Copy Result` action is therefore retired; the viewer
+  toolbar/Edit `Copy selected text` path remains the sole primary copy affordance.
+- [ ] Remove the obsolete sidebar search-copy and hidden selection-mirror widgets, while preserving
+  search navigation/highlighting and the real toolbar/Edit selection-copy path.
+- [ ] Replace the empty signature-review selector row with a compact, accessible no-embedded-signatures
+  state; retain the selector only when actual embedded signatures exist.
+- [ ] Recompose the rail's lower groups so empty labels collapse, status copy does not reserve a fixed
+  200-pixel minimum, secondary actions use a compact two-column arrangement where the 280-pixel rail
+  permits it, and `Confirm and sign` remains the single visually primary action.
+- [ ] Rename the output-path action to `Save signed PDF as...` and make the primary signing path request
+  a destination when none has been explicitly confirmed; cancellation must not start signing.
+- [ ] Add focused regression tests, run the full validation suite, rebuild the package, and repeat the
+  installed-package document-open review before closing this plan.
+
+## Surprises & Discoveries
+
+- Observation: `Copy Result` copies the current case-insensitive search match span, not the query
+  input. The match usually equals the query, but can preserve different source casing or PDF text
+  extraction. A search highlight is not a text selection, so the toolbar copy action is technically
+  separate today.
+  Evidence: `QtPdfDocumentTextSearchEngine.search()` lowercases query/page text, obtains a selected
+  span from `QPdfDocument`, and `DocumentTextSearchSession.current_copy_text()` returns that span.
+
+- Observation: the application has no non-UI callers for `copy_current_document_text_match()` or
+  `copy_current_text_match()` beyond the sidebar composition and their tests. The search state’s
+  `can_copy` field exists only to enable that duplicate control.
+  Evidence: repository search on 2026-08-23 found callers only in
+  `signing_workspace_sidebar.py`, `signing_workspace_composition.py`, `signing_workspace_runtime.py`,
+  `signing_shell.py`, and their focused tests.
+
+- Observation: the empty signature selector is disabled because the fixture has zero embedded
+  signatures, not because certificate or preset setup is unavailable. The review summary already
+  knows this distinction, but the UI allocates a selector row that cannot contain a useful choice.
+  Evidence: `build_document_review_summary(signature_count=0)` and selector rendering in
+  `SigningWorkspaceSidebar.apply_document_review_workspace_state()`.
+
+- Observation: the rail is a fixed-width right-hand surface whose root layout places the properties
+  scroll area, document review, document text, signing actions, and status region sequentially. The
+  status region currently reserves `STATUS_REGION_MINIMUM_HEIGHT = 200`, and several labels remain
+  present even when their text is empty. This is why lower controls can consume the height needed by
+  the signing setup above them.
+  Evidence: `SigningWorkspaceSidebar.__init__()` and `_build_signing_action_controls()`.
+
+- Observation: `Choose output...` is optional in the rail but the File → Save path already has a
+  separate “choose if not explicit” behavior. The rail’s direct sign callback can reach the signing
+  coordinator without first enforcing an explicitly user-confirmed destination.
+  Evidence: `SigningWorkspaceActionBridge.choose_output_pdf_path()`, `has_explicit_output_pdf_path()`,
+  `AppFrame._save_document()`, and `SigningWorkspaceActionBridge.submit_sign_request()`.
+
+## Decision Log
+
+- Decision: retire the visible sidebar `Copy Result` action and the search-copy-only state seam unless
+  implementation discovers an unrecorded non-UI consumer.
+  Rationale: search-match copying and arbitrary selected-text copying do not represent sufficiently
+  distinct V1 user intents to justify two prominent copy buttons. Search remains fully usable for
+  finding and navigating matches; selected-text copy remains available in the viewer toolbar and Edit
+  menu.
+  Date/Author: 2026-08-23 / Codex.
+
+- Decision: remove hidden checkbox/button mirrors from the sidebar rather than preserving invisible
+  compatibility widgets.
+  Rationale: `gui_text_selection_mode_execplan.md` moved the user-facing controls to the toolbar/Edit
+  command, and the hidden widgets now create duplicate state and layout plumbing. The runtime should
+  render from explicit selection-mode state instead.
+  Date/Author: 2026-08-23 / Codex.
+
+- Decision: represent zero embedded signatures with compact explanatory text and no disabled selector
+  row; show the selector only when one or more embedded signatures exist.
+  Rationale: the selector is meaningful only for existing signatures. Removing the empty row improves
+  hierarchy and preserves the distinction between document review and signing-material readiness.
+  Date/Author: 2026-08-23 / Codex.
+
+- Decision: remove the fixed 200-pixel status minimum and collapse empty status labels, while keeping
+  full error/recovery text readable when a non-empty failure state requires it.
+  Rationale: the human finding is vertical competition, not a need to shrink the PDF-first canvas or
+  change the fixed rail topology. Content-driven sizing fixes the default successful path without
+  hiding recovery information.
+  Date/Author: 2026-08-23 / Codex.
+
+- Decision: keep an optional explicit save-path command in the rail, rename it `Save signed PDF as...`,
+  and make `Confirm and sign` invoke the same chooser when no explicit path has been confirmed.
+  Rationale: users may choose a destination early, but the primary workflow must not require them to
+  understand an implementation-oriented “output” term or silently sign to a suggested path. The
+  existing overwrite/source-safety confirmation remains authoritative.
+  Date/Author: 2026-08-23 / Codex.
+
+- Decision: retain a full-width primary `Confirm and sign` button and use a two-column grid only for
+  secondary actions whose labels remain readable at the 280-pixel rail minimum.
+  Rationale: visual hierarchy must identify one next action, while compact secondary actions reclaim
+  vertical space without changing the fixed right-rail topology.
+  Date/Author: 2026-08-23 / Codex.
+
+## Outcomes & Retrospective
+
+This plan is not complete yet. Its intended outcome is a corrected installed document-open surface
+that no longer presents duplicate copy concepts, empty disabled signature controls, or a rail whose
+lower status/actions hide the signing setup. The final retrospective must report the focused test
+count, full-suite result, source-tree X11 observations, package identity, installed-package result,
+and any remaining fixture/HITL gates. It must not claim that Orca, high-contrast, DPI, monitor, or
+signed/restricted/multi-page behavior passed merely because this layout slice passed.
+
+## Context and Orientation
+
+FoliaSeal is a Python/PySide6 Linux desktop application for reviewing and signing PDFs. The central
+viewer is the primary surface. A persistent right-hand signing rail contains reusable setup controls,
+document review, text search, signing actions, and status. The rail is intentionally bounded between
+280 and 640 logical pixels and must remain in that topology.
+
+The sidebar is assembled by `src/foliaseal/presentation/qt/signing_workspace_sidebar.py` and wired to
+the viewer by `src/foliaseal/presentation/qt/signing_workspace_composition.py`. Runtime callbacks and
+state live in `src/foliaseal/presentation/qt/signing_workspace_runtime.py`. The document-review summary
+is built in `src/foliaseal/application/document_review.py`; review/search/selection transitions are
+owned by `src/foliaseal/application/document_review_workspace.py`. Output-path selection and signing
+entry are coordinated by `src/foliaseal/presentation/qt/signing_workspace_action_bridge.py` and
+`src/foliaseal/presentation/qt/app_frame.py`.
+
+“Search match” means the text span found by the PDF search engine. “Selected text” means text the user
+dragged across in the viewer after entering text-selection mode. “Explicit output path” means a path
+the user accepted through the save dialog; a suggested filename seeded from settings is not treated as
+user confirmation.
+
+The governing UI contract requires a primary canvas, stable right rail, keyboard-accessible controls,
+concise state/error guidance, and a user-chosen signed-output path. This slice must preserve those
+contracts and must not add a second signing workflow, a general PDF-editing feature, or Wayland scope.
+
+## Plan of Work
+
+First remove the duplicate copy surface from the presentation boundary. Delete the sidebar `Copy Result`
+button and its row participation. Remove the hidden checkbox, hidden `Copy Selection`, and hidden
+`Clear Selection` widgets that were retained as state mirrors after the toolbar/Edit text-selection
+surface was introduced. Replace any render wiring that depended on those widgets with explicit state
+callbacks or the existing toolbar refresh callback. Then remove the now-unused search-copy callbacks,
+runtime methods, shell-port members, `DocumentTextSearchSession.current_copy_text()`, and
+`DocumentTextSearchState.can_copy` only after repository-wide caller and test inventory confirms they
+are dead. Search navigation, match count, context, previous/next behavior, highlight overlays, and
+toolbar/Edit selected-text copy must remain intact.
+
+Next simplify the document-review empty state. In `document_review.py`, use the user-facing headline
+`No embedded signatures` and concise detail that explains the PDF is unsigned and that a visible
+approval signature can be placed. In the sidebar state renderer, show that compact message without a
+disabled empty selector; when signature labels exist, show an accessible label and enabled selector
+with the existing detail behavior. Add state tests for unsigned, signed, and restricted documents so
+the selector is not accidentally hidden when it has real choices.
+
+Then recompose the lower rail. Make status and detail labels visible only when they contain meaningful
+text, remove the unconditional 200-pixel status minimum, and set content-driven size policies that do
+not force the properties scroll area to collapse at 1100x700. Keep long error/recovery text readable
+and test it explicitly. Arrange `Save signed PDF as...`, `Open signed PDF`, `Verify again`, `Return to
+draft`, and `Open preserved copy` in a compact two-column secondary-action grid where the measured
+button widths remain readable at 280 pixels. Keep `Confirm and sign` full-width and visually primary.
+Do not change the rail’s 280–640 bounds, the viewer/rail ownership boundary, or persistence behavior.
+
+Finally correct the output-path workflow. Rename the rail button and its accessible name to
+`Save signed PDF as...`. Ensure the rail’s primary sign callback checks
+`has_explicit_output_pdf_path()` before confirmation/submission; if false, invoke the existing save
+dialog and overwrite/source-safety confirmation. A canceled dialog must return without starting a
+transaction, changing the draft output path, or marking the draft dirty. An accepted path must be
+reused by the subsequent confirmation/sign operation without a second chooser. Update readiness copy
+so it says “Choose where to save the signed PDF...” when the path is not confirmed and “Review the save
+path...” once it is.
+
+## Milestones
+
+The first milestone is copy-surface retirement. Focused application and Qt tests will prove that search
+still navigates/highlights matches and that toolbar/Edit copy still copies a direct selection, while no
+sidebar or hidden-widget path remains for search-match copying. The milestone is complete when the
+dead seam inventory is clean and the focused tests pass.
+
+The second milestone is rail composition. The empty signature state, compact search state, dynamic
+status sizing, and secondary-action grid will be visible in an offscreen 1100x700 frame and at the
+280-pixel rail minimum. The milestone is complete when setup controls retain usable widths and the
+primary action remains reachable without a misleading scroll trap.
+
+The third milestone is save-path behavior and release evidence. Focused tests will prove chooser
+cancel/accept behavior from the primary sign action, then a source-tree X11 audit and fresh package
+audit will run. The installed-package matrix will be resumed only after those AFK checks pass.
+
+## Concrete Steps
+
+Run all commands from `/home/daekar/FoliaSeal`.
+
+Before editing, inspect the current callers and preserve unrelated work:
+
+    git status --short
+    rg -n "copy_current_document_text_match|copy_current_text_match|can_copy" src tests
+    rg -n "Copy Result|Copy Selection|Save signed PDF|Choose output|STATUS_REGION_MINIMUM_HEIGHT" src tests
+
+Implement the focused slice in the named modules, then run the focused tests:
+
+    .venv/bin/pytest -q \
+      tests/unit/test_document_text_search.py \
+      tests/unit/test_document_review.py \
+      tests/unit/test_document_review_workspace.py \
+      tests/unit/test_signing_workspace_sidebar.py \
+      tests/unit/test_qt_signing_workspace_runtime.py \
+      tests/unit/test_qt_signing_action_boundary.py \
+      tests/unit/test_qt_signing_action_coordinator.py \
+      tests/unit/test_qt_signing_shell.py \
+      tests/unit/test_qt_signing_workspace_composition.py \
+      tests/integration/test_signing_rail_layout.py
+
+Expected focused validation is zero failures. The new tests must cover removal of the duplicate copy
+surface, unsigned/signed review rendering, 280-pixel layout usability, secondary-button geometry,
+save-dialog cancellation, save-dialog acceptance, and no duplicate chooser when an explicit path exists.
+
+Run repository checks:
+
+    .venv/bin/ruff check src tests
+    .venv/bin/python -m compileall -q src tests
+    .venv/bin/pytest -q
+    git diff --check
+
+Run the bounded source-tree display audit in the supported Cinnamon/X11 session. It must use a fresh
+temporary artifact root, capture the unsigned document-open state, exercise text search/selection, and
+capture the rail at the supported minimum. Do not run Wayland and do not leave the GUI process open.
+
+Build and audit a fresh package from the resulting commit using the existing
+`src/foliaseal/build/debian_packaging.py` and `scripts/deb_package_audit.py` flow. Keep the `.deb`,
+PyInstaller output, reports, and screenshots under one owned `/tmp/foliaseal-*` root and remove that
+root after inspection. Do not commit generated packages or screenshots.
+
+## Validation and Acceptance
+
+The copy contract passes when search input still finds and navigates case-insensitive matches, the
+viewer toolbar/Edit `Copy selected text` action copies a manually selected span, and no visible or
+hidden sidebar `Copy Result`/selection-mirror controls remain. Search must not silently copy the query
+input or lose its highlights.
+
+The empty-review contract passes when an unsigned PDF says `No embedded signatures`, explains that the
+document can receive a visible approval signature, and does not present a disabled empty selector.
+An input containing embedded signatures must show an accessible selector and its detail state; a
+restricted document must retain its restriction guidance.
+
+The rail contract passes at 1100x700 and at the legal 280-pixel rail width when setup controls remain
+reachable, empty search/status labels do not create large blank regions, secondary actions are readable,
+and `Confirm and sign` remains the single primary action. Long failure/recovery text must remain
+readable rather than be clipped or silently removed.
+
+The save-path contract passes when the rail says `Save signed PDF as...`, an explicit path can be chosen
+early, and pressing `Confirm and sign` without one opens the same chooser before signing. Canceling
+leaves the unsigned draft and path unchanged; accepting a path proceeds to the existing confirmation
+and signing flow; an already explicit path does not open a duplicate chooser. Source-overwrite and
+existing-destination safety confirmations must remain unchanged.
+
+Final acceptance requires the focused tests, full suite, Ruff, compileall, diff check, source-tree X11
+audit, and fresh package audit to pass. The installed-package human matrix must then repeat the
+document-open review and record whether the copy, empty-review, rail-density, and save-path findings
+are resolved before continuing to Orca, scaling, monitor, fixture, and Help gates.
+
+## Idempotence and Recovery
+
+The code and tests are safe to rerun. Keep generated packages, PDFs, screenshots, and logs under one
+owned temporary root. If a focused test fails, leave the failure visible, update `Progress` and
+`Surprises & Discoveries`, and repair the smallest owning seam. Do not restore the retired duplicate
+copy path merely to make an old test pass; update the test to the new single-copy contract.
+
+If save-path behavior fails after the chooser opens, ensure no signing worker or temporary signed output
+remains. A canceled chooser must never mutate the draft. If a display audit is interrupted, terminate
+only the audit-owned FoliaSeal process, close audit-owned dialogs, remove the exact temporary root, and
+verify no matching process/window remains. Never delete user certificates, configuration, unrelated
+desktop windows, or shared Orca state.
+
+## Artifacts and Notes
+
+The durable evidence is the focused test output, full-suite summary, concise X11 screenshots/report,
+package audit JSON, package commit/checksum, and the installed-package HITL observation. Generated
+`.deb` files, PyInstaller directories, screenshots, PDFs, private keys, credentials, and machine-local
+absolute paths are disposable and must not be committed.
+
+The expected source ownership remains narrow:
+
+    src/foliaseal/presentation/qt/signing_workspace_sidebar.py
+    src/foliaseal/presentation/qt/signing_workspace_composition.py
+    src/foliaseal/presentation/qt/signing_workspace_runtime.py
+    src/foliaseal/presentation/qt/signing_shell.py
+    src/foliaseal/presentation/qt/signing_workspace_action_bridge.py
+    src/foliaseal/presentation/qt/app_frame.py
+    src/foliaseal/application/document_review.py
+    src/foliaseal/application/document_review_workspace.py
+    src/foliaseal/application/document_text_search.py
+    tests/unit and tests/integration files that cover those contracts
+
+Do not mix certificate lifecycle changes, viewer rendering redesign, schema changes, new PDF fixture
+families, Wayland support, or unrelated terminology cleanup into this slice.
+
+## Interfaces and Dependencies
+
+Use the existing `DocumentReviewWorkspaceState` and `SigningActionState` as the state boundaries; do not
+introduce a second review model or a second signing action path. The viewer toolbar and Edit menu remain
+the public text-selection interface. The action bridge remains the owner of save-dialog and overwrite
+confirmation behavior. The rail remains the owner of layout and state projection, not PDF parsing or
+certificate persistence.
+
+The implementation may remove the search-copy-only methods and fields only after the caller inventory
+in this plan is reproduced and all references are updated. It must retain the existing
+`DocumentTextSearchState` query, match, context, navigation, and highlight semantics. It must retain
+`has_explicit_output_pdf_path()` as the source of truth for whether the user confirmed a destination.
+
+Revision note: 2026-08-23 / Codex: created after the installed-package acceptance session confirmed
+that the no-document frame and keyboard reachability were good but the document-open surface had
+duplicate copy affordances, an over-reserved right rail, a confusing empty signature selector, and
+ambiguous output-path wording. The plan records the decision to retire the duplicate search-copy
+surface and correct the remaining findings in one bounded presentation/workflow slice.

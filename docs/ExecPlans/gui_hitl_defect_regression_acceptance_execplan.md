@@ -32,11 +32,15 @@ root, and reconciles the governing status plans.
   intentionally dirty with this implementation plus its living-plan updates.
 - [x] (2026-08-20) Build a fresh `foliaseal_0.1.0_amd64.deb`; offline extraction and private
   `dpkg --unpack` audits pass, including corrected relative-wrapper isolation behavior.
-- [ ] Pass the real Cinnamon/X11 display-backed audit; this execution context currently has no
-  reachable `DISPLAY=:0`, so this remains an explicit desktop/HITL gate.
-- [ ] Install the exact corrected package on the approved host using the documented authenticated path and verify
-  `dpkg --audit`, installed wrapper, Help, resources, and desktop launcher.
-- [ ] Run the human matrix with special attention to corrected Gates 1–3, then complete Gates 4–12.
+- [x] (2026-08-23) Rebuilt the package from `f6e431cc4`, passed offline, private-install-root, and
+  display-backed Cinnamon/X11 audits, and recorded the package checksum in the installed-package
+  matrix. Desktop-authenticated installation succeeded and `dpkg --audit` is clean.
+- [x] (2026-08-23) Confirmed the installed wrapper's no-document frame and keyboard reachability in
+  the bounded X11 session. The human matrix is now paused at the first document-open review because
+  `Copy Result`, disabled signature review, right-rail space allocation, and `Choose output...` wording
+  need focused follow-up recording before later gates continue.
+- [ ] Install-state regression matrix: continue with the human matrix after the new document-review
+  findings are assigned to a focused correction slice; then complete Gates 4–12.
 - [ ] Record any remaining product defect as a focused child plan or environment limitation.
 - [ ] Restore theme/scaling, close FoliaSeal and the audit terminal, remove only owned temporary roots,
   and verify no FoliaSeal process/window remains.
@@ -56,6 +60,13 @@ root, and reconciles the governing status plans.
   instead of its own relative bundle, causing Help-path validation to escape the extracted package.
   Correction: the generated wrapper now always resolves its sibling package root relative to its own
   path, which works both installed and under extraction/private-install audits.
+- Observation: the first current-release installed review found no-document and keyboard acceptance
+  clean, but the document-open rail is not yet ready for release acceptance. Search-match copy is
+  labeled `Copy Result` while selected-text copy is a separate toolbar/Edit action; the unsigned
+  signature selector is disabled because there are no embedded signatures; and long status/review
+  blocks plus a 200-pixel status minimum consume too much vertical rail space at the default window
+  size. The output-path command is also unclear to first-time users.
+  Evidence: human observation on 2026-08-23 and the current sidebar/review/search implementations.
 
 ## Decision Log
 

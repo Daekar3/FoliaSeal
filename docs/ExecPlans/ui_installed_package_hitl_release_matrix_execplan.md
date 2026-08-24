@@ -13,12 +13,15 @@ PySide6 application was usable with Mint Screen Reader and Orca despite the
 same warnings, so those warnings are environmental diagnostics rather than
 release failures by themselves.
 
-This plan prepares one reproducible human acceptance session against the
-installed Debian package. A reviewer will be able to use the actual packaged
-application to review, sign, save, reopen, and verify a PDF while checking
-screen-reader speech, keyboard operation, contrast, scaling, monitor movement,
-and offline Help. The session is the evidence required by SPEC.md and UI_SPEC.md;
-automated package audits remain supporting evidence only.
+This plan prepares one reproducible human acceptance session against a fresh
+Debian package built from the current checkout. A reviewer will use the actual
+packaged application to review, sign, save, reopen, and verify a PDF while
+checking screen-reader speech, keyboard operation, contrast, scaling, monitor
+movement, and offline Help. Package preparation, installation, accessibility,
+visual, and workflow checks are one ordered release session rather than
+separate duplicate source-tree and packaged-app reviews. The session is the
+evidence required by SPEC.md and UI_SPEC.md; automated package audits remain
+supporting evidence only.
 
 ## Child ExecPlan Dependencies
 
@@ -74,6 +77,33 @@ automated package audits remain supporting evidence only.
 - [x] (2026-08-20) Rebuilt the corrected package and passed fresh offline extraction and private
   install-root audits; Help/resources/font/icon checks and host `pdftoppm` conversion passed. The
   display-backed audit remains blocked solely because this execution context cannot open `DISPLAY=:0`.
+- [x] (2026-08-23) Rebuild the package from current checkout `f6e431cc4`, record the package checksum
+  and commit identity, and rerun the offline, private-install-root, and supported Cinnamon/X11 audits.
+- [ ] (2026-08-23) Execute the combined installed-package session in this order: install and launch the
+  exact fresh package; run the normal visual signing workflow; repeat the critical path keyboard-only;
+  repeat it with Orca; exercise high contrast, scaling, minimum size, and monitor movement; then run
+  the additional PDF fixtures and installed Help checks before cleanup.
+- [x] (2026-08-23) Built `foliaseal_0.1.0_amd64.deb` from `f6e431cc4d1272782ff26664b57965fa4b720afc`
+  with SHA-256 `3fbd21c8df43986204dd7bbdc3f6ba01547309da454f856c6860f16fe2bdec35`. Offline and
+  private-install-root audits passed with five Help topics, 18 fonts, two icons, Poppler conversion,
+  and clean owned-root teardown. The display-backed audit passed with `qt_platform=xcb` and
+  `gui_startup.status=started`; its temporary extraction root was cleaned.
+- [x] (2026-08-23) Installed that exact package through desktop-authenticated `pkexec dpkg -i` over
+  the existing `0.1.0`; `dpkg --audit` is clean. Launched `/usr/bin/foliaseal gui` on `DISPLAY=:0`
+  with disposable HOME/XDG roots; the owned process is running for the human acceptance session.
+- [x] (2026-08-23) Confirmed the installed wrapper remains visible in a bounded interactive X11
+  session and captured the 1100x732 no-document frame. The frame shows the stable disabled-document
+  state, `Open a PDF...`, `Manage Signature Library...`, the top-level menus, and no recent-file data.
+  This is machine-observed rendering evidence; the scenario remains open until the human observer
+  confirms the normal visual workflow and keyboard reachability.
+- [x] (2026-08-23) Human Gate 1 confirmed the no-document frame and keyboard reachability for menus
+  and buttons. The first document-open review then exposed a `Copy Result` meaning/copy-surface
+  ambiguity and substantial default-rail density/space-allocation concerns; the matrix is paused for
+  defect recording before continuing into signing-state gates.
+- [x] (2026-08-23) Closed the owned interactive package session after the observation, removed its
+  temporary HOME/XDG root, package/build roots, screenshots, and session markers, and verified that
+  no session-owned FoliaSeal process or window remained. The installed package itself remains in place
+  for the next corrected-package acceptance pass.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not
@@ -108,6 +138,45 @@ automated package audits remain supporting evidence only.
   display-backed extraction, plus the private install-root smoke, because each
   proves a different package boundary. None of them substitutes for an actual
   installed desktop session.
+- Observation: the latest source-tree terminology cleanup is committed as
+  `f6e431cc4`, so the previously installed `0.1.0` package cannot be treated as
+  current-release evidence until a fresh package is built and identified by
+  commit/checksum.
+- Observation: `Copy Result` copies the current text-search match span, not the
+  search query itself. The current match may happen to equal the query, making
+  the distinction invisible. Text-selection mode uses a separate viewer-toolbar
+  `Copy selected text` action and the Edit command path; the sidebar `Copy Result`
+  button does not change meaning when text-selection mode is active.
+  Evidence: `DocumentTextSearchSession.current_copy_text()` and
+  `SigningWorkspaceSidebar._build_document_text_controls()`.
+- Clarification: search is case-insensitive substring matching. The copied match
+  preserves the extracted PDF text, so it can differ from the query's casing or
+  extracted representation. A search highlight is not a text selection, however;
+  the toolbar `Copy selected text` action remains disabled until the user enters
+  text-selection mode and selects text directly.
+  Evidence: `QtPdfDocumentTextSearchEngine.search()` lowercases both operands,
+  then copies `QPdfDocument`'s selected span; the viewer selection state is
+  maintained separately in `document_review_workspace.py`.
+- Observation: the disabled signature selector in the unsigned fixture represents
+  the absence of embedded signatures in the PDF, not missing certificates or
+  presets. Certificate/preset readiness is a separate signing-rail state.
+  Evidence: `document_review.build_document_review_summary()` and the selector
+  enablement in `SigningWorkspaceSidebar.apply_document_review_workspace_state()`.
+- Observation: at the default installed window size, the right rail reserves a
+  large vertical status region and places verbose review/search/status groups in
+  one scrollable column. The human observer reported that signature/presentation
+  controls are effectively hidden behind an unhelpful scrollbar, with excess
+  whitespace under the search prompt and oversized horizontal action buttons.
+  Evidence: live installed-package observation; the current rail uses a fixed
+  320-pixel width, `STATUS_REGION_MINIMUM_HEIGHT = 200`, wrapped labels, and
+  vertically stacked full-width buttons.
+- Observation: `Choose output...` is semantically accurate to the current
+  implementation but unclear to a first-time user because it chooses the output
+  path before signing. A clearer candidate is `Choose save path...` or
+  `Save signed PDF as...`; changing the timing or label requires a focused UI
+  decision and regression coverage rather than an acceptance-only edit.
+  Evidence: `SigningActionCoordinator.accept_output_path()` records the path
+  before `Confirm and sign`.
 
 ## Decision Log
 
@@ -128,12 +197,41 @@ automated package audits remain supporting evidence only.
   Rationale: the V1 Linux target is Cinnamon/X11; Wayland validation is a later
   compatibility tranche.
   Date/Author: 2026-08-16 / Codex.
+- Decision: combine packaged workflow, keyboard, Orca, visual, and Help checks
+  into one ordered HITL session after AFK package preparation.
+  Rationale: the installed package is the actual V1 deliverable, and a single
+  session prevents accepting the source tree and then repeating the same user
+  workflow against a different artifact.
+  Date/Author: 2026-08-23 / Codex.
+- Decision: require a fresh package from the current checkout before host
+  installation.
+  Rationale: the package version may remain unchanged while user-facing
+  terminology and other fixes change; commit identity and checksum are needed
+  to prove which build was accepted.
+  Date/Author: 2026-08-23 / Codex.
+- Decision: pause the human matrix at the first document-open review when a
+  control's meaning or default layout is materially unclear.
+  Rationale: continuing into certificate/signing gates would mix acceptance of
+  a confusing surface with later workflow results and could hide a release
+  defect behind a successful signing operation.
+  Date/Author: 2026-08-23 / Codex.
+- Decision: treat search-match copy and arbitrary selected-text copy as one
+  user-facing copy concept for the V1 surface unless a later usability test
+  demonstrates a strong need for both visible actions.
+  Rationale: the backend operations are technically distinct, but two prominent
+  copy buttons create a discoverability problem and do not represent two common
+  user intents. The focused correction should remove or demote `Copy Result`,
+  retain the clear `Copy selected text` affordance, and preserve search-match
+  copying in the application layer only if a secondary convenience action is
+  still justified.
+  Date/Author: 2026-08-23 / Codex.
 
 ## Outcomes & Retrospective
 
 The AFK preparation is complete when this plan contains a fresh package audit,
-the baseline metadata, and an explicit HITL handoff. The plan must not be
-marked fully complete until the installed-package session and final release
+the baseline metadata, the current commit/checksum, and an explicit ordered
+HITL handoff. The plan must not be marked fully complete until the combined
+installed-package session, required fixture coverage, and final release
 reconciliation are recorded. A successful session closes the human release
 gate; an observed failure becomes a bounded implementation plan with a new
 acceptance test or reproducible observation.
@@ -162,11 +260,14 @@ be called usable, not merely a test count.
 
 ## Plan of Work
 
-First build a fresh `.deb` in one owned temporary directory and run the existing
-offline extraction audit, private package-manager-root audit, and display-backed
-audit. Record the package filename, package version, audit status, Help topics,
-resource checks, Poppler result, selected display, Qt platform, and cleanup
-result. Do not install it into the host package database during AFK preparation.
+First build a fresh `.deb` in one owned temporary directory from the current
+checkout and record both `git rev-parse HEAD` and a checksum of the package.
+Run the existing offline extraction audit, private package-manager-root audit,
+and display-backed audit. Record the package filename, package version, audit
+status, Help topics, resource checks, Poppler result, selected display, Qt
+platform, and cleanup result. Do not install it into the host package database
+during AFK preparation. Do not reuse an older package merely because its
+version string is unchanged.
 
 Next capture the environment baseline immediately before the human session.
 Run the following from the same X11 session and preserve its output with the
@@ -187,13 +288,16 @@ timeout/return code, and bounded stderr are context, not a pass/fail substitute
 for speech.
 
 After the user authorizes the selected host/VM target, install the exact package
-and launch `/usr/bin/foliaseal gui` with the disposable fixture and temporary
-HOME/XDG roots. Record the ten UI_SPEC scenarios and the SPEC release-bar
-workflow. Before scenario 9, use Mint's accessibility/appearance controls to
-enable a high-contrast theme and record the theme transition; restore the
-previous theme after the session. The observer may use screenshots or short
-notes, but must not record credentials, private keys, or document contents
-beyond disposable fixtures.
+identified by the recorded commit and checksum, then launch
+`/usr/bin/foliaseal gui` with the disposable fixture and temporary HOME/XDG
+roots. Follow one continuous session: normal visual workflow, keyboard-only
+workflow, Orca workflow, high-contrast/scaling/minimum-size/monitor checks,
+additional edge-case fixtures, and installed Help. Record the ten UI_SPEC
+scenarios and the SPEC release-bar workflow. Before the visual-responsiveness
+checks, use Mint's accessibility/appearance controls to enable a high-contrast
+theme and record the theme transition; restore the previous theme after the
+session. The observer may use screenshots or short notes, but must not record
+credentials, private keys, or document contents beyond disposable fixtures.
 
 ## Concrete Steps
 
@@ -308,3 +412,14 @@ was successfully used with Mint Screen Reader and Orca despite the same Qt
 AT-SPI warnings seen in the FoliaSeal probe. This separates non-blocking Qt
 diagnostics from user-visible accessibility failures and makes the installed
 package the single final HITL target.
+
+Revision note: 2026-08-23 / Codex: revised after the acceptance review to make
+the current-commit fresh package and the single combined installed-package,
+keyboard, Orca, visual, fixture, and Help session the required order. The
+previously installed package remains historical evidence until this exact
+checkout is rebuilt and identified by checksum.
+
+Revision note: 2026-08-23 / Codex: recorded the fresh package audits, desktop-
+authenticated installation, and bounded visible no-document launch. The human
+matrix remains intentionally open; machine-rendered startup is not a substitute
+for visual, keyboard, Orca, or physical-DPI judgment.
