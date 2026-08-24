@@ -81,9 +81,11 @@ of the corrected document-open state.
   `29b27916fa0cbaa77d8faf3503701b559b074479`. Final `.deb` SHA-256 is
   `ade4ba16ac25b498c5bb048ebe20f06fff807cf34472ece46984881ef63abc68`.
   Offline extraction, isolated `dpkg --unpack`, Help/resources/dependency checks, and display-backed
-  `qt_platform=xcb` startup all passed. The exact package was installed with authenticated `pkexec
-  dpkg -i`; host `dpkg --audit` and installed Help passed. A disposable installed no-document frame
-  was captured under `/tmp/foliaseal-installed-final-audit` and the process was terminated cleanly.
+  `qt_platform=xcb` startup all passed. An authenticated host installation of the same implementation
+  preceded the final lint-only cleanup; host `dpkg --audit`, installed Help, and a disposable installed
+  no-document frame under `/tmp/foliaseal-installed-final-audit` passed, with the process terminated
+  cleanly. The final lint-only commit changed no runtime behavior and its exact package is covered by
+  the fresh audit above.
 
 ## Surprises & Discoveries
 
@@ -196,7 +198,8 @@ an empty disabled signature selector, or a rail whose lower status/actions hide 
 and full-suite validation passed (`1607 passed, 20 skipped, 1 warning`); the real source-tree X11 audit
 completed signing, reopen/verify, and a second signature; and the final package from implementation
 commit `29b27916fa0cbaa77d8faf3503701b559b074479` passed offline, isolated-install, and display-backed audits.
-The exact package was installed and its no-document frame was captured and cleaned up. Orca,
+The audited implementation package was installed in the preceding authenticated session and its
+no-document frame was captured and cleaned up; the final post-install commit was lint-only. Orca,
 high-contrast, physical-DPI, monitor movement, and broader restricted/multi-page acceptance remain
 separate release-matrix gates and are not claimed by this slice.
 
