@@ -37,8 +37,8 @@ of the corrected document-open state.
   selection controls in the viewer toolbar and Edit menu; this slice must preserve those controls.
 - [x] `docs/ExecPlans/gui_surface_layout_correction_execplan.md` established the fixed PDF-first
   topology, adjustable 280–640 pixel rail bounds, and the existing geometry-test seam.
-- [ ] The source-tree and package acceptance plans must be rerun after implementation; their prior
-  green results do not certify this changed surface.
+- [x] The source-tree and package acceptance plans were rerun after implementation; their prior
+  green results were not used as certification for this changed surface.
 
 ## Progress
 
@@ -77,8 +77,12 @@ of the corrected document-open state.
   private-install-root, and display-backed startup checks.
 - [x] (2026-08-23) Added focused regression tests for copy retirement, restricted/unsigned/signed review
   states, 280-pixel rail geometry, readiness wording, chooser ordering, and cancel/accept behavior.
-- [ ] Run the full validation suite, rebuild the package, and repeat the
-  installed-package document-open review before closing this plan.
+- [x] (2026-08-23) Rebuilt and audited the final package from commit `45bec3135100777ecc1b732c78fbf0b50fecbe77`.
+  Final `.deb` SHA-256 is `764db47dd9c5e2d5169b3b07b1b68745207778d4bee4ae1579c6bc3da5521cf7`.
+  Offline extraction, isolated `dpkg --unpack`, Help/resources/dependency checks, and display-backed
+  `qt_platform=xcb` startup all passed. The exact package was installed with authenticated `pkexec
+  dpkg -i`; host `dpkg --audit` and installed Help passed. A disposable installed no-document frame
+  was captured under `/tmp/foliaseal-installed-final-audit` and the process was terminated cleanly.
 
 ## Surprises & Discoveries
 
@@ -186,12 +190,14 @@ of the corrected document-open state.
 
 ## Outcomes & Retrospective
 
-This plan is not complete yet. Its intended outcome is a corrected installed document-open surface
-that no longer presents duplicate copy concepts, empty disabled signature controls, or a rail whose
-lower status/actions hide the signing setup. The final retrospective must report the focused test
-count, full-suite result, source-tree X11 observations, package identity, installed-package result,
-and any remaining fixture/HITL gates. It must not claim that Orca, high-contrast, DPI, monitor, or
-signed/restricted/multi-page behavior passed merely because this layout slice passed.
+Completed 2026-08-23. The installed document-open surface no longer presents duplicate copy concepts,
+an empty disabled signature selector, or a rail whose lower status/actions hide signing setup. Focused
+and full-suite validation passed (`1607 passed, 20 skipped, 1 warning`); the real source-tree X11 audit
+completed signing, reopen/verify, and a second signature; and the final package from commit
+`45bec3135100777ecc1b732c78fbf0b50fecbe77` passed offline, isolated-install, and display-backed audits.
+The exact package was installed and its no-document frame was captured and cleaned up. Orca,
+high-contrast, physical-DPI, monitor movement, and broader restricted/multi-page acceptance remain
+separate release-matrix gates and are not claimed by this slice.
 
 ## Context and Orientation
 
@@ -398,3 +404,8 @@ that the no-document frame and keyboard reachability were good but the document-
 duplicate copy affordances, an over-reserved right rail, a confusing empty signature selector, and
 ambiguous output-path wording. The plan records the decision to retire the duplicate search-copy
 surface and correct the remaining findings in one bounded presentation/workflow slice.
+
+Revision note: 2026-08-23 / Codex: completed the implementation, two-wave compliance review,
+full-suite validation, source-tree X11 audit, final package rebuild/audit, authenticated installation,
+and installed no-document frame check. Updated governing UI/architecture documentation and recorded
+the exact final commit/checksum; all audit-owned processes and temporary roots were cleaned.

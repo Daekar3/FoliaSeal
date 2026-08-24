@@ -104,6 +104,14 @@ supporting evidence only.
   temporary HOME/XDG root, package/build roots, screenshots, and session markers, and verified that
   no session-owned FoliaSeal process or window remained. The installed package itself remains in place
   for the next corrected-package acceptance pass.
+- [x] (2026-08-23) The focused correction plan
+  `gui_document_review_copy_and_rail_density_execplan.md` completed: the duplicate sidebar copy
+  surface is retired, unsigned review is compact and explanatory, the rail is content-driven at the
+  legal minimum, and primary signing requests Save As before mutation when needed. Commit
+  `45bec3135100777ecc1b732c78fbf0b50fecbe77` was rebuilt as a final `.deb`, SHA-256
+  `764db47dd9c5e2d5169b3b07b1b68745207778d4bee4ae1579c6bc3da5521cf7`; offline, private-install,
+  display-backed, authenticated-install, and installed Help checks passed. The remaining work is the
+  ordered human release matrix, not AFK correction of this document-open slice.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not

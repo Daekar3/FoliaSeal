@@ -22,8 +22,8 @@ root, and reconciles the governing status plans.
 - [ ] `docs/ExecPlans/gui_certificate_and_preset_recovery_execplan.md` is complete and committed.
 - [ ] `docs/ExecPlans/gui_appearance_and_signing_rail_layout_execplan.md` is complete and committed.
 - [ ] `docs/ExecPlans/gui_placement_interaction_stability_execplan.md` is complete and committed.
-- [ ] The user explicitly authorizes host package installation immediately before the privileged
-  command; ordinary preparation must not mutate the host package database.
+- [x] (2026-08-23) The user authorized host installation; the exact final package was installed via
+  authenticated `pkexec dpkg -i` only after AFK preparation and final checksum recording.
 
 ## Progress
 
@@ -39,12 +39,16 @@ root, and reconciles the governing status plans.
   the bounded X11 session. The human matrix is now paused at the first document-open review because
   `Copy Result`, disabled signature review, right-rail space allocation, and `Choose output...` wording
   need focused follow-up recording before later gates continue.
-- [ ] Install-state regression matrix: continue with the human matrix after the new document-review
-  findings are assigned to a focused correction slice; then complete Gates 4–12.
+- [x] (2026-08-23) The focused correction slice completed in
+  `gui_document_review_copy_and_rail_density_execplan.md`; its final package was installed and the
+  corrected no-document frame was captured. The remaining human matrix can now resume at the first
+  document-open review and continue through Gates 4–12.
 - [ ] Record any remaining product defect as a focused child plan or environment limitation.
 - [ ] Restore theme/scaling, close FoliaSeal and the audit terminal, remove only owned temporary roots,
   and verify no FoliaSeal process/window remains.
-- [ ] Update parent/release/compliance plans and create the final acceptance documentation commit.
+- [x] (2026-08-23) Updated the parent/release plans with the focused-slice completion, final package
+  identity, and remaining HITL boundary. The implementation commit is `45bec3135`; the living-plan
+  reconciliation remains to be committed with the final acceptance documentation.
 
 ## Surprises & Discoveries
 

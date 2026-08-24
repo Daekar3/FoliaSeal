@@ -98,11 +98,15 @@ change classes.
   reason but lacks enough explanatory hierarchy; and the default right rail hides signing/presentation
   controls behind a poor scroll allocation with oversized action buttons and an ambiguous `Choose
   output...` label. These findings are recorded for Child 4 follow-up rather than treated as cosmetic.
-- [ ] Complete Child 4: installed-package regression matrix, documentation reconciliation, and final
-  acceptance record.
-- [ ] Run the full suite, compliance review, package validation, and final acceptance work in Child 4.
-- [ ] Update parent/release status plans and create the focused implementation/documentation commit;
-  Child 4 remains open for display-backed and human acceptance evidence.
+- [x] Complete the focused document-review correction slice (Child 4a): duplicate copy retirement,
+  compact unsigned review state, content-driven rail density, explicit save-path entry, documentation
+  reconciliation, and AFK/package evidence are complete in
+  `gui_document_review_copy_and_rail_density_execplan.md`.
+- [ ] Complete the remaining installed-package regression matrix and final HITL acceptance record.
+- [x] Run the full suite, two-wave compliance review, package validation, and source/install visual
+  evidence for Child 4a. The remaining Child 4 work is the ordered human release matrix.
+- [x] Update parent/release status plans and create the focused implementation commit
+  `45bec3135`; final living-plan reconciliation is recorded for the documentation commit below.
 
 ## Surprises & Discoveries
 
