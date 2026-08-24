@@ -420,8 +420,12 @@ class SigningWorkspaceSidebar:
         open_preserved_copy_button.clicked.connect(on_open_preserved_copy)  # type: ignore[attr-defined]
         layout.addWidget(choose_output_button)
         layout.addWidget(sign_button)
-        layout.addWidget(_compose_row(self._bindings, open_signed_output_button, verify_again_button))
-        layout.addWidget(_compose_row(self._bindings, return_to_draft_button, open_preserved_copy_button))
+        layout.addWidget(
+            _compose_row(self._bindings, open_signed_output_button, verify_again_button)
+        )
+        layout.addWidget(
+            _compose_row(self._bindings, return_to_draft_button, open_preserved_copy_button)
+        )
         status_layout.addWidget(journey_label)
         status_layout.addWidget(stage_label)
         status_layout.addWidget(detail_label)

@@ -293,7 +293,6 @@ def _assemble_signing_workspace_composition(
     sign_executor = request.sign_executor
     on_sign_request = request.on_sign_request
     on_open_signed_output = request.on_open_signed_output
-    on_copy_text = request.on_copy_text
     on_error = request.on_error
     on_status_change = request.on_status_change
     on_source_reload = request.on_source_reload
@@ -308,9 +307,7 @@ def _assemble_signing_workspace_composition(
     search_document_text = host_actions.search_document_text
     previous_document_text_match = host_actions.previous_document_text_match
     next_document_text_match = host_actions.next_document_text_match
-    set_document_text_selection_mode = host_actions.set_document_text_selection_mode
     copy_selected_document_text = host_actions.copy_selected_document_text
-    clear_selected_document_text = host_actions.clear_selected_document_text
     get_app_settings = host_actions.get_app_settings
     set_app_settings = host_actions.set_app_settings
     open_signature_library = (

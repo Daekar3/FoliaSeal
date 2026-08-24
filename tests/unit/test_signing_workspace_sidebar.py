@@ -253,8 +253,12 @@ def test_signing_workspace_sidebar_preserves_restricted_unsigned_guidance() -> N
 
     sidebar.apply_document_review_workspace_state(restricted_state)
 
-    assert sidebar.document_review_controls.headline_label.text() == "No embedded signatures"
-    assert "Adding a signature may be blocked" in sidebar.document_review_controls.detail_label.text()
+    assert sidebar.document_review_controls.headline_label.text() == (
+        "No embedded signatures"
+    )
+    assert "Adding a signature may be blocked" in (
+        sidebar.document_review_controls.detail_label.text()
+    )
     assert sidebar.document_review_controls.signature_selector.visible is False
     assert sidebar.document_review_controls.signature_selector_label.visible is False
 
