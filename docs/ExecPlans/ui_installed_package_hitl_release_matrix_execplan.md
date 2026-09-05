@@ -113,10 +113,28 @@ supporting evidence only.
   and display-backed checks passed. The authenticated host install and installed Help/no-document
   check covered the same implementation before the final lint-only cleanup; the remaining work is the
   ordered human release matrix, not AFK correction of this document-open slice.
+- [x] (2026-09-04) Human Gate 1 passed in the installed application. The no-document frame, shell
+  controls, keyboard traversal, top-level menus, focus behavior, and visible action enablement were
+  all reported usable.
+- [x] (2026-09-04) Human Gate 2 passed through certificate management: PDF opening, document review,
+  text search, match navigation, selected-text copy, and certificate creation/import/management were
+  usable. The former sidebar `Copy Result` check is retired by design; the duplicate search-match
+  action was removed, while `Copy selected text` remains the supported copy surface.
+- [ ] (2026-09-04) Selecting an existing signature preset caused an immediate severe resource/performance
+  spike. After creating a new certificate in the same session, the installed application aborted before
+  the next signing step. `coredumpctl` records SIGABRT in Qt6Pdf during `QPdfDocument::load`, reached
+  from a Qt timer callback. This is a release-blocking defect and requires a focused reproduction and
+  correction child before the remaining signing gates can continue. The current Qt panel also connects
+  both `currentTextChanged` and `currentIndexChanged` to the same preset-selection handler, which is a
+  strong duplicate-event lead but not yet a confirmed sole cause.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not
   create fixes for Qt warnings that do not affect observed behavior.
+- [x] (2026-09-04) Created and explorer-reviewed the focused
+  `gui_preset_pdf_lifecycle_stability_parent_execplan.md` family for the preset
+  resource spike and QtPdf abort; implementation and installed retest remain
+  open.
 - [ ] Reconcile the parent/release plans and commit the final release corpus.
 
 ## Surprises & Discoveries
@@ -151,13 +169,15 @@ supporting evidence only.
   `f6e431cc4`, so the previously installed `0.1.0` package cannot be treated as
   current-release evidence until a fresh package is built and identified by
   commit/checksum.
-- Observation: `Copy Result` copies the current text-search match span, not the
-  search query itself. The current match may happen to equal the query, making
-  the distinction invisible. Text-selection mode uses a separate viewer-toolbar
-  `Copy selected text` action and the Edit command path; the sidebar `Copy Result`
-  button does not change meaning when text-selection mode is active.
-  Evidence: `DocumentTextSearchSession.current_copy_text()` and
-  `SigningWorkspaceSidebar._build_document_text_controls()`.
+- Historical observation (before the focused correction): `Copy Result` copied
+  the current text-search match span, not the search query itself. The current
+  match could happen to equal the query, making the distinction invisible.
+  Text-selection mode used a separate viewer-toolbar `Copy selected text`
+  action and the Edit command path. The focused correction retired the sidebar
+  `Copy Result` surface; this historical behavior is not a current acceptance
+  requirement.
+  Evidence: `DocumentTextSearchSession.current_copy_text()` and the prior
+  `SigningWorkspaceSidebar._build_document_text_controls()` implementation.
 - Clarification: search is case-insensitive substring matching. The copied match
   preserves the extracted PDF text, so it can differ from the query's casing or
   extracted representation. A search highlight is not a text selection, however;
@@ -224,15 +244,11 @@ supporting evidence only.
   a confusing surface with later workflow results and could hide a release
   defect behind a successful signing operation.
   Date/Author: 2026-08-23 / Codex.
-- Decision: treat search-match copy and arbitrary selected-text copy as one
-  user-facing copy concept for the V1 surface unless a later usability test
-  demonstrates a strong need for both visible actions.
-  Rationale: the backend operations are technically distinct, but two prominent
-  copy buttons create a discoverability problem and do not represent two common
-  user intents. The focused correction should remove or demote `Copy Result`,
-  retain the clear `Copy selected text` affordance, and preserve search-match
-  copying in the application layer only if a secondary convenience action is
-  still justified.
+- Decision: the V1 surface retains only the clear `Copy selected text`
+  affordance; the sidebar `Copy Result` action is retired.
+  Rationale: two prominent copy buttons created a discoverability problem and
+  did not represent two common user intents. The implementation and current
+  HITL gate therefore treat the retired control’s absence as compliant.
   Date/Author: 2026-08-23 / Codex.
 
 ## Outcomes & Retrospective
@@ -432,3 +448,7 @@ Revision note: 2026-08-23 / Codex: recorded the fresh package audits, desktop-
 authenticated installation, and bounded visible no-document launch. The human
 matrix remains intentionally open; machine-rendered startup is not a substitute
 for visual, keyboard, Orca, or physical-DPI judgment.
+
+Revision note: 2026-09-04 / Codex: clarified that the historical `Copy Result`
+behavior predates its intentional retirement, and linked the new preset/PDF
+lifecycle stability family as a prerequisite to resuming Gate 2.

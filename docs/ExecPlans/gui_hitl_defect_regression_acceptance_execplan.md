@@ -22,6 +22,8 @@ root, and reconciles the governing status plans.
 - [ ] `docs/ExecPlans/gui_certificate_and_preset_recovery_execplan.md` is complete and committed.
 - [ ] `docs/ExecPlans/gui_appearance_and_signing_rail_layout_execplan.md` is complete and committed.
 - [ ] `docs/ExecPlans/gui_placement_interaction_stability_execplan.md` is complete and committed.
+- [ ] `docs/ExecPlans/gui_preset_pdf_lifecycle_stability_parent_execplan.md` and both of its children
+  must complete before the blocked Gate 2 preset/certificate path is retried.
 - [x] (2026-08-23) The user authorized host installation; the exact final package was installed via
   authenticated `pkexec dpkg -i` only after AFK preparation and final checksum recording.
 
@@ -49,6 +51,18 @@ root, and reconciles the governing status plans.
 - [x] (2026-08-23) Updated the parent/release plans with the focused-slice completion, final package
   identity, and remaining HITL boundary. The implementation commit is `29b27916f`; the living-plan
   reconciliation remains to be committed with the final acceptance documentation.
+- [x] (2026-09-04) Human Gate 1 passed, and Gate 2 passed through certificate management. The
+  document-open copy check is not a defect: `Copy Result` was intentionally removed as a duplicate of
+  the selected-text copy command.
+- [ ] (2026-09-04) Gate 2 was blocked after selecting an existing preset caused an immediate resource
+  spike and the installed process later aborted during certificate creation. The available coredump
+  shows SIGABRT inside Qt6Pdf while loading a document from a Qt timer callback. Preserve this as a
+  release-blocking defect; complete the focused preset-selection/PDF-lifecycle child family before
+  resuming the matrix. Do not treat the absence of `Copy Result` as a failure.
+- [x] (2026-09-04) The focused preset/PDF lifecycle parent and two children were authored and revised
+  after independent explorer review. They now require single-delivery counters, generated-preview load
+  accounting, callback correlation, stale-image fallback, and cleanup evidence before this acceptance
+  child resumes.
 
 ## Surprises & Discoveries
 

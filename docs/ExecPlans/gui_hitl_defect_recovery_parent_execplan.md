@@ -54,6 +54,9 @@ The external HITL evidence is embedded here so a novice can proceed without need
   correction slice; the final regression child must still certify placement behavior in the package.
 - [ ] `docs/ExecPlans/gui_hitl_defect_regression_acceptance_execplan.md` is intentionally last; it
   consumes all three correction children and the existing package audit plan.
+- [ ] `docs/ExecPlans/gui_preset_pdf_lifecycle_stability_parent_execplan.md` owns the newly observed
+  preset-selection resource spike and QtPdf abort; its two children must complete before the installed
+  regression matrix resumes.
 
 Children 1–3 may be investigated independently, but each child must finish its own focused tests,
 documentation update, and narrow commit before Child 4 starts. If two children discover a shared
@@ -103,6 +106,16 @@ change classes.
   reconciliation, and AFK/package evidence are complete in
   `gui_document_review_copy_and_rail_density_execplan.md`.
 - [ ] Complete the remaining installed-package regression matrix and final HITL acceptance record.
+- [x] (2026-09-04) The installed human pass confirmed Gate 1 and Gate 2 through certificate
+  management. The former `Copy Result` check is correctly retired: the sidebar duplicate was removed
+  and selected-text copy is the supported command.
+- [ ] (2026-09-04) The same pass exposed a release-blocking preset/PDF lifecycle failure: selecting
+  an existing preset caused an immediate resource spike, followed by an installed-process SIGABRT
+  during certificate creation. The coredump terminates in Qt6Pdf `QPdfDocument::load` from a Qt timer
+  callback. A focused reproduction/correction child is required before the remaining matrix gates.
+- [x] (2026-09-04) Created the focused stability family
+  `gui_preset_pdf_lifecycle_stability_parent_execplan.md` with separate preset-reentrancy and PDF-load
+  lifecycle children; independent explorer review is required before implementation.
 - [x] Run the full suite, two-wave compliance review, package validation, and source/install visual
   evidence for Child 4a. The remaining Child 4 work is the ordered human release matrix.
 - [x] Update parent/release status plans and create the focused implementation commit
