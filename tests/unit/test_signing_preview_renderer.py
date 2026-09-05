@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 from dataclasses import replace
 from pathlib import Path
@@ -6,8 +7,10 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+import foliaseal.application.signing_preview_renderer as signing_preview_renderer_module
 from foliaseal.application import compare_preview_to_request, render_signing_preview
 from foliaseal.application.coordinate_transform import PageBox
+from foliaseal.application.preview_render_boundary import PreviewRasterResult
 from foliaseal.application.sign_pdf_use_case import SigningBackendAppearance
 from foliaseal.application.signing_backend import (
     _BackendHorizontalInkMeasurer,
@@ -105,6 +108,51 @@ def test_renderer_removes_partial_temp_root_when_rasterizer_fails(tmp_path: Path
         if path.is_dir() and path.name.startswith("foliaseal-canonical-preview-")
     }
     assert roots <= before
+
+
+def test_canonical_preview_reuses_layout_and_bounds_generated_raster_requests(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    workflow.set_signature_appearance(build_signature_appearance(image_stamp_path=None))
+    workflow.set_signature_rect(build_signature_rect())
+    preview = workflow.preview()
+    layout_calls: list[dict[str, object]] = []
+    generated_pdf_roles: list[str] = []
+    original_layout = signing_preview_renderer_module._canonical_preview_layout
+
+    def _count_layout_calls(*args, **kwargs):
+        layout_calls.append(dict(kwargs))
+        return original_layout(*args, **kwargs)
+
+    class _CountingRenderer:
+        def render_page(self, request):
+            generated_pdf_roles.append(Path(request.document_path).stem)
+            return PreviewRasterResult(
+                width_px=32,
+                height_px=16,
+                rgba_bytes=bytes([255, 255, 255, 255]) * (32 * 16),
+            )
+
+    monkeypatch.setattr(
+        signing_preview_renderer_module,
+        "_canonical_preview_layout",
+        _count_layout_calls,
+    )
+    snapshot = render_canonical_signature_preview(
+        preview,
+        zoom=1.0,
+        render_port=_CountingRenderer(),
+        use_horizontal_ink_reservation=False,
+    )
+
+    assert snapshot is not None
+    try:
+        assert len(layout_calls) == 1
+        assert generated_pdf_roles == ["full", "text", "stamp"]
+    finally:
+        shutil.rmtree(Path(snapshot.image_path).parent, ignore_errors=True)
 
 
 def _rectangles_overlap(first: dict[str, int], second: dict[str, int]) -> bool:

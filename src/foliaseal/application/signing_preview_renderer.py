@@ -358,13 +358,6 @@ def _render_canonical_signature_preview_in_dir(
     ):
         return None
 
-    full_style = _canonical_preview_stamp_style(
-        preview,
-        include_text=True,
-        include_stamp=True,
-        include_border=include_border,
-        use_horizontal_ink_reservation=use_horizontal_ink_reservation,
-    )
     full_layout = _canonical_preview_layout(
         preview,
         include_text=True,
@@ -373,6 +366,11 @@ def _render_canonical_signature_preview_in_dir(
         render_port=render_port,
         use_horizontal_ink_reservation=use_horizontal_ink_reservation,
     )
+    # Reuse the layout (and any rendered-ink measurement it performed) for
+    # the full raster. Rebuilding the style independently repeats the
+    # canonical layout calculation and, for horizontal image stamps, can
+    # trigger another temporary PDF render before the visible preview starts.
+    full_style = full_layout.style
     full_render = _render_preview_style(
         style=full_style,
         signature_rect=preview.signature_rect,

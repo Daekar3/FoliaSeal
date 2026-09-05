@@ -116,6 +116,10 @@ change classes.
 - [x] (2026-09-04) Created the focused stability family
   `gui_preset_pdf_lifecycle_stability_parent_execplan.md` with separate preset-reentrancy and PDF-load
   lifecycle children; independent explorer review is required before implementation.
+- [x] (2026-09-04) Implemented the stability family’s AFK slice: preset delivery is single and guarded,
+  canonical preview layout preparation is reused, QtPdf load failures are explicit, and failed preview
+  snapshots are cleaned. Full validation and fresh package audits pass; the exact host-installed
+  preset/certificate retry remains the release-blocking HITL gate.
 - [x] Run the full suite, two-wave compliance review, package validation, and source/install visual
   evidence for Child 4a. The remaining Child 4 work is the ordered human release matrix.
 - [x] Update parent/release status plans and create the focused implementation commit

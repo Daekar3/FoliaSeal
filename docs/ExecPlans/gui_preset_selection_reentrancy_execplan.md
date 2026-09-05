@@ -15,7 +15,7 @@ preview once, without a CPU/RSS spike or repeated password prompt.
 
 - [x] The parent plan records the 2026-09-04 installed resource spike, QtPdf
   coredump, and duplicate-signal lead.
-- [ ] No dependency on the deeper PDF lifecycle child is required to implement
+- [x] No dependency on the deeper PDF lifecycle child is required to implement
   the single-delivery correction, but its load-count evidence consumes this
   child’s instrumentation results.
 
@@ -24,12 +24,14 @@ preview once, without a CPU/RSS spike or repeated password prompt.
 - [x] (2026-09-04) Located both signal connections at
   `signing_workspace_properties_panel.py:1064-1071` and the handler at
   `:1154-1183`.
-- [ ] Add a focused test that models one real Qt combo change and fails on two
+- [x] Added a focused test that models one real Qt combo change and fails on two
   handler/coordinator invocations.
-- [ ] Keep one appropriate signal connection and remove the duplicate path.
-- [ ] Add preview/load-count assertions, certificate-bearing preset coverage,
-  and separate viewer-refresh-count coverage.
-- [ ] Run focused and full validation; update the parent and acceptance plans.
+- [x] Kept `currentTextChanged` as the sole preset-selection signal, removed
+  the duplicate index path, and added an explicit reentrancy guard.
+- [x] Added exact preview/session/coordinator/password counts and a separate
+  viewer-refresh invariant.
+- [x] Focused tests and the full suite pass; parent and acceptance evidence
+  updates are in progress pending the installed HITL rerun.
 
 ## Surprises & Discoveries
 
@@ -62,6 +64,12 @@ canonical preview lifecycle refresh for one combo change. Viewer refresh count
 must remain unchanged by a preset selection. The slice must state whether PDF
 load counts also fell as expected and whether any remaining spike belongs to the
 separate lifecycle child.
+
+Implementation evidence (2026-09-04): `eed5c93da` removes the duplicate signal
+connection and the focused shell test observes exactly one handler, session,
+coordinator, canonical preview refresh, and certificate password prompt, with
+no viewer refresh. Full-suite validation is `1612 passed, 20 skipped, 1
+warning`; installed acceptance remains the only open gate.
 
 ## Context and Orientation
 
@@ -142,3 +150,6 @@ Revision note: 2026-09-04 / Codex — explorer review clarified that acceptance
 must count session/password calls and canonical preview refreshes separately
 from viewer refreshes, and must preserve placeholder/programmatic update
 coverage.
+
+Revision note: 2026-09-04 / Codex — implementation removed duplicate signal
+delivery, added the reentrancy guard, and recorded exact boundary counts.

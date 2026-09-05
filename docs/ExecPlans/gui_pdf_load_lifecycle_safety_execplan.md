@@ -17,7 +17,7 @@ native QtPdf abort.
 
 - [x] The parent plan records the coredump and the duplicate-signal resource
   hypothesis.
-- [ ] `gui_preset_selection_reentrancy_execplan.md` should complete first so
+- [x] `gui_preset_selection_reentrancy_execplan.md` completed first so
   load-count evidence is not dominated by known duplicate selection work.
 - [ ] The installed regression acceptance child consumes this plan’s result and
   must retest the package on Cinnamon/X11.
@@ -30,14 +30,20 @@ native QtPdf abort.
 - [x] (2026-09-04) Located Qt PDF load boundaries in
   `app_frame_workspace_open.py` and `infra/render/qt_backend.py`, plus shell
   timers in `signing_shell.py`.
-- [ ] Add temporary or test-only counters identifying each load path, timer or
-  queued callback, document path, generated preview role, and repeated refresh.
+- [x] (2026-09-04) Completed the load-boundary inventory: workspace page-count
+  loading, QtPdf render/geometry/link loads, generated canonical-preview
+  `full`/`text`/`stamp` requests, and the separate text-search/selection and
+  harness paths. Test-only counters cover backend load status and generated
+  preview roles without shipping runtime logging.
 - [ ] Reproduce preset-only, certificate-only, combined, and stale-image-preset
   cases with RSS/stderr/coredump evidence.
-- [ ] Implement and test the smallest lifecycle safeguard justified by the
-  reproduction.
-- [ ] Remove diagnostics, run full validation, and update the parent/release
-  plans with exact results.
+- [x] (2026-09-04) Implemented the smallest evidence-backed safeguards: reuse
+  one computed canonical layout per refresh and discard a snapshot when its
+  pixmap cannot be loaded; `_open_document()` reports failed QtPdf status
+  instead of returning an invalid document.
+- [x] (2026-09-04) No diagnostics were added to release code. Focused tests,
+  full validation, and package audits pass; the installed reproduction remains
+  pending host installation and the human preset/certificate sequence.
 
 ## Surprises & Discoveries
 
@@ -56,6 +62,10 @@ native QtPdf abort.
 - Observation: a persisted image-stamp preset references a missing external
   path. Preview fallback should be tested, but a handled missing image is not
   evidence of a native abort.
+- Observation: after layout reuse, the representative canonical preview emits
+  exactly three generated raster requests (`full`, `text`, `stamp`) and no
+  duplicate layout calculation. No evidence establishes concurrent QtPdf
+  loads; the remaining risk is installed runtime behavior.
 
 ## Decision Log
 
@@ -84,6 +94,15 @@ controlled reproduction did not reproduce it), show load/refresh counts before
 and after, and explain why the chosen safeguard prevents repeated, re-entrant,
 or otherwise runaway work. Installed Gate 2 preset/certificate acceptance is the
 final proof.
+
+Current evidence (2026-09-04): the pre-fix coredump remains the only native
+abort; the corrected full suite and fresh package audits do not reproduce it.
+Test-only fakes show one backend document load per `_open_document()` call and
+three bounded generated raster roles for the representative refresh; they do
+not claim a native QtPdf RSS measurement. The exact timer origin remains
+unproven, so no timer-specific change was made.
+Host installation and the human preset/certificate sequence are the remaining
+proof.
 
 ## Context and Orientation
 
@@ -183,3 +202,7 @@ Revision note: 2026-09-04 / Codex — explorer review corrected “overlapping
 loads” to distinguish repeated synchronous work from concurrency, expanded the
 load-boundary inventory, added callback correlation, and made generated-preview
 cleanup/stale-image behavior explicit.
+
+Revision note: 2026-09-04 / Codex — implementation reused the canonical layout
+computed for the full render, added generated-role/load-status regression
+coverage, and cleans failed pixmap snapshots without retaining temp roots.

@@ -127,6 +127,12 @@ supporting evidence only.
   correction child before the remaining signing gates can continue. The current Qt panel also connects
   both `currentTextChanged` and `currentIndexChanged` to the same preset-selection handler, which is a
   strong duplicate-event lead but not yet a confirmed sole cause.
+- [x] (2026-09-04) The focused stability implementation now removes duplicate preset delivery, reuses
+  one canonical preview layout per refresh, validates QtPdf load status, and cleans failed preview
+  snapshots. Full validation is `1612 passed, 20 skipped, 1 warning`; a fresh `0.1.0` package passed
+  offline, private-install-root, and display-backed X11 audits. The exact package remains in its
+  owned temporary evidence root (not committed); host installation and the repeat human
+  preset/certificate path remain pending.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not

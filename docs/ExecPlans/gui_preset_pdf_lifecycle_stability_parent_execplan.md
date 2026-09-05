@@ -50,8 +50,14 @@ family.
 - [x] (2026-09-04) Identified a concrete duplicate-event lead: the preset
   combo connects both `currentTextChanged` and `currentIndexChanged` to the
   same handler, and the repository fake emits both signals for one change.
-- [ ] Complete the preset-selection reentrancy child and its focused tests.
-- [ ] Complete the PDF-load lifecycle child and its focused tests/evidence.
+- [x] (2026-09-04) Completed the preset-selection reentrancy correction in
+  `eed5c93da`: one `currentTextChanged` delivery, an explicit reentrancy guard,
+  and exact handler/session/coordinator/password/preview/viewer call counts.
+- [x] (2026-09-04) Added the narrow PDF lifecycle safeguards in the corrected
+  checkout and their evidence:
+  `_open_document()` status handling, canonical-preview generated-role raster
+  counts, reuse of one computed preview layout per refresh, and cleanup when a
+  pixmap load fails. Focused lifecycle tests and the full suite pass.
 - [ ] Rebuild and install the exact corrected package, repeat Gate 2 preset and
   certificate workflow, and record the result in the release matrix.
 - [ ] Reconcile parent/release plans and commit the complete plan/evidence set.
@@ -70,6 +76,15 @@ family.
   under `/mnt/Fast Storage/...` that is absent on this host. This should remain
   a handled data-quality case, not an assumed native-crash cause.
   Evidence: the local profile catalog and preview fallback handling.
+- Observation: one representative canonical preview refresh emits three
+  generated raster requests (`full`, `text`, `stamp`), while the corrected
+  renderer computes its layout once. The previous code computed the same
+  layout twice before those requests, and horizontal image-stamp measurement
+  could add a nested reference render.
+  Evidence: `tests/unit/test_signing_preview_renderer.py::test_canonical_preview_reuses_layout_and_bounds_generated_raster_requests`.
+- Observation: the corrected full suite and fresh package audits do not
+  reproduce the native abort; installed preset/certificate behavior remains
+  unverified until the package is installed and exercised by HITL.
 - Observation: the coredump identifies QtPdf and a timer/event-loop boundary but
   not the originating Python callback. Instrumentation must distinguish
   source-safety, transaction polling, layout restoration, queued callbacks, and
@@ -168,6 +183,11 @@ include:
     .venv/bin/python scripts/deb_package_audit.py <fresh-deb> --artifacts-dir <owned-root>/offline
     .venv/bin/python scripts/deb_package_audit.py <fresh-deb> --artifacts-dir <owned-root>/install-root --package-manager-root <owned-root>/dpkg-root
     DISPLAY=:0 QT_QPA_PLATFORM=xcb .venv/bin/python scripts/deb_package_audit.py <fresh-deb> --artifacts-dir <owned-root>/x11 --display-backed
+
+Evidence captured on 2026-09-04: full suite `1612 passed, 20 skipped, 1
+warning`; offline and disposable-root package audits passed; the
+display-backed X11 audit passed with `gui_startup.status=started`. Host
+installation and the blocked human Gate 2 rerun remain pending.
 
 The human rerun uses `/usr/bin/foliaseal gui`, a disposable PDF, and disposable
 profile/certificate data. Record responsiveness, preset selection, certificate
