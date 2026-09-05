@@ -70,6 +70,10 @@ root, and reconciles the governing status plans.
   their focused correction is recorded in `gui_placement_interaction_stability_execplan.md` and
   `gui_appearance_same_name_edit_stability_execplan.md`. The matrix remains paused until both live
   gates pass.
+- [x] (2026-09-04) Source correction validated the placement-refresh boundary: same-page release skips
+  PDF refresh, cross-page release performs one refresh, and the full suite reports `1617 passed, 20
+  skipped, 1 warning`. A fresh package was rebuilt and passed the offline package audit; the installed
+  binary still needs replacement and a fresh Gate 2 retest.
 
 ## Surprises & Discoveries
 

@@ -68,6 +68,9 @@ family.
   commits and unchanged profile refreshes no longer regenerate canonical preview
   PDFs; same-name Appearance edits preserve identity and references. Focused and
   full validation pass; the fresh package is installed for live retest.
+- [x] (2026-09-04) Extended placement safeguards to retain cross-page navigation with
+  exactly one viewer refresh. Focused and full validation report `1617 passed, 20 skipped,
+  1 warning`; a fresh package was rebuilt and passed the offline package audit.
 - [ ] Confirm installed placement commit and Appearance edit/rename-back paths
   remain responsive and crash-free, then reconcile release plans.
 - [ ] Reconcile parent/release plans and commit the complete plan/evidence set.

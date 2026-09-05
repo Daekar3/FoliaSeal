@@ -142,9 +142,13 @@ supporting evidence only.
   placement refresh and same-name Appearance transaction before continuing.
 - [x] (2026-09-04) The focused correction now skips canonical PDF preview work for
   placement-only and unchanged profile refreshes, and same-name Appearance edits
-  update in place with stable IDs. Full validation is `1616 passed, 20 skipped,
+  update in place with stable IDs. Full validation is `1617 passed, 20 skipped,
   1 warning`; fresh package audits pass. Installed placement/edit acceptance is
   the remaining gate.
+- [x] (2026-09-04) Source validation now proves same-page rectangle release skips
+  PDF refresh while cross-page placement performs one refresh. Full validation is
+  `1617 passed, 20 skipped, 1 warning`; the rebuilt package passed the offline audit,
+  while the installed placement and Appearance gates remain pending until replacement.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not

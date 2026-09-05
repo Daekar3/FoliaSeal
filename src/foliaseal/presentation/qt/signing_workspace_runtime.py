@@ -550,11 +550,21 @@ class SigningWorkspaceRuntime:
 
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
         self._properties_panel_required().set_signature_rect(signature_rect, notify=False)
-        jump_to_page = getattr(self._viewer_workflow_required(), "jump_to_page", None)
-        if callable(jump_to_page):
-            jump_to_page(signature_rect.page_index)
+        viewer_workflow = self._viewer_workflow_required()
+        current_page = viewer_workflow.session.current_page
+        session_jump_to_page = getattr(viewer_workflow.session, "jump_to_page", None)
+        workflow_jump_to_page = getattr(viewer_workflow, "jump_to_page", None)
+        page_changed = signature_rect.page_index != current_page
+        if page_changed:
+            # ViewerWorkflow.jump_to_page() renders as a side effect. Prefer the
+            # session-only transition so the following widget refresh performs
+            # exactly one visible PDF render for cross-page placement.
+            if callable(session_jump_to_page):
+                session_jump_to_page(signature_rect.page_index)
+            elif callable(workflow_jump_to_page):
+                workflow_jump_to_page(signature_rect.page_index)
         refresh = getattr(self._viewer_widget_required(), "refresh", None)
-        if callable(refresh):
+        if page_changed and callable(refresh):
             refresh(navigation=True)
         placement_context = (
             self._viewer_interaction_session_required()
@@ -574,11 +584,17 @@ class SigningWorkspaceRuntime:
             signature_rect=signature_rect,
         )
         self._properties_panel_required().set_signature_rect(signature_rect, notify=False)
-        jump_to_page = getattr(self._viewer_workflow_required(), "jump_to_page", None)
-        if callable(jump_to_page):
-            jump_to_page(signature_rect.page_index)
+        viewer_workflow = self._viewer_workflow_required()
+        page_changed = signature_rect.page_index != viewer_workflow.session.current_page
+        session_jump_to_page = getattr(viewer_workflow.session, "jump_to_page", None)
+        workflow_jump_to_page = getattr(viewer_workflow, "jump_to_page", None)
+        if page_changed:
+            if callable(session_jump_to_page):
+                session_jump_to_page(signature_rect.page_index)
+            elif callable(workflow_jump_to_page):
+                workflow_jump_to_page(signature_rect.page_index)
         refresh = getattr(self._viewer_widget_required(), "refresh", None)
-        if callable(refresh):
+        if page_changed and callable(refresh):
             refresh(navigation=True)
         self.sync_signature_overlay()
         self._refresh_sign_button_state_required()()

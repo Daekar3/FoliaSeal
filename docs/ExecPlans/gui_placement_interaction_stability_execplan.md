@@ -51,6 +51,18 @@ signature rendering, or the frozen PDF-first topology.
   regeneration; the viewer-selection regression proves zero preview refreshes
   and preserves the explicit placement interaction plan. Full suite and lint
   validation pass; installed placement acceptance is pending.
+- [x] (2026-09-04) New installed HITL evidence reproduced an immediate resource
+  spike after rectangle release. Explorer review traced the remaining synchronous
+  work to `SigningWorkspaceRuntime.apply_signature_rect_placement()`, which
+  unconditionally reloads and rerenders the visible PDF even for same-page
+  placement.
+- [x] (2026-09-04) Removed the redundant same-page viewer refresh and retained
+  navigation plus one widget refresh only for cross-page placement. Focused
+  coverage proves same-page placement performs zero PDF refreshes while
+  cross-page placement performs one; full validation reports `1617 passed, 20
+  skipped, 1 warning`.
+- [ ] Rebuild and repeat the installed placement/edit retest; the installed
+  binary has not yet consumed this correction.
 
 ## Surprises & Discoveries
 
@@ -71,6 +83,14 @@ signature rendering, or the frozen PDF-first topology.
   transition or sustained X11 CPU behavior.
   Evidence: the focused tests use the existing fake session/viewer seams; the display-backed session is
   an explicit Child 4/HITL gate.
+- Observation: the first placement-stability correction suppressed the canonical
+  signature preview but left a full viewer refresh in the runtime placement
+  command. That refresh is unnecessary when the rectangle is drawn on the page
+  already visible and is the strongest current explanation for the live spike.
+  Evidence: `apply_signature_rect_placement()` calls `viewer.refresh(navigation=True)`
+  unconditionally; `ViewerWorkflow.render_current_page()` performs both raster
+  rendering and geometry loading, and the Qt backend creates a fresh `QPdfDocument`
+  for each operation.
 
 ## Decision Log
 
@@ -92,6 +112,14 @@ signature rendering, or the frozen PDF-first topology.
   truthful.
   Rationale: the command is an explicit recovery path required by the user and UI_SPEC.
   Date/Author: 2026-08-20 / Codex.
+- Decision: skip viewer reload/rasterization when applying a placement on the
+  currently visible page; retain the refresh only when placement changes the
+  visible page.
+  Rationale: pointer release already has the rendered page and overlay update;
+  same-page reload is redundant and crosses the native QtPdf load boundary that
+  caused the observed resource spike. Cross-page keyboard/programmatic placement
+  still needs navigation and exactly one fresh page render.
+  Date/Author: 2026-09-04 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -99,7 +127,9 @@ Initially pointer placement can work while adjustment crashes and keyboard behav
 At completion, the command must be safe across document/session replacement, placement overlay state,
 and repeated enter/exit cycles. Record measured drag/update behavior and whether the remaining CPU cost is
 an environment artifact or a product regression. Do not mark the child complete from a unit test that
-never mounts the real viewer lifecycle.
+never mounts the real viewer lifecycle. The current live failure remains open until the rebuilt installed
+binary demonstrates that same-page release no longer spikes resources and cross-page placement refreshes
+once.
 
 ## Context and Orientation
 

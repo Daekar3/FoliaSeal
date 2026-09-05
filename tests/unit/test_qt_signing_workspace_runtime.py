@@ -665,3 +665,22 @@ def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_
         ("overlay", bound.draft_workflow.signature_rect),
         ("refresh_sign_button_state", None),
     ]
+
+
+def test_same_page_placement_skips_pdf_refresh() -> None:
+    bound = _bind_runtime()
+    current_page = bound.viewer_workflow.session.current_page
+    rect = SignatureRect(
+        page_index=current_page,
+        left_pt=24.0,
+        bottom_pt=18.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+
+    bound.runtime.apply_signature_rect_placement(rect)
+
+    assert bound.viewer_workflow.jump_calls == []
+    assert bound.viewer_widget.refresh_calls == []
+    assert bound.viewer_widget.overlays == [bound.draft_workflow.signature_rect]
+    assert bound.refresh_sign_button_state_calls == ["refresh"]
