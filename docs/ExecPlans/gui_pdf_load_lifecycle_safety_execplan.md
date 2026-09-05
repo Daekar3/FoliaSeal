@@ -92,9 +92,15 @@ native QtPdf abort.
   is `1a153dd7...`; package SHA-256 is `57587617...`. The installed package is
   intentionally not overwritten by the agent because `dpkg` requires the user's
   visible sudo session.
-- [ ] Install the rebuilt package on Cinnamon/X11 and repeat the rectangle +
+- [x] (2026-09-05) Installed the rebuilt package on Cinnamon/X11 and repeated the rectangle +
   Single Left acceptance gate while observing CPU, disk writes,
   preview-directory churn, and coredump state.
+- [x] (2026-09-05) Installed package SHA-256 `1a153dd7...` was verified at
+  `/usr/lib/foliaseal/foliaseal`. After rectangle + Single Left, a 9-second
+  live observation held CPU at 3.1–3.4%, RSS near 259 MiB, unchanged process
+  I/O counters, and one stable canonical-preview directory. The window remained
+  open and no FoliaSeal coredump appeared. This confirms the idle-poll guard
+  removes the runaway work; final signing workflow acceptance remains separate.
 
 ## Surprises & Discoveries
 

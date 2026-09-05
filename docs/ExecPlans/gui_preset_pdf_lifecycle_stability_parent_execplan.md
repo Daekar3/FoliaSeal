@@ -82,8 +82,12 @@ family.
 - [x] (2026-09-05) Implemented the next timer-safety correction in the working
   tree: idle transaction polls no longer reload signing readiness, while active
   transactions continue to deliver queued worker completion through the typed
-  coordinator/boundary activity state. Focused validation, package installation,
-  and the installed placement retest remain open.
+  coordinator/boundary activity state. Focused validation and package rebuild
+  are complete.
+- [x] (2026-09-05) Installed the guarded package on Cinnamon/X11 and repeated
+  rectangle + Single Left. CPU remained ~3.1–3.4%, process I/O stayed flat, and
+  no FoliaSeal coredump appeared. The timer-loop defect is closed; the broader
+  placement/Appearance edit and rename-back acceptance remains tracked above.
 
 ## Surprises & Discoveries
 
@@ -105,13 +109,12 @@ family.
   layout twice before those requests, and horizontal image-stamp measurement
   could add a nested reference render.
   Evidence: `tests/unit/test_signing_preview_renderer.py::test_canonical_preview_reuses_layout_and_bounds_generated_raster_requests`.
-- Observation: the corrected full suite and fresh package audits do not
-  reproduce the native abort; installed preset/certificate behavior remains
-  unverified until the package is installed and exercised by HITL.
-- Observation: the coredump identifies QtPdf and a timer/event-loop boundary but
-  not the originating Python callback. Instrumentation must distinguish
-  source-safety, transaction polling, layout restoration, queued callbacks, and
-  viewer refresh activity.
+- Observation: the guarded package was installed and exercised after rectangle
+  + Single Left selection. The process stayed responsive at ~3.1–3.4% CPU with
+  flat I/O and no new FoliaSeal coredump, confirming the idle transaction-poll
+  path was the runaway caller.
+- Observation: the remaining open acceptance is the broader placement and
+  Appearance edit/rename-back sequence, not the idle timer loop.
 
 ## Decision Log
 

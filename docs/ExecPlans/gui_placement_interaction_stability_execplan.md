@@ -99,10 +99,13 @@ signature rendering, or the frozen PDF-first topology.
 - [x] (2026-09-05) The typed idle-poll guard is implemented in the working tree:
   coordinator activity is exposed through the action boundary, and idle bridge
   polls no longer reload readiness. Focused regression coverage was added for
-  idle and active polling; package rebuild and installed retest remain open.
+  idle and active polling; package rebuild is complete and installed retest is
+  recorded below.
 - [x] (2026-09-05) Rebuilt the distributable with the timer guard (bundle SHA-256
   `1a153dd7...`; package SHA-256 `57587617...`). Installation and live placement
-  acceptance remain the external HITL gate.
+  acceptance completed on Cinnamon/X11: CPU stayed ~3.1–3.4%, process I/O was
+  unchanged, and no new FoliaSeal coredump appeared during a 9-second
+  rectangle + Single Left observation.
 
 ## Surprises & Discoveries
 
