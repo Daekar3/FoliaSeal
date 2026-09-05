@@ -78,6 +78,12 @@ signature rendering, or the frozen PDF-first topology.
   PDF generation; full validation reports `1618 passed, 20 skipped, 1 warning`.
 - [ ] Rebuild/install this stronger correction and repeat the live placement /
   profile-selection gate while confirming preview files stop changing.
+- [x] (2026-09-05) The installed package matched the resize-reflow correction but
+  still regenerated the same canonical preview every ~2 seconds. Added a
+  preview/layout-key cache at `_update_preview_controls()` so identical requests
+  reuse the existing snapshot regardless of callback origin. Full suite remains
+  green (`1618 passed, 20 skipped, 1 warning`).
+- [ ] Rebuild/install the render-key correction and reobserve the live workflow.
 
 ## Surprises & Discoveries
 

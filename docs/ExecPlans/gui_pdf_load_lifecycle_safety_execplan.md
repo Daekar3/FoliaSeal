@@ -57,6 +57,11 @@ native QtPdf abort.
   new canonical-preview directories. The resize path now reapplies layout using
   the existing render state, eliminating canonical PDF generation from resize
   callbacks. Full validation is `1618 passed, 20 skipped, 1 warning`.
+- [x] (2026-09-05) The installed resize guard did not stop repeated identical
+  canonical renders. Added a preview/layout-key cache at the canonical update
+  boundary so duplicate requests reuse the live snapshot and cannot create fresh
+  temporary PDFs. Full validation remains `1618 passed, 20 skipped, 1 warning`;
+  installed confirmation is pending.
 
 ## Surprises & Discoveries
 

@@ -428,6 +428,7 @@ class SignaturePropertiesPanel:
         self._preview_layout = QtSignaturePreviewLayout(bindings=bindings)
         self._last_preview: SigningDraftPreview | None = None
         self._last_canonical_render_state: CanonicalPreviewRenderState | None = None
+        self._last_canonical_render_key: tuple[Any, float, int, int] | None = None
         self._last_preview_resize_size: tuple[int | None, int | None] | None = None
         self._preview_resize_refresh_in_progress = False
         self.widget = _build_close_aware_widget(
@@ -1234,13 +1235,27 @@ class SignaturePropertiesPanel:
             preview=preview,
             controls=self._preview_controls,
         )
-        canonical_render_state = self._canonical_preview_lifecycle.refresh(
-            preview=preview,
-            preview_scale=layout_state.preview_scale,
-            inner_body_width=layout_state.inner_body_size[0],
-            inner_body_height=layout_state.inner_body_size[1],
-            fallback_card_style=layout_state.fallback_card_style,
+        render_key = (
+            preview,
+            layout_state.preview_scale,
+            layout_state.inner_body_size[0],
+            layout_state.inner_body_size[1],
         )
+        if (
+            render_key == self._last_canonical_render_key
+            and self._last_canonical_render_state is not None
+        ):
+            canonical_render_state = self._last_canonical_render_state
+        else:
+            canonical_render_state = self._canonical_preview_lifecycle.refresh(
+                preview=preview,
+                preview_scale=layout_state.preview_scale,
+                inner_body_width=layout_state.inner_body_size[0],
+                inner_body_height=layout_state.inner_body_size[1],
+                fallback_card_style=layout_state.fallback_card_style,
+            )
+            if canonical_render_state.snapshot is not None:
+                self._last_canonical_render_key = render_key
         self._last_canonical_render_state = canonical_render_state
         self._preview_layout.apply(
             preview=preview,
