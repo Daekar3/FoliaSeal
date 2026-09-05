@@ -124,6 +124,9 @@ change classes.
   selection and explicit no-auto-place. The next release-blocking failures are placement-rectangle
   release (resource spike followed by QtPdf abort) and same-name Appearance edit/rename-back; the
   focused `gui_appearance_same_name_edit_stability_execplan.md` now owns the latter.
+- [x] (2026-09-04) The placement correction now skips PDF refresh for same-page release and performs
+  one navigation/render refresh for cross-page placement. Focused and full validation pass with
+  `1617 passed, 20 skipped, 1 warning`; installed-package retest is still required.
 - [x] Run the full suite, two-wave compliance review, package validation, and source/install visual
   evidence for Child 4a. The remaining Child 4 work is the ordered human release matrix.
 - [x] Update parent/release status plans and create the focused implementation commit

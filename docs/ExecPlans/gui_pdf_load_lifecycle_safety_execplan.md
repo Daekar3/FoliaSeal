@@ -42,9 +42,11 @@ native QtPdf abort.
   pixmap cannot be loaded; `_open_document()` reports failed QtPdf status
   instead of returning an invalid document.
 - [x] (2026-09-04) No diagnostics were added to release code. Focused tests,
-  full validation, and package audits pass; the corrected `0.1.0` package is
-  installed and launched on Cinnamon/X11, while the human placement and
-  Appearance-edit sequence remains pending.
+  full validation, and package audits pass; placement tests prove same-page
+  placement skips the PDF refresh and cross-page placement performs one. The
+  full suite reports `1617 passed, 20 skipped, 1 warning`; the installed
+  placement/Appearance retest remains pending because the package predates this
+  correction.
 
 ## Surprises & Discoveries
 
@@ -102,8 +104,8 @@ Test-only fakes show one backend document load per `_open_document()` call and
 three bounded generated raster roles for the representative refresh; they do
 not claim a native QtPdf RSS measurement. The exact timer origin remains
 unproven, so no timer-specific change was made.
-Host installation and the human preset/certificate sequence are the remaining
-proof.
+Host installation and the human placement/Appearance sequence are the remaining
+proof; the source correction is intentionally not treated as installed evidence.
 
 ## Context and Orientation
 

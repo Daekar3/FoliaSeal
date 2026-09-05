@@ -39,7 +39,7 @@ not redesign the Appearance editor, change profile schemas, or replace the PDF b
   collisions, rename-away/rename-back identity, and dependent preset references.
 - [x] (2026-09-04) Implemented identity-aware Appearance duplicate handling and skipped expensive
   preview regeneration for placement-only updates and unchanged profile refreshes.
-- [x] (2026-09-04) Focused suites pass (`183 passed`); full suite passes (`1616 passed, 20 skipped,
+- [x] (2026-09-04) Focused suites pass (`183 passed`); full suite passes (`1617 passed, 20 skipped,
   1 warning`), and Ruff/compileall/diff checks are clean. Fresh package audits pass.
 - [x] (2026-09-04) Fresh package executable SHA-256 is `ae2e2cca...fe797`; the
   package is installed over the prior `0.1.0` and `/usr/bin/foliaseal` launched
