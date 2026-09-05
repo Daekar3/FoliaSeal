@@ -54,15 +54,22 @@ root, and reconciles the governing status plans.
 - [x] (2026-09-04) Human Gate 1 passed, and Gate 2 passed through certificate management. The
   document-open copy check is not a defect: `Copy Result` was intentionally removed as a duplicate of
   the selected-text copy command.
-- [ ] (2026-09-04) Gate 2 was blocked after selecting an existing preset caused an immediate resource
-  spike and the installed process later aborted during certificate creation. The available coredump
-  shows SIGABRT inside Qt6Pdf while loading a document from a Qt timer callback. Preserve this as a
-  release-blocking defect; complete the focused preset-selection/PDF-lifecycle child family before
-  resuming the matrix. Do not treat the absence of `Copy Result` as a failure.
+- [x] (2026-09-04) The corrected package passed Gate 2 through explicit preset,
+  certificate, appearance, and placement-profile selection without auto-place.
+  The former `Copy Result` check remains retired by design.
+- [ ] (2026-09-04) Gate 2 now fails at rectangle release: resource use spikes and
+  the installed process aborts in Qt6Pdf during the synchronous placement refresh
+  chain. The same session rejects saving an edited Appearance under its existing
+  name and later crashes when renaming it back. Add focused placement-refresh and
+  same-name Appearance transaction children before resuming the matrix.
 - [x] (2026-09-04) The focused preset/PDF lifecycle parent and two children were authored and revised
   after independent explorer review. They now require single-delivery counters, generated-preview load
   accounting, callback correlation, stale-image fallback, and cleanup evidence before this acceptance
   child resumes.
+- [x] (2026-09-04) The installed retest exposed placement-release and same-name Appearance failures;
+  their focused correction is recorded in `gui_placement_interaction_stability_execplan.md` and
+  `gui_appearance_same_name_edit_stability_execplan.md`. The matrix remains paused until both live
+  gates pass.
 
 ## Surprises & Discoveries
 

@@ -58,8 +58,18 @@ family.
   `_open_document()` status handling, canonical-preview generated-role raster
   counts, reuse of one computed preview layout per refresh, and cleanup when a
   pixmap load fails. Focused lifecycle tests and the full suite pass.
-- [ ] Rebuild and install the exact corrected package, repeat Gate 2 preset and
-  certificate workflow, and record the result in the release matrix.
+- [x] (2026-09-04) Rebuilt and installed the exact corrected Debian package
+  (`0.1.0`); `/usr/bin/foliaseal` matches the artifact executable SHA-256
+  (`645be985...cfb4f`), and the installed GUI launched on Cinnamon/X11.
+- [x] (2026-09-04) The corrected installed session passed preset selection,
+  certificate management, appearance/certificate/placement profile selection,
+  and the explicit no-auto-place check.
+- [x] (2026-09-04) Implemented bounded placement/profile safeguards: placement
+  commits and unchanged profile refreshes no longer regenerate canonical preview
+  PDFs; same-name Appearance edits preserve identity and references. Focused and
+  full validation pass; the fresh package is installed for live retest.
+- [ ] Confirm installed placement commit and Appearance edit/rename-back paths
+  remain responsive and crash-free, then reconcile release plans.
 - [ ] Reconcile parent/release plans and commit the complete plan/evidence set.
 
 ## Surprises & Discoveries
@@ -184,10 +194,10 @@ include:
     .venv/bin/python scripts/deb_package_audit.py <fresh-deb> --artifacts-dir <owned-root>/install-root --package-manager-root <owned-root>/dpkg-root
     DISPLAY=:0 QT_QPA_PLATFORM=xcb .venv/bin/python scripts/deb_package_audit.py <fresh-deb> --artifacts-dir <owned-root>/x11 --display-backed
 
-Evidence captured on 2026-09-04: full suite `1612 passed, 20 skipped, 1
-warning`; offline and disposable-root package audits passed; the
-display-backed X11 audit passed with `gui_startup.status=started`. Host
-installation and the blocked human Gate 2 rerun remain pending.
+Evidence captured on 2026-09-04: full suite `1616 passed, 20 skipped, 1
+warning`; offline, disposable-root, and display-backed package audits passed
+with `gui_startup.status=started`. The corrected package is installed and the
+placement/Appearance human retest remains pending.
 
 The human rerun uses `/usr/bin/foliaseal gui`, a disposable PDF, and disposable
 profile/certificate data. Record responsiveness, preset selection, certificate

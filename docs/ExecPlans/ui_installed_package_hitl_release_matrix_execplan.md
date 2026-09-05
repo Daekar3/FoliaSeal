@@ -133,6 +133,18 @@ supporting evidence only.
   offline, private-install-root, and display-backed X11 audits. The exact package remains in its
   owned temporary evidence root (not committed); host installation and the repeat human
   preset/certificate path remain pending.
+- [x] (2026-09-04) The corrected installed package passed the repeated Gate 2
+  path through profile selection and the explicit no-auto-place check. It then
+  failed on placement rectangle release with an immediate resource spike and a
+  native QtPdf abort; editing an Appearance under its existing name was rejected
+  as a duplicate, and renaming it back to the original name crashed the process.
+  Preserve this as a release-blocking result and create focused children for the
+  placement refresh and same-name Appearance transaction before continuing.
+- [x] (2026-09-04) The focused correction now skips canonical PDF preview work for
+  placement-only and unchanged profile refreshes, and same-name Appearance edits
+  update in place with stable IDs. Full validation is `1616 passed, 20 skipped,
+  1 warning`; fresh package audits pass. Installed placement/edit acceptance is
+  the remaining gate.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not

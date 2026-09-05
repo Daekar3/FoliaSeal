@@ -42,8 +42,9 @@ native QtPdf abort.
   pixmap cannot be loaded; `_open_document()` reports failed QtPdf status
   instead of returning an invalid document.
 - [x] (2026-09-04) No diagnostics were added to release code. Focused tests,
-  full validation, and package audits pass; the installed reproduction remains
-  pending host installation and the human preset/certificate sequence.
+  full validation, and package audits pass; the corrected `0.1.0` package is
+  installed and launched on Cinnamon/X11, while the human placement and
+  Appearance-edit sequence remains pending.
 
 ## Surprises & Discoveries
 

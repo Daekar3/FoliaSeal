@@ -589,7 +589,7 @@ class ReusableSigningObjects:
             self._check_duplicate(
                 catalog.appearance_profiles,
                 name,
-                command.overwrite,
+                command.overwrite or existing_by_id is not None,
                 "Appearance",
             )
             return catalog.upsert_appearance_profile(profile)

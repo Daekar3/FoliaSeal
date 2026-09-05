@@ -47,6 +47,10 @@ signature rendering, or the frozen PDF-first topology.
 - [ ] Run the final full-suite/package and human acceptance checks in Child 4.
 - [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
   final package and human acceptance remain tracked in Child 4.
+- [x] (2026-09-04) Placement-only panel updates now skip canonical preview
+  regeneration; the viewer-selection regression proves zero preview refreshes
+  and preserves the explicit placement interaction plan. Full suite and lint
+  validation pass; installed placement acceptance is pending.
 
 ## Surprises & Discoveries
 

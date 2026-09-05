@@ -300,6 +300,32 @@ def test_document_independent_appearance_editor_edit_preserves_identity_and_canc
     assert profile.appearance.signer_label_prefix == "Changed"
 
 
+def test_document_independent_appearance_editor_same_name_updates_in_place() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    original = service.view().appearances[0]
+    service.execute(SavePreset("Contract", appearance_profile_id=original.ref.object_id))
+    errors: list[str] = []
+    editor = AppearanceProfileEditorDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        initial_ref=original.ref,
+        on_error=errors.append,
+    )
+    editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Changed")
+    editor.controls.save_button.click()
+
+    updated = service.view().appearances[0]
+    assert errors == []
+    assert updated.ref == original.ref
+    assert updated.display_name == "Approval"
+    assert service.resolve(original.ref).appearance.signer_label_prefix == "Changed"
+    assert service.view().presets[0].details.startswith("Appearance: Approval")
+
+
 def test_library_exposes_appearance_create_and_edit_actions() -> None:
     service = ReusableSigningObjects(
         InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))

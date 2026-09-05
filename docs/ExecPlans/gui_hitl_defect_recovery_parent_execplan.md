@@ -120,6 +120,10 @@ change classes.
   canonical preview layout preparation is reused, QtPdf load failures are explicit, and failed preview
   snapshots are cleaned. Full validation and fresh package audits pass; the exact host-installed
   preset/certificate retry remains the release-blocking HITL gate.
+- [x] (2026-09-04) The corrected installed package passed the repeated Gate 2 path through profile
+  selection and explicit no-auto-place. The next release-blocking failures are placement-rectangle
+  release (resource spike followed by QtPdf abort) and same-name Appearance edit/rename-back; the
+  focused `gui_appearance_same_name_edit_stability_execplan.md` now owns the latter.
 - [x] Run the full suite, two-wave compliance review, package validation, and source/install visual
   evidence for Child 4a. The remaining Child 4 work is the ordered human release matrix.
 - [x] Update parent/release status plans and create the focused implementation commit

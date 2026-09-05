@@ -270,6 +270,52 @@ def test_duplicate_save_requires_overwrite_and_failed_write_keeps_catalog(tmp_pa
     assert all(item.display_name != "New" for item in service.view().appearances)
 
 
+def test_same_id_appearance_edit_allows_same_name_and_preserves_preset_reference(
+    tmp_path: Path,
+) -> None:
+    service = ReusableSigningObjects(SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"))
+    original = build_signature_appearance()
+    changed = build_signature_appearance(signer_label_prefix="Changed")
+    service.execute(SaveAppearance("Approval", original))
+    appearance_ref = service.view().appearances[0].ref
+    service.execute(SavePreset("Contract", appearance_profile_id=appearance_ref.object_id))
+
+    service.execute(
+        SaveAppearance(
+            "Approval",
+            changed,
+            appearance_profile_id=appearance_ref.object_id,
+        )
+    )
+
+    resolved = service.resolve(appearance_ref)
+    assert resolved.appearance == changed
+    assert service.view().presets[0].details.startswith("Appearance: Approval")
+    assert service.view().appearances[0].ref == appearance_ref
+
+
+def test_appearance_rename_away_and_back_preserves_identity_and_references(tmp_path: Path) -> None:
+    events: list[ReusableObjectMutation] = []
+    service = ReusableSigningObjects(
+        SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+        on_mutation=events.append,
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    appearance_ref = service.view().appearances[0].ref
+    service.execute(SavePreset("Contract", appearance_profile_id=appearance_ref.object_id))
+
+    service.execute(RenameObject(ref=appearance_ref, new_name="Temporary"))
+    service.execute(RenameObject(ref=appearance_ref, new_name="Approval"))
+
+    assert service.view().appearances[0].ref == appearance_ref
+    assert service.view().appearances[0].display_name == "Approval"
+    assert service.view().presets[0].details.startswith("Appearance: Approval")
+    assert [(event.ref, event.materially_changed) for event in events[-2:]] == [
+        (appearance_ref, False),
+        (appearance_ref, False),
+    ]
+
+
 def test_names_are_case_insensitively_unique_and_duplicate_starts_unpinned(tmp_path: Path) -> None:
     service = ReusableSigningObjects(SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"))
     service.execute(SaveAppearance("Approval", build_signature_appearance()))

@@ -667,8 +667,8 @@ class SignaturePropertiesPanel:
         if callable(raise_widget):
             raise_widget()
 
-    def load_from_workflow(self) -> None:
-        self._render_setup_state()
+    def load_from_workflow(self, *, refresh_preview: bool = True) -> None:
+        self._render_setup_state(refresh_preview=refresh_preview)
 
     def load_setup_state(self) -> SignaturePropertiesViewState:
         """Return the current setup through the shell-facing capability boundary."""
@@ -697,10 +697,12 @@ class SignaturePropertiesPanel:
     def _render_setup_state(
         self,
         state: SignaturePropertiesViewState | None = None,
+        *,
+        refresh_preview: bool = True,
     ) -> SigningDraftPreview:
         if state is None:
             state = self._setup_session.load(control_issue=self._control_issue)
-        return self._apply_coordinator_state(state)
+        return self._apply_coordinator_state(state, refresh_preview=refresh_preview)
 
     def _build_preview_controls(self) -> PreviewControls:
         bindings = self._bindings
@@ -864,7 +866,10 @@ class SignaturePropertiesPanel:
                 self._setup_form.set_placement_enabled(True)
         finally:
             self._suspend_updates = False
-        self.load_from_workflow()
+        # Placement-only changes do not alter the appearance preview. When
+        # the caller suppresses notification (the viewer interaction path),
+        # avoid synchronously rebuilding generated preview PDFs here.
+        self.load_from_workflow(refresh_preview=notify)
         if notify:
             self._notify_change()
 
@@ -889,7 +894,13 @@ class SignaturePropertiesPanel:
         state = self._setup_session.refresh_catalogs(
             control_issue=self._control_issue,
         )
-        self._apply_coordinator_state(state)
+        # Catalog-only mutations such as rename/pin do not change the active
+        # document or appearance. Re-rendering the synthetic preview here
+        # would synchronously reopen several temporary PDFs and can re-enter
+        # QtPdf while a library button is being handled. Refresh only when the
+        # projected preview actually changed.
+        refresh_preview = self._last_preview is None or state.preview != self._last_preview
+        self._apply_coordinator_state(state, refresh_preview=refresh_preview)
         return state
 
     def save_current_signature_preset(self) -> SignaturePropertiesViewState | None:
@@ -1243,6 +1254,8 @@ class SignaturePropertiesPanel:
     def _apply_coordinator_state(
         self,
         state: SignaturePropertiesViewState,
+        *,
+        refresh_preview: bool = True,
     ) -> SigningDraftPreview:
         self._suspend_updates = True
         try:
@@ -1261,7 +1274,10 @@ class SignaturePropertiesPanel:
         finally:
             self._suspend_updates = False
         preview = state.preview
-        self._update_preview_controls(preview)
+        if refresh_preview:
+            self._update_preview_controls(preview)
+        else:
+            self._last_preview = preview
         if state.certificate_readiness is not None:
             _set_widget_text(
                 self._certificate_controls.helper_label,

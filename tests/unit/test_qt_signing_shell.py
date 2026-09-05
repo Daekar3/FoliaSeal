@@ -994,6 +994,42 @@ def test_signing_shell_close_aware_widget_exports_profile_refresh(
     assert callable(widget.refresh_signature_profiles)
 
 
+def test_signature_profile_refresh_skips_pdf_preview_when_projection_is_unchanged(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    calls: list[str] = []
+    original = widget.properties_panel._canonical_preview_lifecycle.refresh
+
+    def _spy_preview(**kwargs):
+        calls.append("preview")
+        return original(**kwargs)
+
+    monkeypatch.setattr(
+        widget.properties_panel._canonical_preview_lifecycle,
+        "refresh",
+        _spy_preview,
+    )
+    widget.refresh_signature_profiles()
+
+    assert calls == []
+
+
 def test_signing_shell_output_path_overwrite_cancel_keeps_existing_state(
     monkeypatch,
     tmp_path: Path,
@@ -4911,7 +4947,9 @@ def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition
         signing_workflow=_workflow(tmp_path),
     )
     calls: list[str] = []
+    preview_calls: list[str] = []
     original = signing_shell_module.WorkspaceInteractionSession.refresh_after_panel_change
+    original_preview = widget.properties_panel._canonical_preview_lifecycle.refresh
 
     def _spy_refresh_after_panel_change(self):
         calls.append("panel")
@@ -4923,6 +4961,16 @@ def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition
         _spy_refresh_after_panel_change,
     )
 
+    def _spy_preview(**kwargs):
+        preview_calls.append("preview")
+        return original_preview(**kwargs)
+
+    monkeypatch.setattr(
+        widget.properties_panel._canonical_preview_lifecycle,
+        "refresh",
+        _spy_preview,
+    )
+
     widget.set_signature_rect(
         page_index=0,
         left_pt=24.0,
@@ -4932,6 +4980,7 @@ def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition
     )
 
     assert calls == ["panel"]
+    assert preview_calls == ["preview"]
 
 
 def test_signing_shell_viewer_selection_does_not_route_rect_application_back_through_panel_refresh(
@@ -4954,7 +5003,9 @@ def test_signing_shell_viewer_selection_does_not_route_rect_application_back_thr
         signing_workflow=_workflow(tmp_path),
     )
     calls: list[str] = []
+    preview_calls: list[str] = []
     original = signing_shell_module.WorkspaceInteractionSession.refresh_after_panel_change
+    original_preview = widget.properties_panel._canonical_preview_lifecycle.refresh
 
     def _spy_refresh_after_panel_change(self):
         calls.append("panel")
@@ -4966,11 +5017,22 @@ def test_signing_shell_viewer_selection_does_not_route_rect_application_back_thr
         _spy_refresh_after_panel_change,
     )
 
+    def _spy_preview(**kwargs):
+        preview_calls.append("preview")
+        return original_preview(**kwargs)
+
+    monkeypatch.setattr(
+        widget.properties_panel._canonical_preview_lifecycle,
+        "refresh",
+        _spy_preview,
+    )
+
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=20.0))
 
     rect = widget.signature_rect()
     assert rect is not None
     assert calls == []
+    assert preview_calls == []
 
 
 def test_signing_shell_blank_preset_selection_uses_clear_selected_preset_path(

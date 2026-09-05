@@ -537,13 +537,19 @@ class SigningWorkspaceRuntime:
             height_pt=height_pt,
         )
         self._properties_panel_required().set_signature_rect(signature_rect, notify=False)
+        # This explicit testing/programmatic setter promises a fully rendered
+        # preview; interactive placement uses apply_signature_rect_placement()
+        # and deliberately avoids this expensive PDF regeneration.
+        refresh_preview = getattr(self._properties_panel_required(), "refresh_preview", None)
+        if callable(refresh_preview):
+            refresh_preview()
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_after_panel_change()
         )
         return signature_rect
 
     def apply_signature_rect_placement(self, signature_rect: SignatureRect) -> None:
-        self._properties_panel_required().set_signature_rect(signature_rect)
+        self._properties_panel_required().set_signature_rect(signature_rect, notify=False)
         jump_to_page = getattr(self._viewer_workflow_required(), "jump_to_page", None)
         if callable(jump_to_page):
             jump_to_page(signature_rect.page_index)

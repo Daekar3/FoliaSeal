@@ -30,8 +30,10 @@ preview once, without a CPU/RSS spike or repeated password prompt.
   the duplicate index path, and added an explicit reentrancy guard.
 - [x] Added exact preview/session/coordinator/password counts and a separate
   viewer-refresh invariant.
-- [x] Focused tests and the full suite pass; parent and acceptance evidence
-  updates are in progress pending the installed HITL rerun.
+- [x] Focused tests and the full suite pass; the corrected `0.1.0` package is
+  installed and its GUI launched on Cinnamon/X11 for the pending HITL rerun.
+- [ ] Confirm the installed preset/certificate workflow remains responsive and
+  crash-free after the duplicate-delivery correction.
 
 ## Surprises & Discoveries
 
@@ -68,8 +70,8 @@ separate lifecycle child.
 Implementation evidence (2026-09-04): `eed5c93da` removes the duplicate signal
 connection and the focused shell test observes exactly one handler, session,
 coordinator, canonical preview refresh, and certificate password prompt, with
-no viewer refresh. Full-suite validation is `1612 passed, 20 skipped, 1
-warning`; installed acceptance remains the only open gate.
+no viewer refresh. Full-suite validation is `1616 passed, 20 skipped, 1
+warning`; installed placement/edit acceptance remains the only open gate.
 
 ## Context and Orientation
 
