@@ -4476,11 +4476,84 @@ def test_signing_shell_signature_preset_selection_uses_explicit_coordinator_entr
 
     panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
 
-    assert calls
-    assert set(calls) == {("Compact", None)}
+    assert calls == [("Compact", None)]
     assert panel._signature_preset_controls.preset_combo.currentText() == "Compact"
     assert not hasattr(panel._signature_preset_controls, "profile_combo")
     assert not hasattr(panel._signature_preset_controls, "profile_name")
+
+
+def test_signing_shell_preset_change_delivers_once_across_setup_and_preview_boundaries(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    fake_bindings = _fake_bindings()
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: fake_bindings,
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+        preset_catalog=build_signature_preset_catalog(
+            profiles=(build_signature_preset(name="Compact"),)
+        ),
+    )
+    panel = widget.properties_panel
+    handler_calls: list[str] = []
+    session_calls: list[str] = []
+    coordinator_calls: list[str] = []
+    preview_calls: list[str] = []
+    viewer_refresh_calls: list[str] = []
+
+    original_handler = panel._apply_signature_preset_selection
+    original_session = panel._setup_session.select_signature_preset
+    original_coordinator = panel._coordinator.apply_signature_preset
+    original_preview = panel._canonical_preview_lifecycle.refresh
+
+    def _spy_handler() -> None:
+        handler_calls.append("handler")
+        return original_handler()
+
+    def _spy_session(selected_name: str, *, control_issue=None):
+        session_calls.append(selected_name)
+        return original_session(selected_name, control_issue=control_issue)
+
+    def _spy_coordinator(selected_name: str, *, passphrase=None, control_issue=None):
+        coordinator_calls.append(selected_name)
+        return original_coordinator(
+            selected_name,
+            passphrase=passphrase,
+            control_issue=control_issue,
+        )
+
+    def _spy_preview(**kwargs):
+        preview_calls.append("preview")
+        return original_preview(**kwargs)
+
+    monkeypatch.setattr(panel, "_apply_signature_preset_selection", _spy_handler)
+    monkeypatch.setattr(panel._setup_session, "select_signature_preset", _spy_session)
+    monkeypatch.setattr(panel._coordinator, "apply_signature_preset", _spy_coordinator)
+    monkeypatch.setattr(panel._canonical_preview_lifecycle, "refresh", _spy_preview)
+    monkeypatch.setattr(
+        widget.viewer_widget,
+        "refresh",
+        lambda **kwargs: viewer_refresh_calls.append("viewer"),
+    )
+
+    panel._signature_preset_controls.preset_combo.setCurrentText("Compact")
+
+    assert handler_calls == ["handler"]
+    assert session_calls == ["Compact"]
+    assert coordinator_calls == ["Compact"]
+    assert preview_calls == ["preview"]
+    assert viewer_refresh_calls == []
 
 
 def test_signing_shell_signature_preset_save_uses_setup_session_entrypoint(
@@ -5234,8 +5307,10 @@ def test_signing_shell_signature_preset_selection_applies_certificate_material(
     assert workflow.passphrase == "default-secret"
 
     fake_bindings.q_input_dialog.next_text = "alternate-secret"
+    prompt_count_before_preset = len(fake_bindings.q_input_dialog.calls)
     panel._signature_preset_controls.preset_combo.setCurrentText("Alternate Preset")
 
+    assert len(fake_bindings.q_input_dialog.calls) - prompt_count_before_preset == 1
     assert workflow.selected_certificate_configuration_id == "cert-config-alt"
     assert workflow.certificate_path == str(alternate_path)
     assert workflow.passphrase == "alternate-secret"

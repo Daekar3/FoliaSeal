@@ -418,6 +418,7 @@ class SignaturePropertiesPanel:
         self._on_source_locate = on_source_locate or (lambda: None)
         self._on_source_close = on_source_close or (lambda: None)
         self._suspend_updates = False
+        self._preset_selection_in_progress = False
         self._control_issue: SigningDraftValidationIssue | None = None
         self._canonical_preview_lifecycle = QtCanonicalPreviewLifecycle(
             q_pixmap=bindings.q_pixmap,
@@ -1064,11 +1065,6 @@ class SignaturePropertiesPanel:
         preset_combo.currentTextChanged.connect(  # type: ignore[attr-defined]
             lambda _text: self._on_signature_preset_selected()
         )
-        index_changed = getattr(preset_combo, "currentIndexChanged", None)
-        if hasattr(index_changed, "connect"):
-            index_changed.connect(  # type: ignore[attr-defined]
-                lambda _index: self._on_signature_preset_selected()
-            )
         save_button.clicked.connect(  # type: ignore[attr-defined]
             self.save_current_signature_preset
         )
@@ -1154,6 +1150,15 @@ class SignaturePropertiesPanel:
     def _on_signature_preset_selected(self) -> None:
         if self._suspend_updates:
             return
+        if self._preset_selection_in_progress:
+            return
+        self._preset_selection_in_progress = True
+        try:
+            self._apply_signature_preset_selection()
+        finally:
+            self._preset_selection_in_progress = False
+
+    def _apply_signature_preset_selection(self) -> None:
         selected_name = _combo_text(self._signature_preset_controls.preset_combo)
         if selected_name == SIGNATURE_PRESET_PLACEHOLDER:
             selected_name = ""

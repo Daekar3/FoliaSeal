@@ -86,11 +86,24 @@ class QtCanonicalPreviewLifecycle:
                 render_label_visible=False,
                 render_body_size=(inner_body_width, inner_body_height),
             )
-        pixmap = self._load_canonical_preview_pixmap(
-            snapshot=snapshot,
-            max_width=inner_body_width,
-            max_height=inner_body_height,
-        )
+        try:
+            pixmap = self._load_canonical_preview_pixmap(
+                snapshot=snapshot,
+                max_width=inner_body_width,
+                max_height=inner_body_height,
+            )
+        except Exception:
+            # A rendered snapshot is not usable until its image can be loaded.
+            # Release it before returning the neutral fallback so a failed
+            # refresh cannot retain a temporary preview directory.
+            self._replace_snapshot(None)
+            return CanonicalPreviewRenderState(
+                snapshot=None,
+                pixmap=None,
+                card_style=fallback_card_style,
+                render_label_visible=False,
+                render_body_size=(inner_body_width, inner_body_height),
+            )
         width = inner_body_width
         height = inner_body_height
         pixmap_width = getattr(pixmap, "width", None)

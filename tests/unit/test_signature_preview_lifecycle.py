@@ -324,6 +324,52 @@ def test_preview_lifecycle_falls_back_when_qt_render_backend_is_unavailable(
     assert lifecycle.current_snapshot() is None
 
 
+def test_preview_lifecycle_cleans_snapshot_when_pixmap_loading_fails(tmp_path: Path) -> None:
+    image_dir = tmp_path / "foliaseal-canonical-preview-pixmap-failure"
+    image_dir.mkdir()
+    image_path = image_dir / "preview.png"
+    Image.new("RGBA", (16, 16), color=(0, 0, 0, 255)).save(image_path)
+
+    def _render_snapshot(preview, **kwargs):
+        from foliaseal.application.signing_preview_renderer import (
+            CanonicalSignaturePreviewSnapshot,
+        )
+
+        return CanonicalSignaturePreviewSnapshot(
+            image_path=str(image_path),
+            width_px=16,
+            height_px=16,
+            text_area_bounds_px={"x": 0, "y": 0, "width": 16, "height": 16},
+            stamp_area_bounds_px=None,
+            text_bounds_px={"x": 0, "y": 0, "width": 16, "height": 16},
+            stamp_bounds_px=None,
+        )
+
+    def _load_pixmap(_path: str):
+        raise OSError("preview image disappeared")
+
+    lifecycle = QtCanonicalPreviewLifecycle(
+        q_pixmap=_load_pixmap,
+        qt=_FakeQt,
+        render_backend_factory=_FakeRenderBackend,
+        render_snapshot=_render_snapshot,
+    )
+
+    state = lifecycle.refresh(
+        preview=_workflow(tmp_path).preview(),
+        preview_scale=1.0,
+        inner_body_width=100,
+        inner_body_height=50,
+        fallback_card_style="fallback-style",
+    )
+
+    assert state.snapshot is None
+    assert state.pixmap is None
+    assert state.card_style == "fallback-style"
+    assert lifecycle.current_snapshot() is None
+    assert not image_dir.exists()
+
+
 def test_preview_lifecycle_cleans_up_last_snapshot_on_dispose(tmp_path: Path) -> None:
     image_dir = tmp_path / "foliaseal-canonical-preview-final"
     image_dir.mkdir()

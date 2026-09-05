@@ -41,6 +41,67 @@ def test_qt_backend_rejects_non_positive_zoom(tmp_path) -> None:
         )
 
 
+def test_qt_backend_open_document_loads_once_and_returns_document(monkeypatch, tmp_path) -> None:
+    class _QPdfDocument:
+        class Error:
+            None_ = object()
+
+        instances: list["_QPdfDocument"] = []
+
+        def __init__(self):
+            self.loaded_paths: list[str] = []
+            self.instances.append(self)
+
+        def load(self, path: str):
+            self.loaded_paths.append(path)
+            return self.Error.None_
+
+    pdf_path = tmp_path / "sample.pdf"
+    pdf_path.write_bytes(b"%PDF-1.7\n")
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=_QPdfDocument,
+        qpdf_link_model=object,
+        qmodel_index=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    monkeypatch.setattr(backend, "_import_type", lambda *_args: _QPdfDocument)
+
+    document = backend._open_document(str(pdf_path))
+
+    assert document is _QPdfDocument.instances[0]
+    assert document.loaded_paths == [str(pdf_path)]
+
+
+def test_qt_backend_open_document_reports_load_failure(monkeypatch, tmp_path) -> None:
+    class _QPdfDocument:
+        class Error:
+            None_ = "ok"
+
+        def load(self, _path: str):
+            return "invalid"
+
+    pdf_path = tmp_path / "invalid.pdf"
+    pdf_path.write_bytes(b"not a pdf")
+    backend = QtPdfRenderBackend.__new__(QtPdfRenderBackend)
+    backend._bindings_error = None
+    backend._bindings = _QtBindings(
+        qpdf_document=_QPdfDocument,
+        qpdf_link_model=object,
+        qmodel_index=object,
+        qimage=object,
+        qsize=object,
+        qpdf_document_render_options=object,
+    )
+    monkeypatch.setattr(backend, "_import_type", lambda *_args: _QPdfDocument)
+
+    with pytest.raises(RuntimeError, match="Failed to load PDF document"):
+        backend._open_document(str(pdf_path))
+
+
 def test_qt_backend_geometry_uses_qpdfdocument_page_apis(monkeypatch) -> None:
     class _Document:
         def pageCount(self):
