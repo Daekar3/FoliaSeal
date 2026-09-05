@@ -58,6 +58,10 @@ class _FakeDraftWorkflow:
 class _FakeBoundary:
     def __init__(self) -> None:
         self.submitted = False
+        self.transaction_active = False
+        self.poll_result = None
+        self.poll_calls = 0
+        self.load_calls = 0
         self.accepted_paths: list[tuple[str, bool]] = []
         self.state = SigningActionState(
             can_sign=True,
@@ -72,7 +76,13 @@ class _FakeBoundary:
         )
 
     def load(self) -> SigningActionState:
+        self.load_calls += 1
         return self.state
+
+    def poll_transaction(self):
+        self.poll_calls += 1
+        result, self.poll_result = self.poll_result, None
+        return result
 
     def accept_output_path(self, path: str, *, allow_source_overwrite: bool = False):
         self.accepted_paths.append((path, allow_source_overwrite))
@@ -153,6 +163,62 @@ def _bridge_with_explicit_output(bindings, boundary, **kwargs):
     bindings.q_file_dialog.next_save_file_name = "/tmp/confirmed-output.pdf"
     assert bridge.choose_output_pdf_path() == "/tmp/confirmed-output.pdf"
     return bridge
+
+
+def test_poll_signing_transaction_does_not_reload_idle_async_state() -> None:
+    bindings = _fake_bindings()
+    boundary = _FakeBoundary()
+    boundary.supports_async_transaction = True
+    bridge = _bridge(bindings, boundary)
+
+    assert bridge.poll_signing_transaction() is None
+
+    assert boundary.poll_calls == 1
+    assert boundary.load_calls == 0
+
+
+def test_poll_signing_transaction_reloads_pending_active_async_state() -> None:
+    bindings = _fake_bindings()
+    boundary = _FakeBoundary()
+    boundary.supports_async_transaction = True
+    boundary.transaction_active = True
+    bridge = _bridge(bindings, boundary)
+
+    assert bridge.poll_signing_transaction() is None
+
+    assert boundary.poll_calls == 1
+    assert boundary.load_calls == 1
+
+
+def test_poll_signing_transaction_applies_queued_completion_without_idle_reload() -> None:
+    bindings = _fake_bindings()
+    boundary = _FakeBoundary()
+    boundary.supports_async_transaction = True
+    boundary.transaction_active = True
+    rendered_states: list[SigningActionState] = []
+    bridge = SigningWorkspaceActionBridge(
+        widget=object(),
+        bindings=bindings,
+        sidebar=SimpleNamespace(render_signing_action_state=rendered_states.append),
+        setup_port=SimpleNamespace(
+            apply_changes=lambda: None,
+            load_setup_state=lambda: SimpleNamespace(
+                selected_certificate_configuration_name="Board certificate",
+                selected_signature_preset_name="Board approval",
+            ),
+        ),
+        signing_action_boundary=boundary,
+        draft_workflow=_FakeDraftWorkflow(),
+        app_settings_getter=lambda: SimpleNamespace(default_output_directory=str(Path("/tmp"))),
+    )
+    boundary.poll_result = SimpleNamespace(state=boundary.state)
+
+    result = bridge.poll_signing_transaction()
+
+    assert result is not None
+    assert boundary.poll_calls == 1
+    assert boundary.load_calls == 0
+    assert rendered_states == [boundary.state]
 
 
 def test_sign_confirmation_cancel_is_lossless_and_contains_frozen_summary() -> None:

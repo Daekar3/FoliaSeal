@@ -83,7 +83,10 @@ class SigningWorkspaceActionBridge:
         """Deliver a completed worker result and refresh the rail on the Qt thread."""
         result = self._signing_action_boundary.poll_transaction()
         if result is None:
-            if getattr(self._signing_action_boundary, "supports_async_transaction", False):
+            if (
+                getattr(self._signing_action_boundary, "supports_async_transaction", False)
+                and getattr(self._signing_action_boundary, "transaction_active", False)
+            ):
                 self.reload_state()
             return None
         self._apply_signing_action_state(result.state)

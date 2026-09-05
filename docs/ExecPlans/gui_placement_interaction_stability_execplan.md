@@ -83,7 +83,26 @@ signature rendering, or the frozen PDF-first topology.
   preview/layout-key cache at `_update_preview_controls()` so identical requests
   reuse the existing snapshot regardless of callback origin. Full suite remains
   green (`1618 passed, 20 skipped, 1 warning`).
-- [ ] Rebuild/install the render-key correction and reobserve the live workflow.
+- [x] Rebuild/install the render-key correction and reobserve the live workflow;
+  the correction was present in the installed executable but was insufficient.
+- [x] (2026-09-05) The render-key package was installed and verified, but the
+  live placement/profile sequence still reached 84–86% CPU, wrote roughly
+  6.5 MiB every 3 seconds, and created fresh canonical-preview directories.
+  The process then self-terminated; coredump PID `1826521` is `SIGABRT` in
+  QtPdf while a `QTimer::timeout` callback constructs `QPdfDocument`.
+- [x] (2026-09-05) The remaining loop is outside pointer geometry itself:
+  the optional 100-ms transaction poller reloads signing readiness even while
+  idle; once a rectangle and Single Left appearance exist, readiness invokes
+  the workflow fit validator, whose default raster path creates a fresh QtPdf
+  document on each tick. The next correction must make idle polling a no-op and
+  retain updates only for an active signing transaction.
+- [x] (2026-09-05) The typed idle-poll guard is implemented in the working tree:
+  coordinator activity is exposed through the action boundary, and idle bridge
+  polls no longer reload readiness. Focused regression coverage was added for
+  idle and active polling; package rebuild and installed retest remain open.
+- [x] (2026-09-05) Rebuilt the distributable with the timer guard (bundle SHA-256
+  `1a153dd7...`; package SHA-256 `57587617...`). Installation and live placement
+  acceptance remain the external HITL gate.
 
 ## Surprises & Discoveries
 
@@ -112,6 +131,11 @@ signature rendering, or the frozen PDF-first topology.
   unconditionally; `ViewerWorkflow.render_current_page()` performs both raster
   rendering and geometry loading, and the Qt backend creates a fresh `QPdfDocument`
   for each operation.
+- Observation: after the same-page/viewer and preview-resize/cache corrections,
+  the live spike persisted because the 100-ms transaction timer independently
+  recalculates readiness while idle. This path is triggered only once a complete
+  rectangle + horizontal image-stamp appearance makes fit validation perform a
+  QtPdf raster render, which explains the user-visible timing.
 
 ## Decision Log
 

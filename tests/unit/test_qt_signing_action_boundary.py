@@ -28,6 +28,7 @@ def _state(
 class _FakeCoordinator:
     def __init__(self, *, state: SigningActionState | None = None) -> None:
         self.state = state or _state()
+        self.transaction_active = False
         self.accepted_paths: list[str] = []
         self.submitted_transition = SigningActionTransition(
             request=None,
@@ -56,6 +57,17 @@ class _FakeCoordinator:
         self.invalidate_calls.append(reason)
         self.state = _state()
         return self.state
+
+
+def test_signing_action_boundary_exposes_coordinator_transaction_activity() -> None:
+    from foliaseal.presentation.qt.signing_action_boundary import SigningActionBoundary
+
+    coordinator = _FakeCoordinator()
+    boundary = SigningActionBoundary(coordinator=coordinator)
+
+    assert boundary.transaction_active is False
+    coordinator.transaction_active = True
+    assert boundary.transaction_active is True
 
 
 class _FakeTransactionRunner:

@@ -79,6 +79,11 @@ family.
   render trigger and added a size/reentrancy guard; rebuilt-package HITL is still
   required.
 - [ ] Reconcile parent/release plans and commit the complete plan/evidence set.
+- [x] (2026-09-05) Implemented the next timer-safety correction in the working
+  tree: idle transaction polls no longer reload signing readiness, while active
+  transactions continue to deliver queued worker completion through the typed
+  coordinator/boundary activity state. Focused validation, package installation,
+  and the installed placement retest remain open.
 
 ## Surprises & Discoveries
 

@@ -56,6 +56,11 @@ class SigningActionBoundary:
         """Whether the boundary has an owned worker for the production Qt path."""
         return self._transaction_runner is not None
 
+    @property
+    def transaction_active(self) -> bool:
+        """Whether an asynchronous transaction still awaits worker completion."""
+        return bool(getattr(self._coordinator, "transaction_active", False))
+
     def load(self) -> SigningActionState:
         return self._coordinator.load()
 

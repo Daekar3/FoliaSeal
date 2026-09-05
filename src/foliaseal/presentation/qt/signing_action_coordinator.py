@@ -113,6 +113,11 @@ class SigningActionCoordinator:
     def last_signing_result(self) -> SigningResult | None:
         return self._last_signing_result
 
+    @property
+    def transaction_active(self) -> bool:
+        """Return whether an asynchronous signing transaction awaits completion."""
+        return self._transaction_active
+
     def load(self) -> SigningActionState:
         return self._build_state()
 

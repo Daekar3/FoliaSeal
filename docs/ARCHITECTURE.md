@@ -672,11 +672,11 @@ The canonical repository document split is:
 
 - Location: `src/foliaseal/presentation/qt/signing_workspace_action_bridge.py`
 - Responsibility: Own the shell-facing dialog and state glue for the signing-action flow while delegating policy decisions to `SigningActionBoundary`.
-- Owns: output-path dialog handling, overwrite confirmation, sign-submit state application, signed-output reopen forwarding, certificate-refresh signing-state reload, and the small apply/reset helpers needed to keep the live shell widgets in sync.
+- Owns: output-path dialog handling, overwrite confirmation, sign-submit state application, signed-output reopen forwarding, certificate-refresh signing-state reload, transaction polling, and the small apply/reset helpers needed to keep the live shell widgets in sync.
 - Does not own: signing-action policy, result/state-machine rules, Qt widget construction, or signing backend execution.
 - Key collaborators: `SigningActionBoundary`, `SigningWorkspaceWidget`, `SigningWorkspaceSidebar`, shell-provided dialog/callback/open-output helpers.
 - Main entry points: `SigningWorkspaceActionBridge.choose_output_pdf_path()`, `SigningWorkspaceActionBridge.submit_sign_request()`, `SigningWorkspaceActionBridge.open_signed_output()`, `SigningWorkspaceActionBridge.refresh_certificate_configurations()`.
-- Known constraints: The bridge must keep explicit output-path presence, collision-safe default selection, overwrite confirmation, frozen final-summary confirmation, source-overwrite authorization, and state application explicit so the shell can remain thin while `SigningActionBoundary` stays the narrower policy layer beneath it. Source replacement is confirmed separately with a Cancel-default warning and is authorized only for the current request; the use case still verifies a staged sibling before replacing the source.
+- Known constraints: The bridge must keep explicit output-path presence, collision-safe default selection, overwrite confirmation, frozen final-summary confirmation, source-overwrite authorization, and state application explicit so the shell can remain thin while `SigningActionBoundary` stays the narrower policy layer beneath it. Its periodic transaction poll is idle-safe: a pending poll reloads signing readiness only while the typed boundary reports an active transaction, preventing idle preview/fit work while preserving queued completion delivery. Source replacement is confirmed separately with a Cancel-default warning and is authorized only for the current request; the use case still verifies a staged sibling before replacing the source.
 - Status: Confirmed by code and tests.
 
 ### Qt signing action boundary
@@ -686,7 +686,7 @@ The canonical repository document split is:
 - Owns: `SigningActionBoundary`, `SigningActionBoundaryResult`, shell callback routing for status/error/open-output events, and the small adapter methods that load, accept output paths, submit, reopen, and invalidate.
 - Does not own: Qt widget mutation, signing state-machine policy, preview layout, or signing backend execution.
 - Key collaborators: `SigningActionCoordinator`, `SigningWorkspaceActionBridge`, `SigningWorkspaceWidget`, `SigningWorkspaceSidebar`, shell-provided error/status/open-output callbacks.
-- Main entry points: `SigningActionBoundary.load()`, `SigningActionBoundary.accept_output_path()`, `SigningActionBoundary.submit()`, `SigningActionBoundary.open_signed_output()`, `SigningActionBoundary.invalidate()`.
+- Main entry points: `SigningActionBoundary.load()`, `SigningActionBoundary.accept_output_path()`, `SigningActionBoundary.submit()`, `SigningActionBoundary.open_signed_output()`, `SigningActionBoundary.invalidate()`, and the read-only `transaction_active` activity property.
 - Known constraints: `open_signed_output()` must only forward the callback when the coordinator reports a successful output path, and the boundary must continue to return immutable result snapshots so shell tests can focus on delegation behavior.
 - Status: Confirmed by code and tests.
 
@@ -697,7 +697,7 @@ The canonical repository document split is:
 - Owns: `SigningActionState`, `SigningActionTransition`, result tracking, the active flow-stage and plain-language next-action text, sign-enabled state, reopen/recovery enablement, output-path acceptance, readiness gating, typed `recommended_action` (`sign`, `open_signed_output`, `verify_again`, `return_to_draft`, `open_preserved_copy`, or `None`), preserved-artifact retry/open/return verbs, and sign-result reset behavior when the draft or selected path changes. The sidebar renders the persistent six-step journey while the coordinator derives the currently supported setup, placement, readiness, confirmation, successful-output, or untrusted-recovery state from the active draft.
 - Does not own: Qt dialog handling, shell callback emission, document rendering, preview layout, signing-action boundary orchestration, or signing backend implementation.
 - Key collaborators: `SigningDraftWorkflow`, shell-provided `apply_changes()`, shell readiness/validation callables, signing executor protocol, shell reopen callback.
-- Main entry points: `SigningActionCoordinator.load()`, `SigningActionCoordinator.accept_output_path()`, `SigningActionCoordinator.invalidate()`, `SigningActionCoordinator.submit()`, `SigningActionCoordinator.open_signed_output()`.
+- Main entry points: `SigningActionCoordinator.load()`, `SigningActionCoordinator.accept_output_path()`, `SigningActionCoordinator.invalidate()`, `SigningActionCoordinator.submit()`, `SigningActionCoordinator.open_signed_output()`, and the read-only `transaction_active` activity property.
 - Known constraints: The shell still owns overwrite confirmation and the boundary still owns error emission routing. The sidebar owns widget mutation for returned state, and the coordinator intentionally returns immutable snapshots so shell and sidebar tests can focus on adapter behavior instead of duplicated state policy. `recommended_action` identifies Verify again, Return to draft, or Open preserved copy when a post-write verifier preserves an artifact. A preserved-copy reopen uses a distinct untrusted recovery workspace; it never becomes the requested output by implication. Verify again must establish every-signature cryptographic validity and, when requested, timestamp presence plus timestamp cryptographic validity and TSA-chain trust; later approval additionally requires no certification restriction and an allowed DocMDP permission (`fill_forms` or `annotate`). Return to draft cleans the app-owned preserved artifact and clears recovery state, while workspace disposal also releases it. The coordinator now owns a non-cancellable begin/complete lifecycle with truthful coarse stage/detail feedback; durable crash journaling is provided by the Qt-free application/infra boundary, while the coordinator exposes no percentage, cancel operation, or GUI recovery action.
 - Status: Confirmed by code and tests.
 
@@ -722,8 +722,10 @@ The canonical repository document split is:
   and returns the active state; completion is delivered only by boundary polling, then the
   coordinator's `complete(result=...)` or `complete(error=...)` closes the transaction and emits
   the terminal state. The shell starts a short-interval `QTimer` only when the async runner is
-  available, applies completed results on the Qt thread, stops both transaction/source timers
-  before composition disposal, and joins the worker through composition cleanup. Feedback is
+  available, but the bridge does not reload readiness on idle ticks; it continues polling while
+  the coordinator's typed `transaction_active` state is true so queued worker completion is still
+  delivered. Completed results are applied on the Qt thread, both transaction/source timers stop
+  before composition disposal, and the worker is joined through composition cleanup. Feedback is
   intentionally coarse and truthful (starting, preparing/writing/verifying, still working), with
   no percent estimate and no cancel action. The separate journal records begin/stage/preserve/
   committing/complete/discard transitions and recovers a post-replace crash by digest; Qt does not
