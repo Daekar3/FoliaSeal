@@ -426,6 +426,8 @@ class SignaturePropertiesPanel:
         )
         self._preview_layout = QtSignaturePreviewLayout(bindings=bindings)
         self._last_preview: SigningDraftPreview | None = None
+        self._last_preview_resize_size: tuple[int | None, int | None] | None = None
+        self._preview_resize_refresh_in_progress = False
         self.widget = _build_close_aware_widget(
             bindings.q_widget,
             on_close=self.dispose,
@@ -1225,6 +1227,7 @@ class SignaturePropertiesPanel:
 
     def _update_preview_controls(self, preview: SigningDraftPreview) -> None:
         self._last_preview = preview
+        self._last_preview_resize_size = self._widget_size()
         layout_state = self._preview_layout.plan(
             preview=preview,
             controls=self._preview_controls,
@@ -1249,7 +1252,28 @@ class SignaturePropertiesPanel:
         preview = self._last_preview
         if preview is None or not hasattr(self, "_preview_controls"):
             return
-        self._update_preview_controls(preview)
+        current_size = self._widget_size()
+        if current_size == self._last_preview_resize_size:
+            return
+        if self._preview_resize_refresh_in_progress:
+            return
+        self._preview_resize_refresh_in_progress = True
+        try:
+            self._update_preview_controls(preview)
+        finally:
+            self._preview_resize_refresh_in_progress = False
+
+    def _widget_size(self) -> tuple[int | None, int | None]:
+        """Return the panel size used to prevent resize-triggered render loops."""
+
+        def _dimension(name: str) -> int | None:
+            getter = getattr(self.widget, name, None)
+            if not callable(getter):
+                return None
+            value = getter()
+            return value if isinstance(value, int) and value > 0 else None
+
+        return (_dimension("width"), _dimension("height"))
 
     def _apply_coordinator_state(
         self,

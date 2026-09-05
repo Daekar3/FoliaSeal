@@ -47,6 +47,11 @@ native QtPdf abort.
   full suite reports `1617 passed, 20 skipped, 1 warning`; the installed
   placement/Appearance retest remains pending because the package predates this
   correction.
+- [x] (2026-09-04) Follow-up HITL reported sustained 1.8–1.9 MiB/s writes and
+  elevated CPU after placement/profile selection. No FoliaSeal process remained
+  when inspected, but the timing and preview temp-file pattern implicated
+  resize-triggered canonical preview regeneration. Added a size/reentrancy guard;
+  focused tests and static checks pass. Rebuilt-package HITL remains pending.
 
 ## Surprises & Discoveries
 
@@ -69,6 +74,10 @@ native QtPdf abort.
   exactly three generated raster requests (`full`, `text`, `stamp`) and no
   duplicate layout calculation. No evidence establishes concurrent QtPdf
   loads; the remaining risk is installed runtime behavior.
+- Observation: the panel resize callback was an unbounded render trigger: each
+  resize invoked canonical preview generation even when the panel dimensions had
+  not changed. Preview pixmap replacement can itself emit resize events, matching
+  sustained writes without a user continuing to interact.
 
 ## Decision Log
 

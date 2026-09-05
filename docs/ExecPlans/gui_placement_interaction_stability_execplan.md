@@ -63,6 +63,14 @@ signature rendering, or the frozen PDF-first topology.
   skipped, 1 warning`.
 - [ ] Rebuild and repeat the installed placement/edit retest; the installed
   binary has not yet consumed this correction.
+- [x] (2026-09-04) HITL then reported sustained 1.8–1.9 MiB/s writes and high
+  CPU after rectangle release followed by profile selection. No FoliaSeal PID or
+  new coredump remained when inspected; the write pattern matches repeated
+  canonical-preview temp-file generation.
+- [x] (2026-09-04) Added a panel resize size/reentrancy guard so replacing a
+  preview pixmap cannot recursively regenerate an unchanged canonical preview.
+  Focused shell/runtime tests pass; a rebuilt package and live retest remain
+  required.
 
 ## Surprises & Discoveries
 

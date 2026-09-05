@@ -74,6 +74,10 @@ root, and reconciles the governing status plans.
   PDF refresh, cross-page release performs one refresh, and the full suite reports `1617 passed, 20
   skipped, 1 warning`. A fresh package was rebuilt and passed the offline package audit; the installed
   binary still needs replacement and a fresh Gate 2 retest.
+- [x] (2026-09-04) Follow-up HITL reported sustained 1.8–1.9 MiB/s writes after
+  placement/profile selection. No live FoliaSeal process remained for capture;
+  the resize-triggered canonical-preview loop is now guarded in source and must
+  be retested from the rebuilt installed package.
 
 ## Surprises & Discoveries
 

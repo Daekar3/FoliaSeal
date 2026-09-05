@@ -73,6 +73,11 @@ family.
   1 warning`; a fresh package was rebuilt and passed the offline package audit.
 - [ ] Confirm installed placement commit and Appearance edit/rename-back paths
   remain responsive and crash-free, then reconcile release plans.
+- [x] (2026-09-04) A follow-up HITL observation found sustained 1.8–1.9 MiB/s
+  writes after placement/profile selection. The process was gone by inspection,
+  but the source audit identified an unbounded identical-size preview-resize
+  render trigger and added a size/reentrancy guard; rebuilt-package HITL is still
+  required.
 - [ ] Reconcile parent/release plans and commit the complete plan/evidence set.
 
 ## Surprises & Discoveries

@@ -4983,6 +4983,45 @@ def test_signing_shell_set_signature_rect_uses_explicit_panel_refresh_transition
     assert preview_calls == ["preview"]
 
 
+def test_properties_panel_ignores_identical_resize_events_after_preview_render(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        signing_shell_module,
+        "build_qt_pdf_viewer_widget",
+        lambda **kwargs: _FakeViewerWidget(**kwargs),
+    )
+    monkeypatch.setattr(
+        signing_shell_module.SigningShellAdapter,
+        "_load_bindings",
+        lambda self: _fake_bindings(),
+    )
+
+    widget = build_qt_signing_shell(
+        viewer_workflow=_viewer_workflow(),
+        signing_workflow=_workflow(tmp_path),
+    )
+    lifecycle_calls: list[str] = []
+    original_refresh = widget.properties_panel._canonical_preview_lifecycle.refresh
+
+    def _spy_refresh(**kwargs):
+        lifecycle_calls.append("preview")
+        return original_refresh(**kwargs)
+
+    monkeypatch.setattr(
+        widget.properties_panel._canonical_preview_lifecycle,
+        "refresh",
+        _spy_refresh,
+    )
+    baseline = len(lifecycle_calls)
+
+    widget.properties_panel._refresh_preview_for_resize()
+    widget.properties_panel._refresh_preview_for_resize()
+
+    assert len(lifecycle_calls) == baseline
+
+
 def test_signing_shell_viewer_selection_does_not_route_rect_application_back_through_panel_refresh(
     monkeypatch,
     tmp_path: Path,
