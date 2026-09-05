@@ -5016,6 +5016,7 @@ def test_properties_panel_ignores_identical_resize_events_after_preview_render(
     )
     baseline = len(lifecycle_calls)
 
+    widget.properties_panel.widget._width_value = 520
     widget.properties_panel._refresh_preview_for_resize()
     widget.properties_panel._refresh_preview_for_resize()
 

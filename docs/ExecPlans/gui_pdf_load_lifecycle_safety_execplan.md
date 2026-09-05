@@ -52,6 +52,11 @@ native QtPdf abort.
   when inspected, but the timing and preview temp-file pattern implicated
   resize-triggered canonical preview regeneration. Added a size/reentrancy guard;
   focused tests and static checks pass. Rebuilt-package HITL remains pending.
+- [x] (2026-09-04) Direct observation of PID `1281291` confirmed the loop: 66–69%
+  CPU, approximately 5.9 MiB written in 3 seconds and 53 MiB in 5 seconds, with
+  new canonical-preview directories. The resize path now reapplies layout using
+  the existing render state, eliminating canonical PDF generation from resize
+  callbacks. Full validation is `1618 passed, 20 skipped, 1 warning`.
 
 ## Surprises & Discoveries
 

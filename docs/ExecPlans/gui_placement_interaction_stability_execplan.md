@@ -71,6 +71,13 @@ signature rendering, or the frozen PDF-first topology.
   preview pixmap cannot recursively regenerate an unchanged canonical preview.
   Focused shell/runtime tests pass; a rebuilt package and live retest remain
   required.
+- [x] (2026-09-04) Live observation proved the first guard was insufficient:
+  PID `1281291` sustained roughly 66–69% CPU, wrote about 5.9 MiB in 3 seconds
+  and about 53 MiB in 5 seconds, and created fresh canonical-preview directories.
+  Resize reflow now reuses the existing canonical render state and never invokes
+  PDF generation; full validation reports `1618 passed, 20 skipped, 1 warning`.
+- [ ] Rebuild/install this stronger correction and repeat the live placement /
+  profile-selection gate while confirming preview files stop changing.
 
 ## Surprises & Discoveries
 

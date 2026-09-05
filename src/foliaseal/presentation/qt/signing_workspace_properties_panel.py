@@ -42,6 +42,7 @@ from foliaseal.presentation.qt.signature_preview_layout import (
     _preview_stamp_text,
 )
 from foliaseal.presentation.qt.signature_preview_lifecycle import (
+    CanonicalPreviewRenderState,
     QtCanonicalPreviewLifecycle,
 )
 from foliaseal.presentation.qt.signing_workspace_refinement_dialog import (
@@ -426,6 +427,7 @@ class SignaturePropertiesPanel:
         )
         self._preview_layout = QtSignaturePreviewLayout(bindings=bindings)
         self._last_preview: SigningDraftPreview | None = None
+        self._last_canonical_render_state: CanonicalPreviewRenderState | None = None
         self._last_preview_resize_size: tuple[int | None, int | None] | None = None
         self._preview_resize_refresh_in_progress = False
         self.widget = _build_close_aware_widget(
@@ -1239,6 +1241,7 @@ class SignaturePropertiesPanel:
             inner_body_height=layout_state.inner_body_size[1],
             fallback_card_style=layout_state.fallback_card_style,
         )
+        self._last_canonical_render_state = canonical_render_state
         self._preview_layout.apply(
             preview=preview,
             controls=self._preview_controls,
@@ -1257,9 +1260,22 @@ class SignaturePropertiesPanel:
             return
         if self._preview_resize_refresh_in_progress:
             return
+        canonical_render_state = self._last_canonical_render_state
+        if canonical_render_state is None:
+            return
         self._preview_resize_refresh_in_progress = True
         try:
-            self._update_preview_controls(preview)
+            layout_state = self._preview_layout.plan(
+                preview=preview,
+                controls=self._preview_controls,
+            )
+            self._last_preview_resize_size = current_size
+            self._preview_layout.apply(
+                preview=preview,
+                controls=self._preview_controls,
+                state=layout_state,
+                canonical_render_state=canonical_render_state,
+            )
         finally:
             self._preview_resize_refresh_in_progress = False
 
