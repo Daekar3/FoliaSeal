@@ -249,10 +249,35 @@ class SigningWorkspaceActionBridge:
                 exec_method = getattr(dialog, "exec", None) or getattr(dialog, "exec_", None)
                 if callable(exec_method):
                     exec_method()
-                    return (
-                        getattr(dialog, "clickedButton", lambda: None)()
-                        is affirmative_button
-                    )
+                    clicked = getattr(dialog, "clickedButton", lambda: None)()
+                    if clicked is None:
+                        # Closing the dialog is equivalent to choosing Cancel.
+                        return False
+                    if self._confirmation_button_matches(
+                        dialog,
+                        clicked,
+                        affirmative_button,
+                        label=affirmative_label,
+                        role=getattr(role_type, "AcceptRole", None),
+                    ):
+                        return True
+                    if self._confirmation_button_matches(
+                        dialog,
+                        clicked,
+                        cancel_button,
+                        label="Cancel",
+                        role=getattr(role_type, "RejectRole", None),
+                    ):
+                        return False
+                    warning = getattr(message_box, "warning", None)
+                    if callable(warning):
+                        warning(
+                            self._widget,
+                            "FoliaSeal",
+                            "The confirmation result could not be identified. "
+                            "Signing was not started.",
+                        )
+                    return False
 
         question = getattr(message_box, "question", None)
         if not callable(question):
@@ -261,3 +286,33 @@ class SigningWorkspaceActionBridge:
         if yes_value is None:
             yes_value = getattr(getattr(message_box, "StandardButton", None), "Yes", None)
         return question(self._widget, title, text) == yes_value
+
+    @staticmethod
+    def _confirmation_button_matches(
+        dialog: Any,
+        clicked: Any,
+        expected: Any,
+        *,
+        label: str,
+        role: Any,
+    ) -> bool:
+        """Match a Qt button by semantic label/role, not wrapper identity alone."""
+
+        if clicked is expected:
+            return True
+        text_getter = getattr(clicked, "text", None)
+        text = text_getter() if callable(text_getter) else getattr(clicked, "label", None)
+        if str(text or "").strip() != label:
+            return False
+        button_role = getattr(dialog, "buttonRole", None)
+        if callable(button_role):
+            try:
+                return button_role(clicked) == role
+            except (TypeError, RuntimeError):
+                pass
+        clicked_role = getattr(clicked, "role", None)
+        if clicked_role is not None and role is not None:
+            return clicked_role == role
+        # The dialog owns the button labels, so a matching label is sufficient
+        # for lightweight doubles that cannot expose a role.
+        return True

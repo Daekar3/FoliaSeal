@@ -134,6 +134,27 @@ class _CustomMessageBox:
         return self.clicked
 
 
+class _EquivalentWrapperMessageBox(_CustomMessageBox):
+    """Model Qt returning an equivalent wrapper for the clicked button."""
+
+    def clickedButton(self):  # noqa: N802
+        clicked = super().clickedButton()
+        if clicked is None:
+            return None
+        return SimpleNamespace(label=clicked.label, role=clicked.role)
+
+
+class _UnexpectedWrapperMessageBox(_CustomMessageBox):
+    warnings = []
+
+    @classmethod
+    def warning(cls, _parent, title, text):  # noqa: N802
+        cls.warnings.append((title, text))
+
+    def clickedButton(self):  # noqa: N802
+        return SimpleNamespace(label="Unexpected", role="other")
+
+
 def _bridge(
     bindings,
     boundary: _FakeBoundary,
@@ -266,6 +287,37 @@ def test_sign_confirmation_uses_consequence_labeled_buttons_when_available() -> 
     assert [button.label for button in dialog.buttons] == ["Cancel", "Sign and save"]
     assert dialog.default_button.label == "Cancel"
     assert "Preset: Board approval" in dialog.text
+
+
+def test_sign_confirmation_accepts_equivalent_native_button_wrapper() -> None:
+    bindings = replace(_fake_bindings(), q_message_box=_EquivalentWrapperMessageBox)
+    _EquivalentWrapperMessageBox.next_clicked_label = "Sign and save"
+    _EquivalentWrapperMessageBox.instances.clear()
+    boundary = _FakeBoundary()
+
+    result = _bridge_with_explicit_output(bindings, boundary).submit_sign_request()
+
+    assert result is not None
+    assert boundary.submitted is True
+
+
+def test_sign_confirmation_surfaces_unrecognized_native_result() -> None:
+    bindings = replace(_fake_bindings(), q_message_box=_UnexpectedWrapperMessageBox)
+    _UnexpectedWrapperMessageBox.next_clicked_label = "Sign and save"
+    _UnexpectedWrapperMessageBox.instances.clear()
+    _UnexpectedWrapperMessageBox.warnings.clear()
+    boundary = _FakeBoundary()
+
+    result = _bridge_with_explicit_output(bindings, boundary).submit_sign_request()
+
+    assert result is None
+    assert boundary.submitted is False
+    assert _UnexpectedWrapperMessageBox.warnings == [
+        (
+            "FoliaSeal",
+            "The confirmation result could not be identified. Signing was not started.",
+        )
+    ]
 
 
 def test_sign_confirmation_synchronizes_setup_before_preview() -> None:
