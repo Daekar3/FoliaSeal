@@ -176,6 +176,51 @@ def test_signing_action_boundary_submit_uses_on_error_path_when_not_emit(tmp_pat
     assert errors == ["Post-sign verification failed."]
 
 
+def test_signing_action_boundary_surfaces_submit_startup_exception() -> None:
+    from foliaseal.presentation.qt.signing_action_boundary import SigningActionBoundary
+
+    class _CoordinatorThatRaises(_FakeCoordinator):
+        def submit(self):
+            raise RuntimeError("executor wiring failed")
+
+    events: list[str] = []
+    errors: list[str] = []
+    boundary = SigningActionBoundary(
+        coordinator=_CoordinatorThatRaises(),
+        on_status_change=events.append,
+        emit_error=errors.append,
+    )
+
+    result = boundary.submit()
+
+    assert result.request is None
+    assert result.status_event == "sign_failure"
+    assert result.error_message == "Signing failed: executor wiring failed"
+    assert events == ["sign_started", "sign_failure"]
+    assert errors == ["Signing failed: executor wiring failed"]
+
+
+def test_signing_action_boundary_surfaces_begin_startup_exception() -> None:
+    from foliaseal.presentation.qt.signing_action_boundary import SigningActionBoundary
+
+    class _CoordinatorThatRaises(_FakeCoordinator):
+        def begin(self):
+            raise RuntimeError("composition failed")
+
+    errors: list[str] = []
+    boundary = SigningActionBoundary(
+        coordinator=_CoordinatorThatRaises(),
+        emit_error=errors.append,
+    )
+
+    result = boundary.begin_transaction()
+
+    assert result.request is None
+    assert result.status_event == "sign_failure"
+    assert result.error_message == "Signing failed: composition failed"
+    assert errors == ["Signing failed: composition failed"]
+
+
 def test_signing_action_boundary_open_signed_output_forwards_callback() -> None:
     from foliaseal.presentation.qt.signing_action_boundary import SigningActionBoundary
 
@@ -358,4 +403,29 @@ def test_signing_action_boundary_surfaces_missing_transaction_runner(tmp_path: P
     assert result.request == request
     assert result.status_event == "sign_failure"
     assert events == ["sign_failure"]
-    assert errors == ["Signing transaction runner is unavailable."]
+    assert errors == ["Signing failed: Signing transaction runner is unavailable."]
+
+
+def test_signing_action_boundary_surfaces_inactive_missing_transaction_runner(
+    tmp_path: Path,
+) -> None:
+    from foliaseal.presentation.qt.signing_action_boundary import SigningActionBoundary
+
+    request = build_signing_request(tmp_path)
+
+    class _CoordinatorWithoutActiveTransaction(_FakeCoordinator):
+        def begin(self):
+            return SigningActionTransition(request=request, state=_state())
+
+    errors: list[str] = []
+    boundary = SigningActionBoundary(
+        coordinator=_CoordinatorWithoutActiveTransaction(),
+        emit_error=errors.append,
+    )
+
+    result = boundary.begin_transaction()
+
+    assert result.request == request
+    assert result.status_event == "sign_failure"
+    assert result.error_message == "Signing failed: Signing transaction runner is unavailable."
+    assert errors == ["Signing failed: Signing transaction runner is unavailable."]

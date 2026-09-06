@@ -86,7 +86,10 @@ class SigningActionBoundary:
     def submit(self) -> SigningActionBoundaryResult:
         if self._on_status_change is not None:
             self._on_status_change("sign_started")
-        transition = self._coordinator.submit()
+        try:
+            transition = self._coordinator.submit()
+        except Exception as exc:  # pragma: no cover - defensive integration guard
+            return self._startup_failure_result(exc)
         if transition.status_event is not None and self._on_status_change is not None:
             self._on_status_change(transition.status_event)
         self._emit_transition_error(transition)
@@ -100,16 +103,21 @@ class SigningActionBoundary:
 
     def begin_transaction(self) -> SigningActionBoundaryResult:
         """Begin the production non-blocking signing transaction."""
-        transition = self._coordinator.begin()
+        try:
+            transition = self._coordinator.begin()
+        except Exception as exc:  # pragma: no cover - defensive integration guard
+            return self._startup_failure_result(exc)
         worker_started = False
         if transition.request is not None and self._transaction_runner is None:
             # A production executor without its owned worker would otherwise
             # leave the coordinator active forever while the UI remains at
             # Step 5. Convert that wiring failure into a visible terminal
             # state instead of silently accepting an unserviceable request.
-            transition = self._coordinator.complete(
-                error=RuntimeError("Signing transaction runner is unavailable.")
-            )
+            error = RuntimeError("Signing transaction runner is unavailable.")
+            if self.transaction_active:
+                transition = self._coordinator.complete(error=error)
+            else:
+                return self._startup_failure_result(error, request=transition.request)
         elif transition.request is not None and self._transaction_runner is not None:
             try:
                 self._transaction_runner.start(transition.request)
@@ -128,6 +136,28 @@ class SigningActionBoundary:
             status_event=transition.status_event,
             error_message=transition.error_message,
             error_via_emit=transition.error_via_emit,
+        )
+
+    def _startup_failure_result(
+        self,
+        error: BaseException,
+        *,
+        request: SigningRequest | None = None,
+    ) -> SigningActionBoundaryResult:
+        """Surface a pre-transaction wiring failure on the normal shell seam."""
+        message = f"Signing failed: {error}"
+        if self._on_status_change is not None:
+            self._on_status_change("sign_failure")
+        if self._emit_error is not None:
+            self._emit_error(message)
+        elif self._on_error is not None:
+            self._on_error(message)
+        return SigningActionBoundaryResult(
+            state=self._coordinator.load(),
+            request=request,
+            status_event="sign_failure",
+            error_message=message,
+            error_via_emit=True,
         )
 
     def poll_transaction(self) -> SigningActionBoundaryResult | None:

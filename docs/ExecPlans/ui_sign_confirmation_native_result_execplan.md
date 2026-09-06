@@ -26,7 +26,10 @@ Step 5. The result is observable in the GUI and through focused tests.
   the final dialog closed, the main window remained open at “Step 5 of 6 —
   Confirm and sign” with normal readiness text, and no signed PDF appeared.
 - [x] (2026-09-06) Confirmed there was no recent signing journal record or
-  diagnostic error, so `begin_transaction()` was not reached.
+  diagnostic error. This is inconclusive about executor entry because the
+  signing use case discards journals for ordinary pre-staging failures; the
+  next evidence must come from assembled transaction state and terminal
+  results, not journal absence alone.
 - [x] (2026-09-06) Explorer review identified the fragile
   `clickedButton() is affirmative_button` wrapper-identity comparison as the
   most likely silent-cancellation cause; preview generation may account for
@@ -49,18 +52,22 @@ Step 5. The result is observable in the GUI and through focused tests.
   final dialog still closed to unchanged Step 5 with no output, proving the
   first semantic-button correction was insufficient. No transaction journal
   record was created.
-- [ ] Make missing transaction-runner and transaction-start failures visible,
+- [x] Make missing transaction-runner and transaction-start failures visible,
   add real-Qt confirmation coverage, and rebuild for a second HITL retest.
 - [x] (2026-09-06) Added a boundary guard that converts a configured executor
   without an owned transaction runner into a visible `sign_failure` result,
   and preserved the status event in the boundary result.
+- [x] (2026-09-06) Added matching startup-failure handling for coordinator
+  exceptions and transaction-runner start exceptions: each now reaches a
+  terminal `sign_failure` through the normal shell status/error callbacks
+  instead of leaving an active Step 5 request without worker delivery.
 - [x] (2026-09-06) Added real offscreen PySide6 coverage proving that a native
   **Sign and save** button click is accepted by the confirmation adapter.
 - [x] (2026-09-06) Added an end-to-end offscreen bridge test using real Qt
   confirmation controls and the asynchronous submission route; both native
   confirmation integration tests pass (`2 passed`).
-- [x] (2026-09-06) Re-ran full validation after the second correction:
-  `1627 passed, 20 skipped, 1 warning`; Ruff and diff checks remain clean.
+- [x] (2026-09-06) Re-ran full validation after the startup-failure guard:
+  `1630 passed, 20 skipped, 1 warning`; Ruff and diff checks remain clean.
 - [ ] Rebuild and install this second correction, then repeat the desktop
   signing workflow and record the resulting status/output.
 - [x] (2026-09-06) Compliance review confirmed the guard aligns with
@@ -68,6 +75,9 @@ Step 5. The result is observable in the GUI and through focused tests.
   production composition from native confirmation through runner completion.
 - [ ] Add an end-to-end offscreen composition test for successful and failed
   transactions, then use its route evidence to target the remaining live issue.
+- [ ] If the second installed retest still fails, capture the assembled
+  production composition's async capability, startup status, terminal status,
+  and worker/polling evidence before changing signing behavior again.
 
 ## Surprises & Discoveries
 
@@ -86,9 +96,12 @@ Step 5. The result is observable in the GUI and through focused tests.
 - Observation: the rebuilt package still returns to the unchanged Step 5 state
   after the affirmative click.
   Evidence: the installed binary matches the rebuilt artifact, but no signing
-  journal record or output file appears. The next investigation must cover a
-  missing transaction runner, an exception before worker start, and completion
-  polling rather than assuming the dialog result is the only boundary.
+  journal record or output file appears. Journal absence is not itself proof
+  that the executor was skipped, because ordinary failures before staging
+  discard their journal. The next investigation must cover a missing
+  transaction runner, an exception before worker start, completion polling, and
+  backend terminal failure rather than assuming the dialog result is the only
+  boundary.
 - Observation: a real offscreen Qt message box accepts the affirmative button
   through the semantic adapter.
   Evidence: `tests/integration/test_qt_sign_confirmation_native.py` passes,
@@ -100,6 +113,11 @@ Step 5. The result is observable in the GUI and through focused tests.
   `supports_async_transaction` is true; otherwise it calls synchronous
   `boundary.submit()`. End-to-end composition coverage is therefore required
   before attributing the live no-op to runner wiring.
+- Observation: startup exceptions require the same visible terminal handling
+  as a missing runner. `SigningActionBoundary` now converts coordinator and
+  worker-start exceptions to `sign_failure`, while runner-start failures use
+  the coordinator's ordinary terminal transition. This keeps the shell's
+  status/error callbacks as the single user-visible failure path.
 
 ## Decision Log
 
@@ -118,8 +136,9 @@ Step 5. The result is observable in the GUI and through focused tests.
   Date/Author: 2026-09-06 / Codex.
 - Decision: Keep the change limited to final confirmation result handling and
   its tests; do not change signing backend or output-path policy in this slice.
-  Rationale: the journal evidence shows the transaction was never started, so
-  backend changes would be speculative and broaden the review.
+  Rationale: the existing evidence does not distinguish a pre-worker failure
+  from an ordinary backend failure whose journal was discarded, so backend
+  changes would be speculative and broaden the review.
   Date/Author: 2026-09-06 / Codex.
 - Decision: Preserve the Cancel-default behavior and make an unrecognized
   result explicit rather than treating it as cancellation.
@@ -144,19 +163,30 @@ Step 5. The result is observable in the GUI and through focused tests.
   Rationale: this prevents a miswired production composition from leaving the
   UI indefinitely at Step 5 with no journal or diagnostic.
   Date/Author: 2026-09-06 / Codex.
+- Decision: Treat coordinator and worker-start exceptions as terminal startup
+  failures on the same boundary seam.
+  Rationale: a request must never remain visually active without a worker that
+  can deliver completion; routing these failures through `sign_failure`
+  preserves the non-cancellable transaction contract and gives the user an
+  actionable error.
+  Date/Author: 2026-09-06 / Codex.
 
 ## Outcomes & Retrospective
 
 The bridge now interprets the native final-dialog result semantically, so an
 equivalent PySide wrapper for **Sign and save** reaches the transaction
 boundary. Cancel remains lossless. An unrecognized result emits an explicit
-warning and does not submit. Focused bridge regressions cover affirmative,
-cancel, and unexpected outcomes (`12 passed`). Full-suite validation is complete
-(`1627 passed, 20 skipped, 1 warning`) after this second correction, plus two
-real offscreen Qt confirmation tests (`2 passed`). The first rebuilt
-installed-package retest still failed to leave Step 5, so the plan remains open
-for a second package rebuild and a new HITL run that records whether the new
-missing-runner diagnostic appears.
+warning and does not submit. The boundary also surfaces coordinator, missing
+runner, and worker-start failures as terminal `sign_failure` results. Full-suite
+validation is complete (`1630 passed, 20 skipped, 1 warning`) after this
+startup-failure correction, plus two real offscreen Qt confirmation tests
+(`2 passed`). The
+first rebuilt installed-package retest still failed to leave Step 5. The second
+corrected package has not yet been installed/retested, and full production
+composition coverage is still open; a successful installed run must reach Step
+6 and produce a verified PDF, otherwise the next evidence must identify
+whether confirmation, composition, worker startup, polling, or the backend is
+responsible.
 
 ## Context and Orientation
 
