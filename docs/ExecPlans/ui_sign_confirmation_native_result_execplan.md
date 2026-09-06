@@ -71,6 +71,16 @@ Step 5. The result is observable in the GUI and through focused tests.
 - [x] (2026-09-06) Rebuilt the package from commits `d0a5741cc`, `222360e45`,
   and `511aa71db`: `/tmp/foliaseal-signing-fix3-dist/foliaseal_0.1.0_amd64.deb`
   (SHA-256 `e2c77aae6484feb1d580acabd98c6534da448505c4b42059255cf0552a65b363`).
+- [x] (2026-09-06) Desktop retest reached the backend and exposed a model
+  contract defect: offline V1 signing supplied `timestamp_required=False` with
+  an empty TSA URL, but `SigningRequest` rejected that valid combination.
+- [x] (2026-09-06) Corrected `SigningRequest` validation to require a non-empty
+  `tsa_url` only when timestamping is required; added regression tests for both
+  offline and timestamp-required requests. Full suite now passes (`1632 passed,
+  20 skipped, 1 warning`).
+- [x] (2026-09-06) Applied the same conditional rule to persisted
+  `TimestampPolicy` configuration and added a disabled-policy regression test,
+  preventing config reload from reintroducing the offline URL requirement.
 - [ ] Install this corrected package, then repeat the desktop
   signing workflow and record the resulting status/output.
 - [x] (2026-09-06) Compliance review confirmed the guard aligns with
@@ -121,6 +131,16 @@ Step 5. The result is observable in the GUI and through focused tests.
   worker-start exceptions to `sign_failure`, while runner-start failures use
   the coordinator's ordinary terminal transition. This keeps the shell's
   status/error callbacks as the single user-visible failure path.
+- Observation: the first visible backend error was `tsa_url must be a non-empty
+  string` even though the opened workspace intentionally sets
+  `timestamp_required=False` and `tsa_url=""` for offline V1 signing.
+  Evidence: `app_frame_workspace_open.py` creates that draft state, while
+  `domain/models.py::SigningRequest.__post_init__` previously rejected it.
+- Observation: persisted timestamp-policy parsing had the same unconditional
+  URL requirement even when `required=False`.
+  Evidence: `infra/config/schemas.py::TimestampPolicy.from_dict` previously
+  called `_require_non_empty_str` without consulting `required`; it now accepts
+  an empty string only for disabled policies.
 
 ## Decision Log
 
@@ -173,6 +193,17 @@ Step 5. The result is observable in the GUI and through focused tests.
   preserves the non-cancellable transaction contract and gives the user an
   actionable error.
   Date/Author: 2026-09-06 / Codex.
+- Decision: Treat the TSA URL as optional for offline signing and mandatory only
+  when timestamping is explicitly required.
+  Rationale: `docs/SPEC.md` requires the core V1 signing workflow to work fully
+  offline and keeps timestamping outside the normal GUI workflow; an empty URL
+  is therefore valid when `timestamp_required=False` but must still fail fast
+  when timestamping is requested.
+  Date/Author: 2026-09-06 / Codex.
+- Decision: Keep the same conditional URL rule at the configuration boundary.
+  Rationale: loading a disabled timestamp policy must not recreate the domain
+  inconsistency that caused the GUI signing failure.
+  Date/Author: 2026-09-06 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -180,10 +211,11 @@ The bridge now interprets the native final-dialog result semantically, so an
 equivalent PySide wrapper for **Sign and save** reaches the transaction
 boundary. Cancel remains lossless. An unrecognized result emits an explicit
 warning and does not submit. The boundary also surfaces coordinator, missing
-runner, and worker-start failures as terminal `sign_failure` results. Full-suite
-validation is complete (`1630 passed, 20 skipped, 1 warning`) after this
-startup-failure correction, plus two real offscreen Qt confirmation tests
-(`2 passed`). The
+runner, and worker-start failures as terminal `sign_failure` results. The
+offline TSA contract is now aligned with SPEC: empty `tsa_url` is accepted only
+when timestamping is disabled. Full-suite validation is complete (`1632 passed,
+20 skipped, 1 warning`) after this correction, plus two real offscreen Qt
+confirmation tests (`2 passed`). The
 first rebuilt installed-package retest still failed to leave Step 5. The second
 corrected package has not yet been installed/retested, and full production
 composition coverage is still open; a successful installed run must reach Step

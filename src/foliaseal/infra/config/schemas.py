@@ -152,10 +152,16 @@ class TimestampPolicy:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> TimestampPolicy:
         """Build from persisted mapping."""
+        required = _require_bool(payload, "required")
+        tsa_url = (
+            _require_non_empty_str(payload, "tsa_url")
+            if required
+            else _require_str(payload, "tsa_url")
+        )
         return cls(
             schema_version=_require_int(payload, "schema_version"),
-            required=_require_bool(payload, "required"),
-            tsa_url=_require_non_empty_str(payload, "tsa_url"),
+            required=required,
+            tsa_url=tsa_url,
             timeout_seconds=_require_int(payload, "timeout_seconds"),
         )
 

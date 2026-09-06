@@ -537,8 +537,11 @@ class SigningRequest:
             self.certificate_path,
             "certificate_path",
         )
-        tsa_url = _require_non_empty_str(self.tsa_url, "tsa_url")
         timestamp_required = _require_bool(self.timestamp_required, "timestamp_required")
+        if timestamp_required:
+            tsa_url = _require_non_empty_str(self.tsa_url, "tsa_url")
+        else:
+            tsa_url = _require_str(self.tsa_url, "tsa_url")
         trust_policy = self.trust_policy
         certificate_alias = _require_optional_non_empty_str(
             self.certificate_alias,

@@ -93,6 +93,20 @@ def test_timestamp_policy_round_trip() -> None:
     assert reconstructed == original
 
 
+def test_disabled_timestamp_policy_allows_empty_tsa_url() -> None:
+    policy = TimestampPolicy.from_dict(
+        {
+            "schema_version": 1,
+            "required": False,
+            "tsa_url": "",
+            "timeout_seconds": 10,
+        }
+    )
+
+    assert policy.required is False
+    assert policy.tsa_url == ""
+
+
 def test_app_settings_defaults_to_home_directories(tmp_path) -> None:
     settings = AppSettings.default(home_directory=tmp_path)
 
