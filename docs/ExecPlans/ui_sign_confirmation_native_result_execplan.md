@@ -84,14 +84,19 @@ Step 5. The result is observable in the GUI and through focused tests.
 - [x] (2026-09-06) Rebuilt the package containing the offline-TSA correction:
   `/tmp/foliaseal-signing-offline-dist/foliaseal_0.1.0_amd64.deb` (SHA-256
   `0b68796f8c2a85e33515ee29be02e773af0642d7d7497f68f00051221e297266`).
-- [ ] Install this corrected package, then repeat the desktop
-  signing workflow and record the resulting status/output.
+- [x] (2026-09-06) Installed-package retest completed the workflow: the
+  sibling PDF was created at
+  `/home/daekar/Downloads/2026.03.25 BoD Conference Call Minutes (Proposed)-signed.pdf`
+  (214273 bytes), and local verification reports one cryptographically valid
+  embedded signature with no timestamp required. The transaction journal is
+  empty after completion.
 - [x] (2026-09-06) Compliance review confirmed the guard aligns with
   SPEC/UI_SPEC, but identified that the current tests do not exercise the full
   production composition from native confirmation through runner completion.
 - [ ] Add an end-to-end offscreen composition test for successful and failed
-  transactions, then use its route evidence to target the remaining live issue.
-- [ ] If the second installed retest still fails, capture the assembled
+  transactions as follow-up hardening; installed acceptance now proves the
+  assembled route completes successfully in the target desktop environment.
+- [ ] If a future installed retest fails, capture the assembled
   production composition's async capability, startup status, terminal status,
   and worker/polling evidence before changing signing behavior again.
 
@@ -144,6 +149,11 @@ Step 5. The result is observable in the GUI and through focused tests.
   Evidence: `infra/config/schemas.py::TimestampPolicy.from_dict` previously
   called `_require_non_empty_str` without consulting `required`; it now accepts
   an empty string only for disabled policies.
+- Observation: the corrected package completed the real desktop signing flow
+  without a TSA URL.
+  Evidence: output file timestamp `2026-09-06 15:43`, size `214273` bytes;
+  `PyHankoSignatureVerifier.verify()` returned
+  `signatures_cryptographically_valid=True` and `signature_count=1`.
 
 ## Decision Log
 
@@ -216,15 +226,12 @@ boundary. Cancel remains lossless. An unrecognized result emits an explicit
 warning and does not submit. The boundary also surfaces coordinator, missing
 runner, and worker-start failures as terminal `sign_failure` results. The
 offline TSA contract is now aligned with SPEC: empty `tsa_url` is accepted only
-when timestamping is disabled. Full-suite validation is complete (`1632 passed,
+when timestamping is disabled. Full-suite validation is complete (`1633 passed,
 20 skipped, 1 warning`) after this correction, plus two real offscreen Qt
-confirmation tests (`2 passed`). The
-first rebuilt installed-package retest still failed to leave Step 5. The second
-corrected package has not yet been installed/retested, and full production
-composition coverage is still open; a successful installed run must reach Step
-6 and produce a verified PDF, otherwise the next evidence must identify
-whether confirmation, composition, worker startup, polling, or the backend is
-responsible.
+confirmation tests (`2 passed`). The first rebuilt installed-package retest
+failed, but the corrected offline-signing package completed the desktop flow
+and produced a locally verified PDF. Full production-composition test coverage
+remains a follow-up hardening item rather than a current release blocker.
 
 ## Context and Orientation
 
