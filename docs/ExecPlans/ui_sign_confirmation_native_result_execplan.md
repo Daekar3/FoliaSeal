@@ -40,11 +40,34 @@ Step 5. The result is observable in the GUI and through focused tests.
 - [x] (2026-09-06) Focused bridge validation passes (`12 passed`); updated the
   architecture contract to document semantic native-button matching and
   explicit unexpected-result diagnostics.
-- [x] (2026-09-06) Full regression and lint pass: `1624 passed, 20 skipped,
+- [x] (2026-09-06) Full regression and lint pass: `1626 passed, 20 skipped,
   1 warning` and Ruff/diff checks clean. The remaining validation gate is a
   real installed-package signing attempt through the desktop session.
 - [ ] Perform a bounded installed-package retest.
 - [ ] Commit the completed behavior and documentation slice.
+- [x] (2026-09-06) Retested the rebuilt package in the desktop session. The
+  final dialog still closed to unchanged Step 5 with no output, proving the
+  first semantic-button correction was insufficient. No transaction journal
+  record was created.
+- [ ] Make missing transaction-runner and transaction-start failures visible,
+  add real-Qt confirmation coverage, and rebuild for a second HITL retest.
+- [x] (2026-09-06) Added a boundary guard that converts a configured executor
+  without an owned transaction runner into a visible `sign_failure` result,
+  and preserved the status event in the boundary result.
+- [x] (2026-09-06) Added real offscreen PySide6 coverage proving that a native
+  **Sign and save** button click is accepted by the confirmation adapter.
+- [x] (2026-09-06) Added an end-to-end offscreen bridge test using real Qt
+  confirmation controls and the asynchronous submission route; both native
+  confirmation integration tests pass (`2 passed`).
+- [x] (2026-09-06) Re-ran full validation after the second correction:
+  `1627 passed, 20 skipped, 1 warning`; Ruff and diff checks remain clean.
+- [ ] Rebuild and install this second correction, then repeat the desktop
+  signing workflow and record the resulting status/output.
+- [x] (2026-09-06) Compliance review confirmed the guard aligns with
+  SPEC/UI_SPEC, but identified that the current tests do not exercise the full
+  production composition from native confirmation through runner completion.
+- [ ] Add an end-to-end offscreen composition test for successful and failed
+  transactions, then use its route evidence to target the remaining live issue.
 
 ## Surprises & Discoveries
 
@@ -60,6 +83,23 @@ Step 5. The result is observable in the GUI and through focused tests.
   Evidence: preparing the confirmation summary calls `apply_changes()` and
   `draft_workflow.preview()`, both of which can perform preview work before the
   confirmation result is interpreted.
+- Observation: the rebuilt package still returns to the unchanged Step 5 state
+  after the affirmative click.
+  Evidence: the installed binary matches the rebuilt artifact, but no signing
+  journal record or output file appears. The next investigation must cover a
+  missing transaction runner, an exception before worker start, and completion
+  polling rather than assuming the dialog result is the only boundary.
+- Observation: a real offscreen Qt message box accepts the affirmative button
+  through the semantic adapter.
+  Evidence: `tests/integration/test_qt_sign_confirmation_native.py` passes,
+  so the remaining installed failure is most plausibly production wiring or
+  pre-worker state transition rather than the native button API itself.
+- Observation: the missing-runner guard is defensive rather than the normal
+  production route.
+  Evidence: `submit_sign_request()` chooses `begin_transaction()` only when
+  `supports_async_transaction` is true; otherwise it calls synchronous
+  `boundary.submit()`. End-to-end composition coverage is therefore required
+  before attributing the live no-op to runner wiring.
 
 ## Decision Log
 
@@ -86,6 +126,24 @@ Step 5. The result is observable in the GUI and through focused tests.
   Rationale: irreversible signing must remain safe, but silent no-ops are not
   acceptable and prevent diagnosis.
   Date/Author: 2026-09-06 / Codex.
+- Decision: Treat a configured signing executor without an available
+  transaction runner, or a start-time exception before worker launch, as an
+  explicit signing failure instead of leaving the UI at Step 5.
+  Rationale: the observed unchanged readiness state and absent journal make a
+  pre-worker failure plausible; users need a visible state and diagnostic.
+  Date/Author: 2026-09-06 / Codex.
+- Decision: Add production-composition coverage before making further runtime
+  behavior changes.
+  Rationale: isolated button and boundary tests pass, while the installed app
+  still remains at Step 5. The missing evidence is the assembled route and its
+  timer/worker wiring, not another speculative backend change.
+  Date/Author: 2026-09-06 / Codex.
+- Decision: Fail visibly when `SigningActionBoundary` receives a request but no
+  transaction runner is available, and retain the terminal status event in its
+  returned result.
+  Rationale: this prevents a miswired production composition from leaving the
+  UI indefinitely at Step 5 with no journal or diagnostic.
+  Date/Author: 2026-09-06 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -94,9 +152,11 @@ equivalent PySide wrapper for **Sign and save** reaches the transaction
 boundary. Cancel remains lossless. An unrecognized result emits an explicit
 warning and does not submit. Focused bridge regressions cover affirmative,
 cancel, and unexpected outcomes (`12 passed`). Full-suite validation is complete
-(`1624 passed, 20 skipped, 1 warning`); the installed-package retest remains
-the release gate. Confirm that the signed PDF is created and the GUI advances
-to Step 6, then record any remaining display-backed limitation.
+(`1627 passed, 20 skipped, 1 warning`) after this second correction, plus two
+real offscreen Qt confirmation tests (`2 passed`). The first rebuilt
+installed-package retest still failed to leave Step 5, so the plan remains open
+for a second package rebuild and a new HITL run that records whether the new
+missing-runner diagnostic appears.
 
 ## Context and Orientation
 

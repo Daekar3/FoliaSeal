@@ -321,3 +321,41 @@ def test_signing_action_boundary_does_not_emit_started_when_worker_start_fails(
     assert events == ["sign_failure"]
     assert errors == ["cannot start"]
     assert result.state.transaction_active is False
+
+
+def test_signing_action_boundary_surfaces_missing_transaction_runner(tmp_path: Path) -> None:
+    from foliaseal.presentation.qt.signing_action_boundary import SigningActionBoundary
+
+    request = build_signing_request(tmp_path)
+
+    class _CoordinatorWithoutRunner(_FakeCoordinator):
+        transaction_active = True
+
+        def begin(self):
+            return SigningActionTransition(request=request, state=_state())
+
+        def complete(self, *, result=None, error=None):
+            assert result is None
+            assert error is not None
+            return SigningActionTransition(
+                request=request,
+                state=_state(result_text=str(error)),
+                error_message=str(error),
+                error_via_emit=True,
+                status_event="sign_failure",
+            )
+
+    events: list[str] = []
+    errors: list[str] = []
+    boundary = SigningActionBoundary(
+        coordinator=_CoordinatorWithoutRunner(),
+        on_status_change=events.append,
+        emit_error=errors.append,
+    )
+
+    result = boundary.begin_transaction()
+
+    assert result.request == request
+    assert result.status_event == "sign_failure"
+    assert events == ["sign_failure"]
+    assert errors == ["Signing transaction runner is unavailable."]

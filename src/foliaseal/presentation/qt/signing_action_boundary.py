@@ -102,7 +102,15 @@ class SigningActionBoundary:
         """Begin the production non-blocking signing transaction."""
         transition = self._coordinator.begin()
         worker_started = False
-        if transition.request is not None and self._transaction_runner is not None:
+        if transition.request is not None and self._transaction_runner is None:
+            # A production executor without its owned worker would otherwise
+            # leave the coordinator active forever while the UI remains at
+            # Step 5. Convert that wiring failure into a visible terminal
+            # state instead of silently accepting an unserviceable request.
+            transition = self._coordinator.complete(
+                error=RuntimeError("Signing transaction runner is unavailable.")
+            )
+        elif transition.request is not None and self._transaction_runner is not None:
             try:
                 self._transaction_runner.start(transition.request)
                 worker_started = True
@@ -117,6 +125,7 @@ class SigningActionBoundary:
         return SigningActionBoundaryResult(
             state=transition.state,
             request=transition.request,
+            status_event=transition.status_event,
             error_message=transition.error_message,
             error_via_emit=transition.error_via_emit,
         )
