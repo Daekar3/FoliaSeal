@@ -68,7 +68,10 @@ Step 5. The result is observable in the GUI and through focused tests.
   confirmation integration tests pass (`2 passed`).
 - [x] (2026-09-06) Re-ran full validation after the startup-failure guard:
   `1630 passed, 20 skipped, 1 warning`; Ruff and diff checks remain clean.
-- [ ] Rebuild and install this second correction, then repeat the desktop
+- [x] (2026-09-06) Rebuilt the package from commits `d0a5741cc`, `222360e45`,
+  and `511aa71db`: `/tmp/foliaseal-signing-fix3-dist/foliaseal_0.1.0_amd64.deb`
+  (SHA-256 `e2c77aae6484feb1d580acabd98c6534da448505c4b42059255cf0552a65b363`).
+- [ ] Install this corrected package, then repeat the desktop
   signing workflow and record the resulting status/output.
 - [x] (2026-09-06) Compliance review confirmed the guard aligns with
   SPEC/UI_SPEC, but identified that the current tests do not exercise the full
