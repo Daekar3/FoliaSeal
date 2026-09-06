@@ -81,6 +81,9 @@ Step 5. The result is observable in the GUI and through focused tests.
 - [x] (2026-09-06) Applied the same conditional rule to persisted
   `TimestampPolicy` configuration and added a disabled-policy regression test,
   preventing config reload from reintroducing the offline URL requirement.
+- [x] (2026-09-06) Rebuilt the package containing the offline-TSA correction:
+  `/tmp/foliaseal-signing-offline-dist/foliaseal_0.1.0_amd64.deb` (SHA-256
+  `0b68796f8c2a85e33515ee29be02e773af0642d7d7497f68f00051221e297266`).
 - [ ] Install this corrected package, then repeat the desktop
   signing workflow and record the resulting status/output.
 - [x] (2026-09-06) Compliance review confirmed the guard aligns with
