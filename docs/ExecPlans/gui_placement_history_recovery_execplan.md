@@ -18,9 +18,11 @@ This is the second child of gui_placement_gate10_recovery_parent_execplan.md. Fi
 
 - [x] (2026-09-07) Recorded user failures and inspected relevant source paths; authored plan.
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
-- [ ] Reproduce the scoped failures and record baseline evidence.
-- [ ] Complete the milestones and regression validation below.
-- [ ] Reconcile dependent plans and record remaining acceptance honestly.
+- [x] (2026-09-07) Reproduced the history-loss ordering in the composed callback path.
+- [x] (2026-09-07) Completed the history milestones and focused regression validation.
+- [x] (2026-09-07) Removed optional viewer-history fallbacks from runtime and shell ports; all current fakes expose the required placement-history methods.
+- [x] (2026-09-07) Removed the remaining AppFrame session-history fallback; active workspaces now satisfy the typed capability contract directly and the app-frame/dependent integration tests pass 86 tests.
+- [x] (2026-09-07) Reconciled the parent and acceptance child; installed package verification and bounded human acceptance remain explicitly open.
 
 ## Surprises & Discoveries
 
@@ -31,6 +33,8 @@ Review traced pointer selection through src/foliaseal/application/workspace_inte
 
 AppFrame._sync_edit_history_actions deliberately prefers native text-editor history when a text editor owns focus. A disabled menu is therefore not by itself proof that the placement stack is empty. Tests must distinguish stored history from focus-sensitive action routing.
 
+Implementation evidence (2026-09-07): projection now updates the visible overlay without adopting or clearing history; explicit adoption is reserved for existing-field lifecycle setup. Pointer selections commit once after the ordered interaction plan, keyboard edits commit after projection, and removal records None once before replaying the draft change. Unchanged panel refreshes no longer clear either stack. The shell forwards placement history capabilities to the AppFrame session port. Real offscreen Qt coverage proves handle cancellation, Pan cancellation, AppFrame pointer edit Undo/Redo, menu removal Undo/Redo, Delete Undo, explicit lifecycle reset, and same-page no-rerender behavior. The shared placement-focused suite passes 276 tests and the full repository suite passes 1646 tests with 20 skips and one existing warning; installed acceptance remains open.
+
 ## Decision Log
 
 
@@ -40,12 +44,22 @@ Decision (2026-09-07): Repair the existing placement contract without redesignin
 
 Decision (2026-09-07): Separate behavior repair from package evidence and human acceptance. Rationale: prior isolated tests did not predict installed behavior, so completion needs composed events and rendered evidence.
 
+Decision (2026-09-07): Keep placement history on the typed viewer/session contract. Rationale: returning the draft unchanged when a viewer lacks an undo method hides an integration defect and makes Gate 10 appear accepted while doing nothing. The runtime and shell port now call the required methods directly.
+
+Decision (2026-09-07): Apply the same strict contract at AppFrame action projection. Rationale: Undo/Redo enablement must not silently degrade when an active fake or production session omits required capability methods.
+
 ## Outcomes & Retrospective
 
 
-Planning and source investigation are complete. Implementation, reproduction tests, package verification and new acceptance are pending. This document does not certify a fix.
+Planning, implementation and focused regression validation are complete. Installed package verification and the bounded human acceptance pass remain pending; this document does not certify the installed GUI until those gates pass.
 
-Three-agent review corrections are incorporated. Keyboard commit-after-projection and pointer recording defects now guide regression coverage; focus delivery still needs reproduction. All implementation and installed acceptance remain pending.
+The strict interface cleanup is validated by the shared placement-focused suite (276 passed), the full repository suite (1646 passed, 20 skipped, one existing warning), plus Ruff and `git diff --check`. Installed package verification and the bounded human acceptance pass remain open.
+
+Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md`
+remain consistent with viewer-owned placement history, focus-sensitive Edit Undo/Redo, and explicit
+lifecycle clearing; no governing-document change is required.
+
+Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, explicit lifecycle adoption and no-op refresh behavior now have focused coverage. The acceptance child owns fresh installed payload identity and rendered Cinnamon/X11 verification; this child does not certify those external gates.
 
 ## Context and Orientation
 
@@ -105,3 +119,5 @@ Retain PlacementHistory.commit, undo, redo and clear contracts where possible. E
 Revision note (2026-09-07): Created from installed Gate 2 item 10 failures and current source inspection to prevent passing low-level tests from substituting for usable placement behavior.
 
 Revision note (2026-09-07, review wave): Incorporated validated explorer observations, strengthened production callback and rendered acceptance requirements, and rejected unsupported startup/replay conclusions. The integration test remains an intentionally new artifact.
+
+Revision note (2026-09-07, implementation): Completed the single viewer-owned history path for pointer, keyboard, panel, removal, undo/redo and explicit lifecycle adoption. Added composed offscreen pointer history coverage and focused regressions. Installed acceptance remains with the acceptance child.

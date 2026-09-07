@@ -18,9 +18,11 @@ This is the first child of gui_placement_gate10_recovery_parent_execplan.md in d
 
 - [x] (2026-09-07) Recorded user failures and inspected relevant source paths; authored plan.
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
-- [ ] Reproduce the scoped failures and record baseline evidence.
-- [ ] Complete the milestones and regression validation below.
-- [ ] Reconcile dependent plans and record remaining acceptance honestly.
+- [x] (2026-09-07) Reproduced the source-level failure shape: explicit mode selection did not focus the canvas, composition kept a duplicate mode value, and new drags did not acquire a mouse grab for held Escape cancellation.
+- [x] (2026-09-07) Added explicit viewer focus, authoritative mode projection, mode-dependent handle rendering, and mouse-grab cleanup for canceled new drags.
+- [x] (2026-09-07) Added focused unit and composed offscreen Qt regressions; the shared placement-focused suite passes 276 tests, including all 6 Gate 10 integration tests.
+- [x] (2026-09-07) Removed the composition keyboard-callback compatibility rebuild and made the viewer mode transition a required typed interface; shell/runtime fakes now implement the complete callback and placement-history surface.
+- [ ] Run the installed X11 acceptance and reconcile dependent plans with any remaining history findings.
 
 ## Surprises & Discoveries
 
@@ -40,12 +42,20 @@ Decision (2026-09-07): Repair the existing placement contract without redesignin
 
 Decision (2026-09-07): Separate behavior repair from package evidence and human acceptance. Rationale: prior isolated tests did not predict installed behavior, so completion needs composed events and rendered evidence.
 
+Decision (2026-09-07): Treat Gate 10 viewer callbacks and mode transitions as required production interfaces. Rationale: the prior TypeError retry could silently discard keyboard callbacks, and optional getattr fallbacks could turn missing placement history into a false no-op. Fakes and builders were migrated to the current contract instead of preserving those compatibility paths.
+
 ## Outcomes & Retrospective
 
 
-Planning and source investigation are complete. Implementation, reproduction tests, package verification and new acceptance are pending. This document does not certify a fix.
+The source and offscreen composed regressions now cover explicit canvas focus, mode projection, handle visibility, and held-drag cancellation. The current full repository suite passes 1646 tests with 20 skips and one existing warning. Installed X11 acceptance remains pending, and placement history is intentionally handled by the dependent history child.
 
-Three-agent review corrections are incorporated. Keyboard commit-after-projection and pointer recording defects now guide regression coverage; focus delivery still needs reproduction. All implementation and installed acceptance remain pending.
+Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md`
+remain consistent with the implemented mode, focus, and cancellation contract; no governing-document
+change is required.
+
+The strict-interface remediation remains covered by the focused runtime/composition/viewer/AppFrame/session and signing-shell suites; the shared placement-focused count is 276, the full suite is 1646 passed with 20 skips and one existing warning, and Ruff plus `git diff --check` pass. The installed X11 retest remains the acceptance gate.
+
+Three-agent review corrections are incorporated. Keyboard commit-after-projection and pointer recording defects remain owned by the dependent history child; this child now owns focus delivery, authoritative mode projection, handle rendering, and cancellation lifecycle.
 
 ## Context and Orientation
 

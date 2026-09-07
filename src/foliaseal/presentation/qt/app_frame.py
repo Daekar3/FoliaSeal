@@ -1448,10 +1448,8 @@ class FoliaSealAppFrame:
                 select_all_enabled = False
             else:
                 session = workspace.session
-                undo_getter = getattr(session, "can_undo_placement", None)
-                redo_getter = getattr(session, "can_redo_placement", None)
-                undo_enabled = bool(undo_getter()) if callable(undo_getter) else False
-                redo_enabled = bool(redo_getter()) if callable(redo_getter) else False
+                undo_enabled = bool(session.can_undo_placement())
+                redo_enabled = bool(session.can_redo_placement())
                 select_all_getter = getattr(session, "can_select_all_document_text", None)
                 select_all_enabled = (
                     bool(select_all_getter()) if callable(select_all_getter) else False

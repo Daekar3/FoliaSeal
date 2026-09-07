@@ -104,6 +104,14 @@ class PdfViewerWidgetAdapter:
                 self._review_highlight_page_index: int | None = None
                 self._review_highlight_rect: PdfRect | None = None
                 self._initial_fit_pending = True
+                set_focus_policy = getattr(self, "setFocusPolicy", None)
+                if callable(set_focus_policy):
+                    focus_policy = getattr(bindings.qt, "StrongFocus", None)
+                    if focus_policy is None:
+                        focus_enum = getattr(bindings.qt, "FocusPolicy", None)
+                        focus_policy = getattr(focus_enum, "StrongFocus", None)
+                    if focus_policy is not None:
+                        set_focus_policy(focus_policy)
 
             def refresh(self, *, elapsed_ms: float | None = None, navigation: bool = False) -> None:
                 start_time = perf_counter() if elapsed_ms is None else None
@@ -229,7 +237,16 @@ class PdfViewerWidgetAdapter:
                     if self._drag_origin is not None:
                         self._drag_origin = None
                         self._selection_rect = None
+                        self.releaseMouse()
                         self._emit_interaction("placement_drag_cancelled")
+                        self.update()
+                        event.accept()
+                        return
+                    if self._pan_origin is not None:
+                        self._pan_origin = None
+                        self._pan_click_candidate = False
+                        self.releaseMouse()
+                        self._emit_interaction("pan_drag_cancelled")
                         self.update()
                         event.accept()
                         return
@@ -499,6 +516,7 @@ class PdfViewerWidgetAdapter:
                             return
                 self._drag_origin = point.toPoint()
                 self._selection_rect = bindings.q_rect(self._drag_origin, self._drag_origin)
+                self.grabMouse()
                 self.update()
 
             def mouseMoveEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
@@ -583,6 +601,7 @@ class PdfViewerWidgetAdapter:
                 if not self._is_selection_drag(self._drag_origin, current):
                     self._selection_rect = None
                     self._drag_origin = None
+                    self.releaseMouse()
                     if self._interaction_mode == "text":
                         self._emit_interaction("text_selection_clear_requested")
                     self.update()
@@ -613,6 +632,7 @@ class PdfViewerWidgetAdapter:
                                 self._emit_interaction("placement_snap_applied")
                 except (RuntimeError, ValueError) as exc:
                     self._emit_interaction("selection_error")
+                    self.releaseMouse()
                     self._emit_error(
                         "Selection could not be placed on the PDF page. "
                         "Please keep the selection inside page bounds.",
@@ -620,13 +640,20 @@ class PdfViewerWidgetAdapter:
                     )
                     self.update()
                     return
+                self.releaseMouse()
                 if self._on_selection is not None:
                     self._emit_interaction("selection_success")
                     self._on_selection(pdf_rect)
                 self.update()
 
             def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
-                self._placement_history.synchronize(signature_rect)
+                """Project draft geometry without changing placement history."""
+                self._overlay_signature_rect = signature_rect
+                self.update()
+
+            def adopt_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
+                """Adopt externally loaded geometry at an explicit lifecycle boundary."""
+                self._placement_history.clear(current=signature_rect)
                 self._overlay_signature_rect = signature_rect
                 self.update()
 
@@ -861,6 +888,7 @@ class PdfViewerWidgetAdapter:
                 if mode not in {"pan", "signature", "text"}:
                     raise ValueError(f"Unsupported viewer interaction mode: {mode}")
                 self._interaction_mode = mode
+                self.update()
                 set_cursor = getattr(self, "setCursor", None)
                 if callable(set_cursor):
                     cursor = (
@@ -872,6 +900,20 @@ class PdfViewerWidgetAdapter:
                     )
                     if cursor is not None:
                         set_cursor(cursor)
+
+            def focus_viewer(self) -> None:
+                """Give the page canvas keyboard focus for an explicit tool command."""
+
+                focus = getattr(self, "setFocus", None)
+                if not callable(focus):
+                    return
+                try:
+                    focus()
+                except TypeError:
+                    focus(None)
+
+            def interaction_mode(self) -> str:
+                return self._interaction_mode
 
             def _emit_link_click(self, point: Any) -> None:
                 if self._on_link_click is None:
@@ -1230,6 +1272,8 @@ class PdfViewerWidgetAdapter:
             def _draw_overlay(self, painter: Any, overlay_rect: Any) -> None:
                 painter.setPen(bindings.q_pen(bindings.q_color(255, 102, 0), 2))
                 painter.drawRect(overlay_rect.normalized())
+                if self._interaction_mode != "signature":
+                    return
                 for handle_point in self._overlay_handle_points(overlay_rect):
                     painter.drawRect(
                         bindings.q_rect(
@@ -1458,6 +1502,9 @@ def build_qt_pdf_viewer_widget(
         def set_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
             preview_widget.set_signature_overlay(signature_rect)
 
+        def adopt_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
+            preview_widget.adopt_signature_overlay(signature_rect)
+
         def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
             preview_widget.record_signature_edit(signature_rect)
 
@@ -1525,5 +1572,11 @@ def build_qt_pdf_viewer_widget(
 
         def set_interaction_mode(self, mode: str) -> None:
             preview_widget.set_interaction_mode(mode)
+
+        def focus_viewer(self) -> None:
+            preview_widget.focus_viewer()
+
+        def interaction_mode(self) -> str:
+            return preview_widget.interaction_mode()
 
     return ScrollablePdfViewer()

@@ -29,13 +29,6 @@ class PlacementHistory:
 
         return bool(self._redo)
 
-    def synchronize(self, current: SignatureRect | None) -> None:
-        """Adopt external state and clear history when it differs."""
-        if current != self._current:
-            self._undo.clear()
-            self._redo.clear()
-        self._current = current
-
     def commit(self, current: SignatureRect | None) -> None:
         """Record one user mutation and invalidate the redo branch."""
         if current == self._current:

@@ -407,6 +407,8 @@ class _FakeWidget:
         self.size = None
         self.cursor = None
         self.base_key_events = []
+        self.focus_policy = None
+        self.focused = False
 
     def update(self):
         self.update_calls += 1
@@ -425,6 +427,12 @@ class _FakeWidget:
 
     def setCursor(self, cursor):  # noqa: N802
         self.cursor = cursor
+
+    def setFocusPolicy(self, policy):  # noqa: N802
+        self.focus_policy = policy
+
+    def setFocus(self, *args):  # noqa: N802
+        self.focused = True
 
     def mousePressEvent(self, event):  # noqa: N802
         return None
@@ -591,6 +599,36 @@ def test_mouse_release_event_handles_selection_conversion_failures(monkeypatch):
     widget = PdfViewerWidgetAdapter().create(workflow=workflow, on_selection=selected.append)
     widget.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=10, y=10))
     widget.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=20, y=20))
+
+    assert selected == []
+
+
+def test_explicit_viewer_mode_focuses_canvas_and_exposes_authoritative_mode(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    viewer = PdfViewerWidgetAdapter().create(workflow=_build_workflow())
+
+    assert viewer.interaction_mode() == "signature"
+    viewer.set_interaction_mode("pan")
+    viewer.focus_viewer()
+
+    assert viewer.interaction_mode() == "pan"
+    assert viewer.focused is True
+
+
+def test_new_drag_grabs_mouse_and_escape_releases_it_without_late_commit(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    selected = []
+    viewer = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_selection=selected.append,
+    )
+
+    viewer.mousePressEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=10, y=10))
+    viewer.mouseMoveEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=40, y=40))
+    assert viewer.mouse_grabbed is True
+    viewer.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Escape))
+    assert viewer.mouse_grabbed is False
+    viewer.mouseReleaseEvent(_FakeMouseEvent(button=_FakeQt.LeftButton, x=40, y=40))
 
     assert selected == []
 
@@ -1143,6 +1181,51 @@ def test_external_numeric_edit_enters_placement_history(monkeypatch):
 
     assert preview._overlay_signature_rect == first
     assert applied == [first]
+
+
+def test_overlay_projection_preserves_placement_history(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0, left_pt=10.0, bottom_pt=20.0, width_pt=30.0, height_pt=10.0
+    )
+    second = SignatureRect(
+        page_index=0, left_pt=15.0, bottom_pt=20.0, width_pt=30.0, height_pt=10.0
+    )
+    applied = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+    )
+    preview.record_signature_edit(first)
+    preview.record_signature_edit(second)
+    preview.set_signature_overlay(second)
+
+    assert preview.can_undo_signature_placement() is True
+    assert preview.undo_signature_placement() == first
+    assert applied == [first]
+
+
+def test_overlay_adoption_resets_history_only_at_explicit_lifecycle_boundary(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0, left_pt=10.0, bottom_pt=20.0, width_pt=30.0, height_pt=10.0
+    )
+    second = SignatureRect(
+        page_index=0, left_pt=15.0, bottom_pt=20.0, width_pt=30.0, height_pt=10.0
+    )
+    preview = PdfViewerWidgetAdapter().create(workflow=_build_workflow())
+    preview.record_signature_edit(first)
+    preview.record_signature_edit(second)
+    assert preview.can_undo_signature_placement() is True
+
+    preview.adopt_signature_overlay(first)
+
+    assert preview.can_undo_signature_placement() is False
+    assert preview.can_redo_signature_placement() is False
+    preview.record_signature_edit(second)
+    assert preview.undo_signature_placement() == first
 
 
 def test_keyboard_recovery_moves_off_page_overlay_without_scaling(monkeypatch):

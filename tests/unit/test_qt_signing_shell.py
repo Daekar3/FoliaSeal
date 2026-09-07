@@ -670,6 +670,11 @@ class _FakeViewerWidget(_FakeWidget):
         on_link_click=None,
         on_error=None,
         on_interaction=None,
+        on_keyboard_create=None,
+        on_keyboard_move=None,
+        on_keyboard_resize=None,
+        on_keyboard_recover=None,
+        on_keyboard_apply=None,
     ) -> None:
         super().__init__()
         self.workflow = workflow
@@ -677,6 +682,11 @@ class _FakeViewerWidget(_FakeWidget):
         self.on_link_click = on_link_click
         self.on_error = on_error
         self.on_interaction = on_interaction
+        self.on_keyboard_create = on_keyboard_create
+        self.on_keyboard_move = on_keyboard_move
+        self.on_keyboard_resize = on_keyboard_resize
+        self.on_keyboard_recover = on_keyboard_recover
+        self.on_keyboard_apply = on_keyboard_apply
         self.refresh_calls = []
         self.overlay_signature_rect = None
         self.text_highlight_page_index = None
@@ -684,9 +694,11 @@ class _FakeViewerWidget(_FakeWidget):
         self.text_search_highlight_page_index = None
         self.text_search_highlight_rects = ()
         self.text_search_secondary_highlight_rects = ()
-        self.interaction_mode = "signature"
+        self._interaction_mode = "signature"
         self.fit_page_calls = 0
         self.fit_width_calls = 0
+        self._placement_history = []
+        self._placement_redo = []
 
     def refresh(self, *, elapsed_ms=None, navigation=False):
         self.refresh_calls.append((elapsed_ms, navigation))
@@ -698,6 +710,43 @@ class _FakeViewerWidget(_FakeWidget):
 
     def set_signature_overlay(self, signature_rect):
         self.overlay_signature_rect = signature_rect
+
+    def adopt_signature_overlay(self, signature_rect):
+        self.overlay_signature_rect = signature_rect
+
+    def record_signature_edit(self, signature_rect):
+        if not self._placement_history or self._placement_history[-1] != signature_rect:
+            self._placement_history.append(signature_rect)
+            self._placement_redo.clear()
+        self.overlay_signature_rect = signature_rect
+
+    def clear_signature_history(self):
+        self._placement_history.clear()
+        self._placement_redo.clear()
+
+    def can_undo_signature_placement(self):
+        return len(self._placement_history) > 1
+
+    def can_redo_signature_placement(self):
+        return bool(self._placement_redo)
+
+    def undo_signature_placement(self):
+        if not self.can_undo_signature_placement():
+            return self.overlay_signature_rect
+        self._placement_redo.append(self._placement_history.pop())
+        self.overlay_signature_rect = self._placement_history[-1]
+        return self.overlay_signature_rect
+
+    def redo_signature_placement(self):
+        if not self._placement_redo:
+            return self.overlay_signature_rect
+        target = self._placement_redo.pop()
+        self._placement_history.append(target)
+        self.overlay_signature_rect = target
+        return target
+
+    def focus_viewer(self):
+        return None
 
     def clear_signature_overlay(self):
         self.overlay_signature_rect = None
@@ -727,7 +776,10 @@ class _FakeViewerWidget(_FakeWidget):
         self.text_search_secondary_highlight_rects = ()
 
     def set_interaction_mode(self, mode):
-        self.interaction_mode = mode
+        self._interaction_mode = mode
+
+    def interaction_mode(self):
+        return self._interaction_mode
 
     def fit_page_view(self):
         self.fit_page_calls += 1
@@ -2485,7 +2537,7 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
 
     controls["text_selection_button"].click()
 
-    assert widget.viewer_widget.interaction_mode == "text"
+    assert widget.viewer_widget.interaction_mode() == "text"
     assert controls["text_selection_button"].isChecked() is True
     assert controls["interaction_mode_label"].text() == (
         "Text selection mode — drag across PDF text to select and copy"
@@ -2517,7 +2569,7 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
     controls["text_selection_button"].click()
     widget.viewer_widget.emit_selection(PdfRect(x1=1.0, y1=2.0, x2=3.0, y2=4.0))
 
-    assert widget.viewer_widget.interaction_mode == "signature"
+    assert widget.viewer_widget.interaction_mode() == "signature"
     assert controls["text_selection_button"].isChecked() is False
     assert controls["interaction_mode_label"].text() == (
         "Place mode — drag to draw/resize; Enter creates/accepts; arrows move; "
@@ -2527,7 +2579,7 @@ def test_signing_shell_document_text_selection_mode_copies_and_clears_selection(
 
     controls["pan_button"].click()
 
-    assert widget.viewer_widget.interaction_mode == "pan"
+    assert widget.viewer_widget.interaction_mode() == "pan"
     assert controls["pan_button"].isChecked() is True
     assert controls["place_button"].isChecked() is False
     assert widget.signature_rect() is not None
@@ -2566,7 +2618,7 @@ def test_signing_shell_document_text_selection_consumes_drag_before_signature_pl
     widget.viewer_widget.emit_selection(PdfRect(x1=10.0, y1=10.0, x2=30.0, y2=16.0))
 
     assert widget.signature_rect() is None
-    assert widget.viewer_widget.interaction_mode == "text"
+    assert widget.viewer_widget.interaction_mode() == "text"
     assert controls["text_selection_button"].isChecked() is True
     assert widget.viewer_widget.text_highlight_page_index == 0
     assert widget.viewer_widget.text_highlight_rects == (

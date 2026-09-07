@@ -323,20 +323,16 @@ class QtSigningWorkspaceSessionPort:
         return bool(remove()) if callable(remove) else False
 
     def can_undo_placement(self) -> bool:
-        capability = getattr(self.shell_widget, "can_undo_placement", None)
-        return bool(capability()) if callable(capability) else False
+        return self.shell_widget.can_undo_placement()
 
     def can_redo_placement(self) -> bool:
-        capability = getattr(self.shell_widget, "can_redo_placement", None)
-        return bool(capability()) if callable(capability) else False
+        return self.shell_widget.can_redo_placement()
 
     def undo_placement(self) -> SignatureRect | None:
-        undo = getattr(self.shell_widget, "undo_placement", None)
-        return undo() if callable(undo) else None
+        return self.shell_widget.undo_placement()
 
     def redo_placement(self) -> SignatureRect | None:
-        redo = getattr(self.shell_widget, "redo_placement", None)
-        return redo() if callable(redo) else None
+        return self.shell_widget.redo_placement()
 
     def set_signature_rect(
         self,

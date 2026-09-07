@@ -18,18 +18,29 @@ Execute gui_placement_mode_focus_cancel_execplan.md first, gui_placement_history
 
 - [x] (2026-09-07) Recorded user failures and inspected relevant source paths; authored plan.
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
-- [ ] Reproduce the scoped failures and record baseline evidence.
-- [ ] Complete the milestones and regression validation below.
-- [ ] Reconcile dependent plans and record remaining acceptance honestly.
+- [x] (2026-09-07) Reproduced the scoped history-loss callback ordering and completed the history child implementation.
+- [x] (2026-09-07) Completed mode/focus/cancellation implementation and composed Qt regressions; the shared placement-focused suite passes 276 tests.
+- [x] (2026-09-07) Completed strict Gate 10 interface cleanup: composition preserves all keyboard callbacks, viewer mode transitions are required, and runtime/shell placement history no longer degrades to optional no-ops. Focused suites pass 147 and 113 tests respectively.
+- [x] (2026-09-07) Completed AppFrame history contract cleanup: Edit action enablement now calls the required session capability methods directly; focused app-frame and dependent integration tests pass 86 tests.
+- [ ] Complete the installed acceptance milestone. Fresh package/audit evidence exists, but the installed bundle hash still differs from the fresh payload and rendered placement behavior remains unverified; the worker's sudo install attempt required an interactive password.
+- [x] (2026-09-07) Reconciled the behavior children and older stability plan; source/full validation is green and only fresh installed Cinnamon/X11 plus bounded human acceptance remains open.
 
 ## Surprises & Discoveries
 
 
 The September 7 user report establishes keyboard adjustment and Escape during a held-button drag as failures. Idle Escape leaves apparent placement behavior while the tip says Pan. Mouse handles and Remove Placement work, but Undo of handle edits and removal is unavailable; Redo is blocked by Undo failure. Unattempted applicable tests are Not tested, never N/A.
 
-Source inspection confirms missing explicit focus setup, separate canvas and composition mode values, unconditional handle painting, and destructive history synchronization paths. These are evidence-backed defects or hazards, not a complete reproduced causal chain for every installed symptom. No live reproduction or installed binary identity verification was performed while writing this family.
+Initial source inspection identified missing explicit focus setup, separate canvas and composition mode values, unconditional handle painting, and destructive history synchronization paths. Those implementation findings are now addressed and covered by composed tests; fresh installed binary identity and rendered human acceptance remain external requirements.
 
 Review refined the evidence: pointer edits use notify=False and bypass panel recording; keyboard callbacks project new geometry before the local history commit. Composition initializes Pan correctly, while later menu/Escape transitions can leave stale control projections. Synchronizing an identical Undo/Redo target does not itself clear history; trace secondary notifications for remaining losses.
+
+History child implementation evidence (2026-09-07): viewer projection no longer clears history, pointer and removal operations commit exactly once, keyboard replay remains projection-only, unchanged panel refreshes preserve both stacks, and the shell forwards placement history capabilities to AppFrame. Focused real-Qt coverage includes existing-handle cancellation, Pan cancellation, AppFrame pointer edit Undo/Redo, menu removal Undo/Redo, Delete Undo, lifecycle reset and same-page render counters. Installed acceptance remains open.
+
+Strict-interface remediation evidence (2026-09-07): the composition now invokes the current viewer builder contract once, without a TypeError retry that strips keyboard callbacks. Runtime and shell-port Gate 10 history methods call required typed methods directly. Fakes were migrated to implement those callbacks and history operations. Ruff and `git diff --check` pass; installed acceptance remains open.
+
+AppFrame contract evidence (2026-09-07): `_sync_edit_history_actions` now invokes the typed session `can_undo_placement()` and `can_redo_placement()` methods directly whenever a workspace is active. The final optional-method fallback was removed so a missing history implementation cannot silently disable Gate 10. The app-frame and dependent integration tests pass 86 tests; installed acceptance remains open.
+
+Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md` were reviewed against the implementation and this family. No governing-document change is required: the repaired source follows the existing Pan/Place/Text, keyboard-focus, cancelable-drag, visible-overlay, and undoable-placement contract. The remaining discrepancy is evidence status for the installed GUI, which stays in the acceptance child.
 
 ## Decision Log
 
@@ -40,12 +51,16 @@ Decision (2026-09-07): Repair the existing placement contract without redesignin
 
 Decision (2026-09-07): Separate behavior repair from package evidence and human acceptance. Rationale: prior isolated tests did not predict installed behavior, so completion needs composed events and rendered evidence.
 
+Decision (2026-09-07): Remove compatibility fallbacks that can turn Gate 10 defects into silent no-ops. Rationale: the production viewer and shell already implement the current contract; preserving absent-method retries hid missing callbacks and history. Test doubles now implement the same interface.
+
+Decision (2026-09-07): Enforce the required session history capability at the AppFrame boundary. Rationale: action enablement must surface an incomplete workspace contract instead of converting it into disabled Undo/Redo actions. Author: Codex.
+
 ## Outcomes & Retrospective
 
 
-Planning and source investigation are complete. Implementation, reproduction tests, package verification and new acceptance are pending. This document does not certify a fix.
+Mode/focus/cancellation and placement-history implementation plus composed regressions are complete in the current source tree. Focused placement validation passes 186 tests in the current checkout. A fresh amd64 package was built and passed both offscreen and escalated display-backed payload audits, including XCB startup. The installed bundle hash differs from the fresh payload, and bounded rendered placement acceptance remains open. This document does not certify the installed GUI.
 
-Three-agent review corrections are incorporated. Keyboard commit-after-projection and pointer recording defects now guide regression coverage; focus delivery still needs reproduction. All implementation and installed acceptance remain pending.
+Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, explicit focus, authoritative mode projection, cancellation, AppFrame forwarding and same-page render preservation now have composed coverage. The acceptance child remains the sole owner of fresh package identity and rendered Cinnamon/X11 retest.
 
 ## Context and Orientation
 
@@ -55,7 +70,7 @@ The viewer is built by src/foliaseal/presentation/qt/viewer_widget.py, runtime c
 ## Change Slice
 
 
-Documentation/status update is the present slice. Future behavior commits belong to the first two children; generated package/evidence updates belong to the third. Temporary logs, screenshots, PDFs and packages may be generated under /tmp; never commit certificates, user documents, package binaries, or bulk generated reports.
+Behavior work is complete for both implementation children; generated package/evidence updates and bounded human retest remain with the acceptance child. Temporary logs, screenshots, PDFs and packages may be generated under /tmp; never commit certificates, user documents, package binaries, or bulk generated reports.
 
 ## Plan of Work
 

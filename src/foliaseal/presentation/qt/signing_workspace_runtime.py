@@ -109,6 +109,7 @@ class SigningWorkspaceRuntime:
         self._refresh_sign_button_state: Callable[[], None] | None = None
         self._refresh_page_navigation_state: Callable[[], None] | None = None
         self._result_label: Any = None
+        self._on_viewer_mode_change: Callable[[], None] | None = None
 
     def bind(
         self,
@@ -144,9 +145,14 @@ class SigningWorkspaceRuntime:
         self._link_history.reset(viewer_workflow.session.current_page)
 
     def on_viewer_selection(self, pdf_rect: PdfRect) -> None:
+        before_rect = self._draft_workflow.signature_rect
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().select_in_viewer(pdf_rect),
         )
+        after_rect = self._draft_workflow.signature_rect
+        if after_rect != before_rect:
+            self._viewer_widget_required().record_signature_edit(after_rect)
+            self._last_panel_signature_rect = after_rect
         if self._on_status_change is not None:
             self._on_status_change("document_text_selection_changed")
 
@@ -310,20 +316,17 @@ class SigningWorkspaceRuntime:
     def can_undo_placement(self) -> bool:
         """Return whether the active viewer can undo a placement mutation."""
 
-        capability = getattr(self._viewer_widget_required(), "can_undo_signature_placement", None)
-        return bool(capability()) if callable(capability) else False
+        return self._viewer_widget_required().can_undo_signature_placement()
 
     def can_redo_placement(self) -> bool:
         """Return whether the active viewer can redo a placement mutation."""
 
-        capability = getattr(self._viewer_widget_required(), "can_redo_signature_placement", None)
-        return bool(capability()) if callable(capability) else False
+        return self._viewer_widget_required().can_redo_signature_placement()
 
     def undo_placement(self) -> SignatureRect | None:
         """Undo one placement mutation and refresh readiness projections."""
 
-        undo = getattr(self._viewer_widget_required(), "undo_signature_placement", None)
-        result = undo() if callable(undo) else self._draft_workflow.signature_rect
+        result = self._viewer_widget_required().undo_signature_placement()
         if self._on_status_change is not None:
             self._on_status_change("signing_readiness_changed")
         return result
@@ -331,8 +334,7 @@ class SigningWorkspaceRuntime:
     def redo_placement(self) -> SignatureRect | None:
         """Redo one placement mutation and refresh readiness projections."""
 
-        redo = getattr(self._viewer_widget_required(), "redo_signature_placement", None)
-        result = redo() if callable(redo) else self._draft_workflow.signature_rect
+        result = self._viewer_widget_required().redo_signature_placement()
         if self._on_status_change is not None:
             self._on_status_change("signing_readiness_changed")
         return result
@@ -344,18 +346,15 @@ class SigningWorkspaceRuntime:
             self._refresh_page_navigation_state_required()()
         if name == "text_selection_clear_requested":
             self.clear_selected_document_text()
+        if name == "placement_mode_cancelled":
+            self._on_viewer_mode_change and self._on_viewer_mode_change()
         if self._on_status_change is not None:
             self._on_status_change(name)
 
     def on_panel_change(self) -> None:
         current_signature_rect = self._draft_workflow.signature_rect
-        record_edit = getattr(self._viewer_widget_required(), "record_signature_edit", None)
-        clear_history = getattr(self._viewer_widget_required(), "clear_signature_history", None)
         if current_signature_rect != self._last_panel_signature_rect:
-            if callable(record_edit):
-                record_edit(current_signature_rect)
-        elif callable(clear_history):
-            clear_history()
+            self._viewer_widget_required().record_signature_edit(current_signature_rect)
         self._last_panel_signature_rect = current_signature_rect
         self.apply_workspace_interaction_plan(
             self._workspace_interaction_session_required().refresh_after_panel_change()
@@ -364,9 +363,7 @@ class SigningWorkspaceRuntime:
             self._on_status_change("signing_readiness_changed")
 
     def clear_signature_history(self) -> None:
-        clear_history = getattr(self._viewer_widget_required(), "clear_signature_history", None)
-        if callable(clear_history):
-            clear_history()
+        self._viewer_widget_required().clear_signature_history()
 
     def on_page_change(self, page_number: int) -> None:
         if self._viewer_workflow_required().session.current_page != page_number - 1:
@@ -459,13 +456,24 @@ class SigningWorkspaceRuntime:
         if mode != "text" and self.document_text_selection_mode_enabled():
             transition = self._document_review_workspace_required().set_text_selection_mode(False)
             self._review_bridge_required().apply_transition(transition)
-        setter = getattr(self._viewer_widget_required(), "set_interaction_mode", None)
-        if not callable(setter):
-            raise RuntimeError("The active viewer does not expose interaction modes.")
-        setter(mode)
+        viewer = self._viewer_widget_required()
+        viewer.set_interaction_mode(mode)
+        viewer.focus_viewer()
+        if self._on_viewer_mode_change is not None:
+            self._on_viewer_mode_change()
         if self._on_status_change is not None:
             self._on_status_change(f"viewer_mode_{mode}")
         return mode
+
+    def viewer_interaction_mode(self) -> str:
+        """Return the authoritative mode currently projected by the viewer."""
+
+        return self._viewer_widget_required().interaction_mode()
+
+    def set_viewer_mode_change_handler(self, handler: Callable[[], None] | None) -> None:
+        """Register the composition projection refresh for viewer mode changes."""
+
+        self._on_viewer_mode_change = handler
 
     def can_place_signature_placement(self) -> bool:
         return (
@@ -485,6 +493,7 @@ class SigningWorkspaceRuntime:
     def remove_signature_placement(self) -> bool:
         if not self.can_remove_signature_placement():
             return False
+        self._viewer_widget_required().record_signature_edit(None)
         self.apply_keyboard_placement(None)
         if self._on_status_change is not None:
             self._on_status_change("placement_removed")
@@ -596,7 +605,7 @@ class SigningWorkspaceRuntime:
         refresh = getattr(self._viewer_widget_required(), "refresh", None)
         if page_changed and callable(refresh):
             refresh(navigation=True)
-        self.sync_signature_overlay()
+        self._adopt_signature_overlay()
         self._refresh_sign_button_state_required()()
 
     def signature_rect(self) -> SignatureRect | None:
@@ -681,6 +690,11 @@ class SigningWorkspaceRuntime:
         setter = getattr(self._viewer_widget_required(), "set_signature_overlay", None)
         if callable(setter):
             setter(self._draft_workflow.signature_rect)
+
+    def _adopt_signature_overlay(self) -> None:
+        self._viewer_widget_required().adopt_signature_overlay(
+            self._draft_workflow.signature_rect
+        )
 
     def refresh_review_jump_to_page_index(
         self,

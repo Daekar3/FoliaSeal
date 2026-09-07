@@ -8,6 +8,17 @@ behaviors. The active repair and retest owner is
 [Placement Gate 10 recovery family](gui_placement_gate10_recovery_parent_execplan.md).
 Signing and reopening/verification remain user-reported passes.
 
+Status reconciliation (2026-09-07): This plan is historical for the earlier placement stability and
+resource-spike work. Its remaining Gate 2 interaction implementation and retest responsibilities are
+owned by the [Gate 10 recovery family](gui_placement_gate10_recovery_parent_execplan.md). The source
+implementation now has focused/composed coverage; fresh installed package identity and human acceptance
+remain open in that family. Do not execute this plan as a competing implementation loop.
+
+Acceptance handoff (2026-09-07): The Gate 10 family built and audited a fresh package from the repaired
+source, including an escalated display-backed XCB startup audit. The installed bundle remains an older
+payload because the worker shell could not complete the interactive sudo password prompt; rendered
+placement behavior therefore remains open and is owned exclusively by the Gate 10 acceptance child.
+
 This ExecPlan is a living document and must remain self-contained under
 `/home/daekar/.codex/skills/write-execplan/PLANS.md`. It is Child 3 of
 `docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md`.
@@ -179,13 +190,11 @@ signature rendering, or the frozen PDF-first topology.
 
 ## Outcomes & Retrospective
 
-Initially pointer placement can work while adjustment crashes and keyboard behavior is undiscoverable.
-At completion, the command must be safe across document/session replacement, placement overlay state,
-and repeated enter/exit cycles. Record measured drag/update behavior and whether the remaining CPU cost is
-an environment artifact or a product regression. Do not mark the child complete from a unit test that
-never mounts the real viewer lifecycle. The current live failure remains open until the rebuilt installed
-binary demonstrates that same-page release no longer spikes resources and cross-page placement refreshes
-once.
+This historical slice established the same-page rendering and idle-poll corrections for the earlier
+resource-spike investigation, with its last recorded Cinnamon/X11 observation showing bounded CPU/I/O.
+The later Gate 10 recovery family owns the remaining interaction and history acceptance. Do not treat
+the historical package observation or source tests here as proof of the current installed binary's
+keyboard, cancellation, or Undo/Redo behavior.
 
 ## Context and Orientation
 

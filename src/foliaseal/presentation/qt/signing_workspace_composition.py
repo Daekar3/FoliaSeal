@@ -367,29 +367,8 @@ def _assemble_signing_workspace_composition(
         "on_keyboard_recover": runtime.recover_keyboard_placement,
         "on_keyboard_apply": runtime.apply_keyboard_placement,
     }
-    try:
-        viewer_widget = viewer_widget_builder(**viewer_kwargs)
-    except TypeError as exc:
-        if not any(
-            name in str(exc)
-            for name in (
-                "on_keyboard_create",
-                "on_keyboard_move",
-                "on_keyboard_resize",
-                "on_keyboard_recover",
-                "on_keyboard_apply",
-            )
-        ):
-            raise
-        viewer_kwargs.pop("on_keyboard_create", None)
-        viewer_kwargs.pop("on_keyboard_move", None)
-        viewer_kwargs.pop("on_keyboard_resize", None)
-        viewer_kwargs.pop("on_keyboard_recover", None)
-        viewer_kwargs.pop("on_keyboard_apply", None)
-        viewer_widget = viewer_widget_builder(**viewer_kwargs)
-    set_viewer_mode = getattr(viewer_widget, "set_interaction_mode", None)
-    if callable(set_viewer_mode):
-        set_viewer_mode("pan")
+    viewer_widget = viewer_widget_builder(**viewer_kwargs)
+    viewer_widget.set_interaction_mode("pan")
     viewer_navigation_container = bindings.q_widget()
     viewer_navigation_row = bindings.q_hbox_layout(viewer_navigation_container)
     viewer_navigation_row.setContentsMargins(0, 0, 0, 0)
@@ -539,30 +518,26 @@ def _assemble_signing_workspace_composition(
             return
         runtime.refresh_review_jump_to_page_index(target)
 
-    selected_viewer_mode = {"value": "pan"}
+    def refresh_viewer_mode_projection() -> None:
+        """Project the viewer's authoritative mode onto the local controls."""
 
-    def refresh_text_selection_toolbar_state(
-        document_text_state: DocumentTextWorkspaceState,
-    ) -> None:
+        mode = runtime.viewer_interaction_mode()
         set_checked = getattr(text_selection_button, "setChecked", None)
         if callable(set_checked):
-            set_checked(document_text_state.selection_mode_enabled)
-        copy_selection_button.setEnabled(document_text_state.selection_state.can_copy)
-        if document_text_state.selection_mode_enabled:
-            selected_viewer_mode["value"] = "text"
+            set_checked(mode == "text")
         set_pan_checked = getattr(pan_button, "setChecked", None)
         set_place_checked = getattr(place_button, "setChecked", None)
         if callable(set_pan_checked):
-            set_pan_checked(selected_viewer_mode["value"] == "pan")
+            set_pan_checked(mode == "pan")
         if callable(set_place_checked):
-            set_place_checked(selected_viewer_mode["value"] == "signature")
+            set_place_checked(mode == "signature")
         _set_text(
             interaction_mode_label,
             "Text selection mode — drag across PDF text to select and copy"
-            if document_text_state.selection_mode_enabled
+            if mode == "text"
             else (
                 "Pan mode — drag to move around the page"
-                if selected_viewer_mode["value"] == "pan"
+                if mode == "pan"
                 else (
                     "Place mode — drag to draw/resize; Enter creates/accepts; "
                     "arrows move; Shift accelerates; Ctrl+arrows resize; "
@@ -572,26 +547,29 @@ def _assemble_signing_workspace_composition(
             ),
         )
 
+    runtime.set_viewer_mode_change_handler(refresh_viewer_mode_projection)
+
+    def refresh_text_selection_toolbar_state(
+        document_text_state: DocumentTextWorkspaceState,
+    ) -> None:
+        set_checked = getattr(text_selection_button, "setChecked", None)
+        if callable(set_checked):
+            set_checked(document_text_state.selection_mode_enabled)
+        copy_selection_button.setEnabled(document_text_state.selection_state.can_copy)
+        refresh_viewer_mode_projection()
+
     def toggle_text_selection_mode() -> None:
         is_checked = getattr(text_selection_button, "isChecked", None)
         enabled = bool(is_checked()) if callable(is_checked) else False
         result = runtime.set_document_text_selection_mode(enabled)
-        selected_viewer_mode["value"] = "text" if result else "signature"
-        runtime.set_viewer_interaction_mode(selected_viewer_mode["value"])
+        runtime.set_viewer_interaction_mode("text" if result else "signature")
         set_checked = getattr(text_selection_button, "setChecked", None)
         if callable(set_checked):
             set_checked(result)
 
     def set_viewer_mode(mode: str) -> None:
-        selected_viewer_mode["value"] = mode
         runtime.set_viewer_interaction_mode(mode)
-        set_checked = getattr(text_selection_button, "setChecked", None)
-        if callable(set_checked):
-            set_checked(False)
-        for button, value in ((pan_button, "pan"), (place_button, "signature")):
-            setter = getattr(button, "setChecked", None)
-            if callable(setter):
-                setter(mode == value)
+        refresh_viewer_mode_projection()
 
     def fit_page_view() -> None:
         viewer_widget.fit_page_view()

@@ -57,9 +57,7 @@ class SigningWorkspaceReviewBridge:
 
     def _apply_effects(self, effects: DocumentReviewWorkspaceViewerEffects) -> None:
         if effects.interaction_mode is not None:
-            setter = getattr(self._viewer_widget, "set_interaction_mode", None)
-            if callable(setter):
-                setter(effects.interaction_mode)
+            self._viewer_widget.set_interaction_mode(effects.interaction_mode)
         if effects.clear_highlights:
             clearer = getattr(self._viewer_widget, "clear_text_highlight_overlay", None)
             if callable(clearer):

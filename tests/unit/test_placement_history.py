@@ -28,12 +28,3 @@ def test_placement_history_undo_redo_and_branch_invalidation() -> None:
     history.commit(third)
 
     assert history.redo() == third
-
-
-def test_placement_history_synchronization_clears_external_state() -> None:
-    history = PlacementHistory(_rect(1))
-    history.commit(_rect(2))
-
-    history.synchronize(_rect(9))
-
-    assert history.undo() == _rect(9)

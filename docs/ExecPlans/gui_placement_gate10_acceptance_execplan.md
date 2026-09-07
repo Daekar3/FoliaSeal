@@ -18,14 +18,24 @@ This is the final child of gui_placement_gate10_recovery_parent_execplan.md. Bot
 
 - [x] (2026-09-07) Recorded user failures and inspected relevant source paths; authored plan.
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
-- [ ] Reproduce the scoped failures and record baseline evidence.
-- [ ] Complete the milestones and regression validation below.
-- [ ] Reconcile dependent plans and record remaining acceptance honestly.
+- [x] (2026-09-07) Behavior children completed their source and composed regression work; current validation is 276 focused tests and 1646 full-suite tests with 20 skips and one existing warning.
+- [x] (2026-09-07) Built a fresh package from the current worktree at `/tmp/foliaseal-gate10-mAkhdQ/dist/foliaseal_0.1.0_amd64.deb`; SHA-256 is `882198337ac2e454a0e1f83b187d389f4d1203e82e46b311a41cd126a23a7a21`. Offscreen and escalated display-backed package audits passed; the display-backed audit reported `gui_startup.status=started`, `display_backed=true`, and `qt_platform=xcb`.
+- [ ] Install the exact fresh package and confirm installed-byte/process identity; `dpkg-query` still reports 0.1.0, but `/usr/lib/foliaseal/foliaseal` hash `0fd9c4f9058902efaa88be748bb381aff24f250fa1625a561605b3a1d019675d` does not match the fresh payload hash `eed6690a9ed0fd5bf959de40f06822e33692dbf28f65e2df4059e31af9a2a261`. The prior authorized `sudo dpkg -i` attempt was blocked because this noninteractive shell could not read the user's sudo password.
+- [ ] Complete the rendered Cinnamon/X11 acceptance.
+- [ ] Reconcile the family and record the human Gate 2 item 10 result.
 
 ## Surprises & Discoveries
 
 
 The September 7 failures occurred in the installed application despite prior lower-level coverage. Source-only tests cannot establish that the installed build receives focus or displays the right mode. The earlier gui_placement_interaction_stability_execplan.md remains historical evidence and must not be read as acceptance of this gate. No new package or live audit was produced during plan authoring.
+
+Acceptance evidence (2026-09-07): focused/composed placement tests pass 186 tests. A fresh 0.1.0 amd64 package was built from source HEAD `c752c06dea7cfad3667a5505a4bfc9548195946b` with the package hash recorded above. `scripts/deb_package_audit.py` passed in offscreen mode and in escalated X11 display-backed mode; the latter confirmed the packaged GUI could start through `xcb`. The package wrapper hash matches `/usr/bin/foliaseal`, but the installed bundle executable differs from the fresh package payload, so the current installed application is not this build.
+
+The exact install command was attempted: `sudo dpkg -i /tmp/foliaseal-gate10-mAkhdQ/dist/foliaseal_0.1.0_amd64.deb`. It failed before invoking dpkg with `sudo: a terminal is required to read the password`. No trustworthy fresh GUI process remained for event injection; the observed FoliaSeal title belonged to a GNOME Terminal window, and the user-owned terminal/window was left untouched. Screenshots are retained under `/tmp/foliaseal-gate10-mAkhdQ/live-escalated/` as environment evidence only.
+
+Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md`
+remain consistent with the repaired source contract. No specification or schema edit is needed; this
+child tracks only the missing installed-byte identity and rendered Cinnamon/X11 evidence.
 
 ## Decision Log
 
@@ -39,9 +49,9 @@ Decision (2026-09-07): Separate behavior repair from package evidence and human 
 ## Outcomes & Retrospective
 
 
-Planning and source investigation are complete. Implementation, reproduction tests, package verification and new acceptance are pending. This document does not certify a fix.
+Planning, source investigation, implementation, composed behavior validation, fresh package construction, payload audit, and display-backed packaged startup are complete. Installed-byte/process identity and bounded rendered Cinnamon/X11 placement acceptance remain pending because the current installed bundle hash differs from the fresh payload and the sudo install requires an interactive user password. This document does not certify Gate 2 item 10.
 
-Three-agent review corrections are incorporated. Keyboard commit-after-projection and pointer recording defects now guide regression coverage; focus delivery still needs reproduction. All implementation and installed acceptance remain pending.
+Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, focus delivery, authoritative mode projection, cancellation, and history behavior are covered by the completed behavior children. Only the external package/rendered acceptance remains pending.
 
 ## Context and Orientation
 

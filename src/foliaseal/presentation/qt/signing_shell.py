@@ -512,6 +512,18 @@ class SigningWorkspaceWidget:
     def remove_signature_placement(self) -> bool:
         return self._runtime.remove_signature_placement()
 
+    def can_undo_placement(self) -> bool:
+        return self._runtime.can_undo_placement()
+
+    def can_redo_placement(self) -> bool:
+        return self._runtime.can_redo_placement()
+
+    def undo_placement(self) -> SignatureRect | None:
+        return self._runtime.undo_placement()
+
+    def redo_placement(self) -> SignatureRect | None:
+        return self._runtime.redo_placement()
+
     def document_text_selection_mode_enabled(self) -> bool:
         return self._runtime.document_text_selection_mode_enabled()
 

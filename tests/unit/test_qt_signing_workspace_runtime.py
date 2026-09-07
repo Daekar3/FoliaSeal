@@ -81,11 +81,21 @@ class _FakeViewerWidget:
         self._order = order
         self.undo_available = False
         self.redo_available = False
+        self.clear_history_calls = 0
 
     def set_signature_overlay(self, signature_rect) -> None:
         if self._order is not None:
             self._order.append(("overlay", signature_rect))
         self.overlays.append(signature_rect)
+
+    def adopt_signature_overlay(self, signature_rect) -> None:
+        self.overlays.append(("adopt", signature_rect))
+
+    def record_signature_edit(self, signature_rect) -> None:
+        self.overlays.append(("record", signature_rect))
+
+    def clear_signature_history(self) -> None:
+        self.clear_history_calls += 1
 
     def refresh(self, *, navigation: bool = False) -> None:
         if self._order is not None:
@@ -94,6 +104,12 @@ class _FakeViewerWidget:
 
     def set_interaction_mode(self, mode: str) -> None:
         self.interaction_modes.append(mode)
+
+    def focus_viewer(self) -> None:
+        return None
+
+    def interaction_mode(self) -> str:
+        return self.interaction_modes[-1] if self.interaction_modes else "pan"
 
     def can_undo_signature_placement(self) -> bool:
         return self.undo_available
@@ -432,6 +448,15 @@ def test_signing_workspace_runtime_routes_panel_page_and_refresh_changes() -> No
     assert bound.interaction_session.page_changes == [3]
 
 
+def test_unchanged_panel_refresh_does_not_clear_placement_history() -> None:
+    bound = _bind_runtime()
+
+    bound.runtime.on_panel_change()
+    bound.runtime.on_panel_change()
+
+    assert bound.viewer_widget.clear_history_calls == 0
+
+
 def test_signing_workspace_runtime_emits_shell_error_and_updates_result_label() -> None:
     errors = []
     bound = _bind_runtime(on_error=errors.append)
@@ -554,6 +579,7 @@ def test_signing_workspace_runtime_placement_commands_protect_fixed_fields() -> 
 
     assert bound.runtime.remove_signature_placement() is True
     assert bound.properties_panel.set_signature_rect_calls[-1] == (None, True)
+    assert ("record", None) in bound.viewer_widget.overlays
     assert statuses[-1] == "placement_removed"
 
     bound.draft_workflow.signature_field_name = "ExistingField"
