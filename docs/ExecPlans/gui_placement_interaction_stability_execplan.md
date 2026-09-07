@@ -1,5 +1,13 @@
 # Stabilize placement adjustment, performance, and keyboard affordance
 
+Current acceptance correction (2026-09-07): Installed HITL Gate 2 item 10 fails
+keyboard adjustment, held-drag Escape cancellation, consistent exit to Pan, Undo/Redo
+of pointer edits, and Undo of removal. Mouse handles and removal itself work.
+Earlier implementation/test evidence below does not establish acceptance of these
+behaviors. The active repair and retest owner is
+[Placement Gate 10 recovery family](gui_placement_gate10_recovery_parent_execplan.md).
+Signing and reopening/verification remain user-reported passes.
+
 This ExecPlan is a living document and must remain self-contained under
 `/home/daekar/.codex/skills/write-execplan/PLANS.md`. It is Child 3 of
 `docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md`.
