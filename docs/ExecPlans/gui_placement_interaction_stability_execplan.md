@@ -1,10 +1,10 @@
 # Stabilize placement adjustment, performance, and keyboard affordance
 
-Current acceptance correction (2026-09-07): Installed HITL Gate 2 item 10 fails
-keyboard adjustment, held-drag Escape cancellation, consistent exit to Pan, Undo/Redo
-of pointer edits, and Undo of removal. Mouse handles and removal itself work.
-Earlier implementation/test evidence below does not establish acceptance of these
-behaviors. The active repair and retest owner is
+Current acceptance correction (2026-09-08): The Gate 10 recovery family repaired the earlier
+installed failures. Package `f800e6c...` from commit `8903512c9` passed the installed Cinnamon/X11
+HITL checks for keyboard adjustment, held-key movement/resizing, consistent exit to Pan, pointer
+Undo/Redo, Undo of removal, responsiveness, and sustained CPU/disk behavior. Earlier implementation/
+test evidence below remains historical; the active repair and retest owner is
 [Placement Gate 10 recovery family](gui_placement_gate10_recovery_parent_execplan.md).
 Signing and reopening/verification remain user-reported passes.
 
@@ -12,17 +12,15 @@ Status reconciliation (2026-09-07): This plan is historical for the earlier plac
 resource-spike work. Its remaining Gate 2 interaction implementation and retest responsibilities are
 owned by the [Gate 10 recovery family](gui_placement_gate10_recovery_parent_execplan.md). The source
 implementation now has focused/composed coverage, including typed keyboard autorepeat batching; the
-earlier exact package/X11 launch evidence predates that final repair. Only a fresh package rebuild,
-installation, and rendered human interaction acceptance remain in the Gate 10 family. Do not execute
-this plan as a competing implementation loop.
+earlier exact package/X11 launch evidence predates that final repair. The final package/install and
+rendered human interaction acceptance are recorded in the Gate 10 family. Do not execute this plan as
+a competing implementation loop.
 
-Acceptance handoff (2026-09-07): The Gate 10 family built and audited a package from the pre-final
-autorepeat source, including an escalated display-backed XCB startup audit. The final source now has
-199 focused tests and a 1660-test full-suite result with 20 skips and one existing warning. The
-configured disposable PKCS#12 counter coverage proves readiness reads are deferred during repeats and
-bounded at physical release. Rebuild/install the final source before the compact rendered Adjust,
-keyboard, cancellation, mode, history, and held-key resource acceptance owned exclusively by the Gate
-10 acceptance child.
+Acceptance handoff (2026-09-08): The Gate 10 family recorded package `f800e6c...` from commit
+`8903512c9` and the user's successful Cinnamon/X11 HITL retest. The final source has 199 focused
+tests and a 1660-test full-suite result with 20 skips and one existing warning. Configured disposable
+PKCS#12 counter coverage proves readiness reads are deferred during repeats and bounded at physical
+release. The old plan is now historical and requires no further implementation work.
 
 This ExecPlan is a living document and must remain self-contained under
 `/home/daekar/.codex/skills/write-execplan/PLANS.md`. It is Child 3 of
@@ -48,7 +46,7 @@ signature rendering, or the frozen PDF-first topology.
   provide the placement behavior baseline.
 - [x] `docs/ExecPlans/gui_hitl_defect_recovery_parent_execplan.md` records the observed crash/performance
   evidence.
-- [ ] Child 1 or Child 2 is not required. Child 4 depends on this child’s completion.
+- [x] Child 1 or Child 2 is not required. The Gate 10 acceptance child superseded this historical dependency.
 
 ## Progress
 
@@ -68,13 +66,13 @@ signature rendering, or the frozen PDF-first topology.
 - [x] (2026-08-20) Expose the existing keyboard contract in the live Place-mode guidance and retain
   the accurate Place tooltip.
 - [x] (2026-08-20) Run focused validation: 224 AppFrame/shell/viewer tests passed.
-- [ ] Run the final full-suite/package and human acceptance checks in Child 4.
+- [x] Run the final full-suite/package and human acceptance checks in Child 4; final evidence is recorded in the Gate 10 acceptance child.
 - [x] (2026-08-20) Reconcile parent/release documentation and commit the completed implementation slice;
   final package and human acceptance remain tracked in Child 4.
-- [x] (2026-09-04) Placement-only panel updates now skip canonical preview
+- [x] (2026-09-04, superseded historical status) Placement-only panel updates now skip canonical preview
   regeneration; the viewer-selection regression proves zero preview refreshes
   and preserves the explicit placement interaction plan. Full suite and lint
-  validation pass; installed placement acceptance is pending.
+  validation pass; installed placement acceptance was pending at this historical checkpoint and is closed by the Gate 10 family.
 - [x] (2026-09-04) New installed HITL evidence reproduced an immediate resource
   spike after rectangle release. Explorer review traced the remaining synchronous
   work to `SigningWorkspaceRuntime.apply_signature_rect_placement()`, which
@@ -85,8 +83,7 @@ signature rendering, or the frozen PDF-first topology.
   coverage proves same-page placement performs zero PDF refreshes while
   cross-page placement performs one; full validation reports `1617 passed, 20
   skipped, 1 warning`.
-- [ ] Rebuild and repeat the installed placement/edit retest; the installed
-  binary has not yet consumed this correction.
+- [x] Rebuild and repeat the installed placement/edit retest; the final Gate 10 package/install/HITL result is recorded in the acceptance child.
 - [x] (2026-09-04) HITL then reported sustained 1.8–1.9 MiB/s writes and high
   CPU after rectangle release followed by profile selection. No FoliaSeal PID or
   new coredump remained when inspected; the write pattern matches repeated
@@ -100,8 +97,7 @@ signature rendering, or the frozen PDF-first topology.
   and about 53 MiB in 5 seconds, and created fresh canonical-preview directories.
   Resize reflow now reuses the existing canonical render state and never invokes
   PDF generation; full validation reports `1618 passed, 20 skipped, 1 warning`.
-- [ ] Rebuild/install this stronger correction and repeat the live placement /
-  profile-selection gate while confirming preview files stop changing.
+- [x] Rebuild/install this stronger correction and repeat the live placement/profile-selection gate; the final Gate 10 package/install/HITL result supersedes this historical checkpoint.
 - [x] (2026-09-05) The installed package matched the resize-reflow correction but
   still regenerated the same canonical preview every ~2 seconds. Added a
   preview/layout-key cache at `_update_preview_controls()` so identical requests
@@ -273,8 +269,8 @@ The child passes when:
   the UI_SPEC behavior and are discoverable from the visible mode guidance or Help.
 - Focused tests, full suite, Ruff, compileall, and diff checks pass.
 
-The installed/live-viewer portions remain open until Child 4 records a successful Adjust Placement
-transition and bounded X11 drag observation.
+The installed/live-viewer portions were closed by the Gate 10 acceptance child on 2026-09-08; this
+historical plan does not reopen them.
 
 ## Idempotence and Recovery
 

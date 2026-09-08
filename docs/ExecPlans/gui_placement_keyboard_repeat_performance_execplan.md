@@ -15,7 +15,7 @@ When a user holds Arrow, Shift+Arrow, Ctrl+Arrow, or Ctrl+Shift+Arrow while adju
 
 - [x] `gui_placement_mode_focus_cancel_execplan.md` provides focus, mode, and cancellation behavior.
 - [x] `gui_placement_history_recovery_execplan.md` provides viewer-owned placement history and typed runtime/AppFrame history methods.
-- [ ] Complete this child before `gui_placement_gate10_acceptance_execplan.md` rebuilds and retests the installed package.
+- [x] Complete this child before `gui_placement_gate10_acceptance_execplan.md` rebuilds and retests the installed package.
 
 
 ## Progress
@@ -30,7 +30,7 @@ When a user holds Arrow, Shift+Arrow, Ctrl+Arrow, or Ctrl+Shift+Arrow while adju
 - [x] (2026-09-07) Final targeted remediation added typed synthetic-release results, flush exception recovery, explicit page-navigation flushes, and a mounted production-composition counter test proving zero panel reloads during repeats and one reload at physical release.
 - [x] (2026-09-07) Final navigation/certificate review added a real Qt pending-batch navigation regression and mounted production coverage with a disposable password-protected PKCS#12. Five autorepeat Ctrl-resize events caused zero panel reloads and zero PKCS#12 readiness reads; physical release caused one panel reload and four bounded readiness reads through the current shell projection.
 - [x] (2026-09-07) Full validation is authoritative at 1660 passed, 20 skipped, and one existing warning; the 199-test focused suite, Ruff, and diff checks are green.
-- [ ] Rebuild/install a fresh package and hand off the rendered Cinnamon/X11 human acceptance.
+- [x] (2026-09-08) Installed package `f800e6c...` from commit `8903512c9` passed the Cinnamon/X11 held movement, Ctrl/Ctrl+Shift resize, responsiveness, one-step Undo/Redo, and sustained CPU/disk acceptance.
 
 
 ## Surprises & Discoveries
@@ -61,9 +61,11 @@ When a user holds Arrow, Shift+Arrow, Ctrl+Arrow, or Ctrl+Shift+Arrow while adju
 ## Outcomes & Retrospective
 
 
-Source implementation and validation are complete. Completion requires only a fresh package rebuild/install and the installed 30-second Cinnamon/X11 CPU/disk observation plus the remaining human Gate 10 interaction checks. A source test pass alone cannot close Gate 2 item 10.
+Source implementation, validation, fresh installation, and the installed Cinnamon/X11 acceptance are complete. The user confirmed held movement, Ctrl/Ctrl+Shift resize, responsiveness, one-step Undo/Redo, and no unacceptable sustained CPU/disk behavior for package `f800e6c...` from commit `8903512c9`.
 
-Implementation note (2026-09-07): Arrow and resize presses now update the draft geometry and overlay synchronously without panel/readiness reconciliation. A physical non-autorepeat release invokes one typed runtime flush and commits one history step; synthetic autorepeat releases return an explicit ignored result. Mode changes, focus loss, hide, close, Undo/Redo, deletion, external edits, signing, removal, and both runtime and direct viewer page navigation flush the open batch first. Flush exceptions restore the starting geometry and surface through the existing error path without history divergence. The authoritative focused suite passes 199 tests and the full suite passes 1660 with 20 skips and one existing warning, including mounted composition coverage with a disposable configured PKCS#12: five autorepeat Ctrl-resize events caused zero certificate-readiness reads, while physical release caused four bounded reads. Installed performance acceptance remains open only because the package must be rebuilt/installed before the Cinnamon/X11 human observation.
+Implementation note (2026-09-07): Arrow and resize presses now update the draft geometry and overlay synchronously without panel/readiness reconciliation. A physical non-autorepeat release invokes one typed runtime flush and commits one history step; synthetic autorepeat releases return an explicit ignored result. Mode changes, focus loss, hide, close, Undo/Redo, deletion, external edits, signing, removal, and both runtime and direct viewer page navigation flush the open batch first. Flush exceptions restore the starting geometry and surface through the existing error path without history divergence. The authoritative focused suite passes 199 tests and the full suite passes 1660 with 20 skips and one existing warning, including mounted composition coverage with a disposable configured PKCS#12: five autorepeat Ctrl-resize events caused zero certificate-readiness reads, while physical release caused four bounded reads. Installed package `f800e6c...` from commit `8903512c9` passed the final Cinnamon/X11 held-key and resource acceptance.
+
+Final acceptance note (2026-09-08): Ctrl+Y was discussed as a possible future redo shortcut but was not added to this slice. Existing Ctrl+Shift+Z behavior remains the accepted redo path.
 
 
 ## Context and Orientation

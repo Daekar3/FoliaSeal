@@ -13,6 +13,11 @@ A user choosing Signing → Adjust Placement must immediately be able to move or
 
 This is the first child of gui_placement_gate10_recovery_parent_execplan.md in docs/ExecPlans/. It has no implementation prerequisite. Complete it before the history child edits the same files.
 
+Current authoritative evidence (2026-09-08): the source and installed acceptance record is 199
+focused tests, 1660 full-suite tests with 20 skipped and one existing warning, and package
+`f800e6c...` from commit `8903512c9` passing Cinnamon/X11 mode, cancellation, keyboard adjustment,
+history, and responsiveness checks. The earlier 276-test count below is superseded.
+
 ## Progress
 
 
@@ -20,9 +25,9 @@ This is the first child of gui_placement_gate10_recovery_parent_execplan.md in d
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
 - [x] (2026-09-07) Reproduced the source-level failure shape: explicit mode selection did not focus the canvas, composition kept a duplicate mode value, and new drags did not acquire a mouse grab for held Escape cancellation.
 - [x] (2026-09-07) Added explicit viewer focus, authoritative mode projection, mode-dependent handle rendering, and mouse-grab cleanup for canceled new drags.
-- [x] (2026-09-07) Added focused unit and composed offscreen Qt regressions; the shared placement-focused suite passes 276 tests, including all 6 Gate 10 integration tests.
+- [x] (2026-09-07, superseded historical count) Added focused unit and composed offscreen Qt regressions; the then-current shared placement-focused suite passed 276 tests, including all 6 Gate 10 integration tests. The authoritative current focused count is 199.
 - [x] (2026-09-07) Removed the composition keyboard-callback compatibility rebuild and made the viewer mode transition a required typed interface; shell/runtime fakes now implement the complete callback and placement-history surface.
-- [ ] Run the installed X11 acceptance and reconcile dependent plans with any remaining history findings.
+- [x] (2026-09-08) Dependent installed Cinnamon/X11 acceptance passed for package `f800e6c...` from commit `8903512c9`; mode, cancellation, keyboard adjustment, history, and responsiveness checks are recorded by the acceptance child.
 
 ## Surprises & Discoveries
 
@@ -47,13 +52,13 @@ Decision (2026-09-07): Treat Gate 10 viewer callbacks and mode transitions as re
 ## Outcomes & Retrospective
 
 
-The source and offscreen composed regressions now cover explicit canvas focus, mode projection, handle visibility, and held-drag cancellation. The current full repository suite passes 1646 tests with 20 skips and one existing warning. Installed X11 acceptance remains pending, and placement history is intentionally handled by the dependent history child.
+The source and offscreen composed regressions now cover explicit canvas focus, mode projection, handle visibility, and held-drag cancellation. The authoritative full repository suite passes 1660 tests with 20 skips and one existing warning. Installed Cinnamon/X11 acceptance passed for package `f800e6c...`; placement history remains documented by the dependent history child.
 
 Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md`
 remain consistent with the implemented mode, focus, and cancellation contract; no governing-document
 change is required.
 
-The strict-interface remediation remains covered by the focused runtime/composition/viewer/AppFrame/session and signing-shell suites; the shared placement-focused count is 276, the full suite is 1646 passed with 20 skips and one existing warning, and Ruff plus `git diff --check` pass. The installed X11 retest remains the acceptance gate.
+The strict-interface remediation remains covered by the focused runtime/composition/viewer/AppFrame/session and signing-shell suites; the authoritative focused count is 199, the full suite is 1660 passed with 20 skips and one existing warning, and Ruff plus `git diff --check` pass. The installed Cinnamon/X11 retest passed in the dependent acceptance child.
 
 Three-agent review corrections are incorporated. Keyboard commit-after-projection and pointer recording defects remain owned by the dependent history child; this child now owns focus delivery, authoritative mode projection, handle rendering, and cancellation lifecycle.
 

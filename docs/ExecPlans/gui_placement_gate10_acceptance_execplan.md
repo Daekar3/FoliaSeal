@@ -13,30 +13,39 @@ Prove the repaired controls work as rendered and through normal desktop event de
 
 This is the final child of gui_placement_gate10_recovery_parent_execplan.md. `gui_placement_mode_focus_cancel_execplan.md`, `gui_placement_history_recovery_execplan.md`, and `gui_placement_keyboard_repeat_performance_execplan.md` must pass their behavior tests before package acceptance.
 
+## Current authoritative evidence (2026-09-08)
+
+Package `f800e6c...`, built from commit `8903512c9`, is the authoritative installed artifact for
+this plan. The source validation is 199 focused tests and 1660 full-suite tests with 20 skipped and
+one existing warning. The installed Cinnamon/X11 HITL retest passed held movement, Ctrl resize,
+Ctrl+Shift accelerated resize, responsiveness, one-step Undo/Redo, and sustained CPU/disk behavior.
+The package `882198...`, payload `eed669...`, commit `c752c06...`, and their pending-install claims
+below are superseded historical evidence from before the final autorepeat repair.
+
 ## Progress
 
 
 - [x] (2026-09-07) Recorded user failures and inspected relevant source paths; authored plan.
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
 - [x] (2026-09-07) Behavior children completed their source and composed regression work; authoritative validation is 199 focused tests and 1660 full-suite tests with 20 skips and one existing warning.
-- [x] (2026-09-07) Built a fresh package from the current worktree at `/tmp/foliaseal-gate10-mAkhdQ/dist/foliaseal_0.1.0_amd64.deb`; SHA-256 is `882198337ac2e454a0e1f83b187d389f4d1203e82e46b311a41cd126a23a7a21`. Offscreen and escalated display-backed package audits passed; the display-backed audit reported `gui_startup.status=started`, `display_backed=true`, and `qt_platform=xcb`.
-- [x] (2026-09-07) Installed the exact fresh package and confirmed installed-byte/process identity: `/usr/bin/foliaseal` hash `5a167faf9f85c71b93e6bf88393aff82b30ea1298f272f898b76a2305cb56a73` and `/usr/lib/foliaseal/foliaseal` hash `eed6690a9ed0fd5bf959de40f06822e33692dbf28f65e2df4059e31af9a2a261` match the extracted package payload. `dpkg-query` reports `0.1.0` and `install ok installed`.
+- [x] (2026-09-07, superseded historical evidence) Built a pre-final-repair package from the worktree at `/tmp/foliaseal-gate10-mAkhdQ/dist/foliaseal_0.1.0_amd64.deb`; SHA-256 was `882198337ac2e454a0e1f83b187d389f4d1203e82e46b311a41cd126a23a7a21`, and its payload included `eed669...`. Offscreen and escalated display-backed package audits passed. This artifact is superseded by package `f800e6c...` from commit `8903512c9`.
+- [x] (2026-09-07, superseded historical evidence) Installed the pre-final-repair package and confirmed its then-current installed-byte identity. That installation is not the authoritative current artifact; use package `f800e6c...` from commit `8903512c9` for current acceptance.
 - [x] (2026-09-07) Added the autorepeat performance child after the installed human retest reported significant CPU spin-up while holding adjustment keys during resize; package acceptance must wait for its source tests and a fresh package.
-- [x] (2026-09-07) The autorepeat implementation and focused real Qt event tests pass. The previously installed package predates this repair; rebuild/install is required before the held-key CPU observation can be retested.
-- [x] (2026-09-07) Compliance remediation is covered by typed-session, explicit synthetic-release, cancellation/failure, key-boundary, action/page-boundary, direct viewer navigation, mounted configured-PKCS12 counter, and real Qt Ctrl/Ctrl+Shift resize tests. Targeted validation is 199 passed; the full suite is 1660 passed with 20 skips and one existing warning. A fresh package rebuild/install and rendered Cinnamon/X11 human observation remain pending.
-- [ ] Complete the rendered Cinnamon/X11 acceptance.
-- [ ] Reconcile the family and record the human Gate 2 item 10 result.
+- [x] (2026-09-07) The autorepeat implementation and focused real Qt event tests pass. The previously installed package predated this repair; the final package/install and held-key CPU observation are recorded below.
+- [x] (2026-09-07, superseded historical status) Compliance remediation is covered by typed-session, explicit synthetic-release, cancellation/failure, key-boundary, action/page-boundary, direct viewer navigation, mounted configured-PKCS12 counter, and real Qt Ctrl/Ctrl+Shift resize tests. Targeted validation is 199 passed; the full suite is 1660 passed with 20 skips and one existing warning. At that point a fresh package rebuild/install and rendered Cinnamon/X11 human observation remained pending; the current evidence block records their completion.
+- [x] (2026-09-08) Completed rendered Cinnamon/X11 acceptance against installed package `f800e6c...` from commit `8903512c9`: held movement, Ctrl resize, Ctrl+Shift accelerated resize, responsiveness, one-step Undo/Redo, and sustained CPU/disk behavior all passed.
+- [x] (2026-09-08) Reconciled the family and recorded Gate 2 item 10 as PASS.
 
 ## Surprises & Discoveries
 
 
-The September 7 failures occurred in the installed application despite prior lower-level coverage. Source-only tests cannot establish that the installed build receives focus or displays the right mode. The earlier gui_placement_interaction_stability_execplan.md remains historical evidence and must not be read as acceptance of this gate. No new package or live audit was produced during plan authoring.
+The September 7 failures occurred in the installed application despite prior lower-level coverage. Source-only tests could not establish that the installed build receives focus or displays the right mode. The final installed Cinnamon/X11 retest below closes that evidence gap. The earlier gui_placement_interaction_stability_execplan.md remains historical evidence and is not a competing implementation plan.
 
-Acceptance evidence (2026-09-07): the authoritative focused/composed placement suite passes 199 tests and the full repository suite passes 1660 tests with 20 skips and one existing warning. A fresh 0.1.0 amd64 package was built from source HEAD `c752c06dea7cfad3667a5505a4bfc9548195946b` with the package hash recorded above. `scripts/deb_package_audit.py` passed in offscreen mode and in escalated X11 display-backed mode; the latter confirmed the packaged GUI could start through `xcb`. The previously installed package predates the final autorepeat repair, so a fresh package rebuild and installation are required before the remaining human X11 acceptance. The configured disposable PKCS#12 counter test proves five autorepeat Ctrl-resize events perform zero certificate-readiness reads and physical release performs four bounded reads through the current shell projection.
+Acceptance evidence (2026-09-07, superseded historical evidence): the focused/composed placement suite passed 199 tests and the full repository suite passed 1660 tests with 20 skips and one existing warning. The pre-final-repair source HEAD was `c752c06...` and its package hash was `882198...`; the package audit passed, but the installed package predated the final autorepeat repair. The configured disposable PKCS#12 counter test already proved five autorepeat Ctrl-resize events perform zero certificate-readiness reads and physical release performs four bounded reads through the current shell projection. The current installed result is recorded in the authoritative evidence block above.
 
-Human autorepeat finding (2026-09-07): the installed retest passed individual Arrow behavior but reported significant CPU spin-up when holding adjustment keys during resize. The earlier short automated observation did not exercise held-key autorepeat and cannot close this finding. The autorepeat child must measure and repair the callback chain, rebuild the package, and repeat the installed observation.
+Human autorepeat finding (2026-09-07): the installed retest passed individual Arrow behavior but reported significant CPU spin-up when holding adjustment keys during resize. The typed batching repair and final installed retest closed this finding: held movement and Ctrl/Ctrl+Shift resize remained responsive, one held sequence produced one Undo/Redo step, and no unacceptable sustained CPU/disk behavior occurred.
 
-The exact install command was completed by the user: `sudo dpkg -i /tmp/foliaseal-gate10-mAkhdQ/dist/foliaseal_0.1.0_amd64.deb`. The audit-owned process and temporary event driver were cleaned up after the bounded run. Screenshots are retained under `/tmp/foliaseal-gate10-live-97jQET/` as environment evidence only. Native menu traversal was not certified: no claim is made about Adjust, Undo/Redo or Escape from this run.
+The final installed acceptance used package `f800e6c...` built from commit `8903512c9` on Cinnamon/X11. The user confirmed held Arrow movement, Ctrl resize, Ctrl+Shift accelerated resize, one-step Undo/Redo, responsive interaction, and no unacceptable sustained CPU/disk activity. This is the authoritative HITL result for Gate 2 item 10.
 
 Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md`
 remain consistent with the repaired source contract. No specification or schema edit is needed; this
@@ -54,9 +63,9 @@ Decision (2026-09-07): Separate behavior repair from package evidence and human 
 ## Outcomes & Retrospective
 
 
-Planning, source investigation, implementation, composed behavior validation, and package-audit preparation are complete. Authoritative source validation is 199 focused tests and 1660 full-suite tests with 20 skips and one existing warning; configured PKCS#12 evidence confirms readiness work is deferred from repeats to the physical-release flush. Only a fresh package rebuild/install and rendered Cinnamon/X11 human acceptance remain. This document does not certify Gate 2 item 10 until those external gates pass.
+Planning, source investigation, implementation, composed behavior validation, package audit, fresh installation, and rendered Cinnamon/X11 human acceptance are complete. Authoritative source validation is 199 focused tests and 1660 full-suite tests with 20 skips and one existing warning; configured PKCS#12 evidence confirms readiness work is deferred from repeats to the physical-release flush. Gate 2 item 10 is PASS for installed package `f800e6c...` from commit `8903512c9`.
 
-Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, focus delivery, authoritative mode projection, cancellation, and history behavior are covered by the completed behavior children. Only the external package/rendered acceptance remains pending.
+Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, focus delivery, authoritative mode projection, cancellation, and history behavior are covered by the completed behavior children. The external package/rendered acceptance is now complete for package `f800e6c...` from commit `8903512c9`.
 
 ## Context and Orientation
 
@@ -107,7 +116,7 @@ On a disposable unsigned PDF create rectangle A. Focus a rail field, choose Sign
 
 Include initial creation Undo/Redo, Delete/Undo independently of menu removal, and cancellation of a new-rectangle drag as well as a handle drag. Check the mouse grab is released after cancellation and no edit occurs on later release. With a text field focused, Undo must affect text only; after Adjust focuses the canvas, menu and shortcut Undo must affect placement. Capture Text mode too: completed rectangle visible, handles absent and text selection functional. Record a bounded 30-second CPU and disk-I/O observation after pointer adjustment, distinguishing brief activity from sustained growth; a renewed sustained spike is a failure requiring investigation. Automated callback counters from the history child remain mandatory and complement this observation.
 
-For Gate 2 item 10, gui_placement_interaction_stability_execplan.md is historical evidence only; this family is the sole implementation/retest owner. Update release tracking with the family result without reopening the old plan as a competing implementation task. The final retest must include a held-key sequence long enough to expose the reported CPU spin-up and must record whether the final sequence is one Undo step.
+For Gate 2 item 10, gui_placement_interaction_stability_execplan.md is historical evidence only; this family was the sole implementation/retest owner. The final retest included a held-key sequence long enough to expose the reported CPU spin-up and recorded one-step Undo/Redo with no unacceptable sustained CPU/disk behavior. Ctrl+Y is outside this completed scope and remains a separate future UX opportunity.
 
 ## Idempotence and Recovery
 

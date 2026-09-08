@@ -13,6 +13,14 @@ Mouse edits and Remove Placement must immediately enable Undo. Undo must restore
 
 This is the second child of gui_placement_gate10_recovery_parent_execplan.md. First complete gui_placement_mode_focus_cancel_execplan.md to stabilize focus and mode, then extend its composed Qt regression.
 
+## Current authoritative evidence (2026-09-08)
+
+The current source validation is 199 focused tests and 1660 full-suite tests with 20 skipped and one
+existing warning. Installed package `f800e6c...`, built from commit `8903512c9`, passed the bounded
+Cinnamon/X11 HITL checks for placement adjustment, one-step Undo/Redo, removal restoration,
+responsiveness, and sustained CPU/disk behavior. Earlier counts and open-installation statements in
+the historical chronology below are superseded by this block.
+
 ## Progress
 
 
@@ -22,7 +30,7 @@ This is the second child of gui_placement_gate10_recovery_parent_execplan.md. Fi
 - [x] (2026-09-07) Completed the history milestones and focused regression validation.
 - [x] (2026-09-07) Removed optional viewer-history fallbacks from runtime and shell ports; all current fakes expose the required placement-history methods.
 - [x] (2026-09-07) Removed the remaining AppFrame session-history fallback; active workspaces now satisfy the typed capability contract directly and the app-frame/dependent integration tests pass 86 tests.
-- [x] (2026-09-07) Reconciled the parent and acceptance child; installed package verification and bounded human acceptance remain explicitly open.
+- [x] (2026-09-08) Reconciled the parent and acceptance child; installed package `f800e6c...` from commit `8903512c9` passed the bounded Cinnamon/X11 human acceptance.
 
 ## Surprises & Discoveries
 
@@ -33,7 +41,7 @@ Review traced pointer selection through src/foliaseal/application/workspace_inte
 
 AppFrame._sync_edit_history_actions deliberately prefers native text-editor history when a text editor owns focus. A disabled menu is therefore not by itself proof that the placement stack is empty. Tests must distinguish stored history from focus-sensitive action routing.
 
-Implementation evidence (2026-09-07): projection now updates the visible overlay without adopting or clearing history; explicit adoption is reserved for existing-field lifecycle setup. Pointer selections commit once after the ordered interaction plan, keyboard edits commit after projection, and removal records None once before replaying the draft change. Unchanged panel refreshes no longer clear either stack. The shell forwards placement history capabilities to the AppFrame session port. Real offscreen Qt coverage proves handle cancellation, Pan cancellation, AppFrame pointer edit Undo/Redo, menu removal Undo/Redo, Delete Undo, explicit lifecycle reset, and same-page no-rerender behavior. The shared placement-focused suite passes 276 tests and the full repository suite passes 1646 tests with 20 skips and one existing warning; installed acceptance remains open.
+Implementation evidence (2026-09-07): projection now updates the visible overlay without adopting or clearing history; explicit adoption is reserved for existing-field lifecycle setup. Pointer selections commit once after the ordered interaction plan, keyboard edits commit after projection, and removal records None once before replaying the draft change. Unchanged panel refreshes no longer clear either stack. The shell forwards placement history capabilities to the AppFrame session port. Real offscreen Qt coverage proves handle cancellation, Pan cancellation, AppFrame pointer edit Undo/Redo, menu removal Undo/Redo, Delete Undo, explicit lifecycle reset, and same-page no-rerender behavior. The authoritative focused suite passes 199 tests and the full repository suite passes 1660 tests with 20 skips and one existing warning; installed acceptance passed for package `f800e6c...`.
 
 ## Decision Log
 
@@ -51,15 +59,15 @@ Decision (2026-09-07): Apply the same strict contract at AppFrame action project
 ## Outcomes & Retrospective
 
 
-Planning, implementation and focused regression validation are complete. Installed package verification and the bounded human acceptance pass remain pending; this document does not certify the installed GUI until those gates pass.
+Planning, implementation, focused regression validation, and the bounded installed Cinnamon/X11 acceptance are complete. Package `f800e6c...` from commit `8903512c9` passed one-step placement history and responsiveness checks. This child does not add a Ctrl+Y shortcut; that remains a future UX opportunity.
 
-The strict interface cleanup is validated by the shared placement-focused suite (276 passed), the full repository suite (1646 passed, 20 skipped, one existing warning), plus Ruff and `git diff --check`. Installed package verification and the bounded human acceptance pass remain open.
+The strict interface cleanup is validated by the authoritative focused suite (199 passed), the full repository suite (1660 passed, 20 skipped, one existing warning), plus Ruff and `git diff --check`. Installed package `f800e6c...` from commit `8903512c9` passed the bounded Cinnamon/X11 human acceptance.
 
 Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md`
 remain consistent with viewer-owned placement history, focus-sensitive Edit Undo/Redo, and explicit
 lifecycle clearing; no governing-document change is required.
 
-Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, explicit lifecycle adoption and no-op refresh behavior now have focused coverage. The acceptance child owns fresh installed payload identity and rendered Cinnamon/X11 verification; this child does not certify those external gates.
+Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, explicit lifecycle adoption and no-op refresh behavior now have focused coverage. The acceptance child recorded the fresh installed payload identity and rendered Cinnamon/X11 verification; this child does not duplicate that evidence.
 
 ## Context and Orientation
 
@@ -120,4 +128,4 @@ Revision note (2026-09-07): Created from installed Gate 2 item 10 failures and c
 
 Revision note (2026-09-07, review wave): Incorporated validated explorer observations, strengthened production callback and rendered acceptance requirements, and rejected unsupported startup/replay conclusions. The integration test remains an intentionally new artifact.
 
-Revision note (2026-09-07, implementation): Completed the single viewer-owned history path for pointer, keyboard, panel, removal, undo/redo and explicit lifecycle adoption. Added composed offscreen pointer history coverage and focused regressions. Installed acceptance remains with the acceptance child.
+Revision note (2026-09-07, implementation; superseded status wording): Completed the single viewer-owned history path for pointer, keyboard, panel, removal, undo/redo and explicit lifecycle adoption. Added composed offscreen pointer history coverage and focused regressions. The acceptance child subsequently recorded the installed Cinnamon/X11 result for package `f800e6c...` from commit `8903512c9`.
