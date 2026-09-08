@@ -82,6 +82,7 @@ class _FakeViewerWidget:
         self.undo_available = False
         self.redo_available = False
         self.clear_history_calls = 0
+        self.flush_keyboard_adjustment_calls = 0
 
     def set_signature_overlay(self, signature_rect) -> None:
         if self._order is not None:
@@ -96,6 +97,9 @@ class _FakeViewerWidget:
 
     def clear_signature_history(self) -> None:
         self.clear_history_calls += 1
+
+    def flush_keyboard_adjustment(self) -> None:
+        self.flush_keyboard_adjustment_calls += 1
 
     def refresh(self, *, navigation: bool = False) -> None:
         if self._order is not None:
@@ -198,6 +202,9 @@ class _FakeDraftWorkflow:
             self._order.append(("placement_context", placement_context))
         self.placement_context = placement_context
 
+    def set_signature_rect(self, signature_rect) -> None:
+        self.signature_rect = signature_rect
+
 
 class _FakeViewerInteractionSession:
     def __init__(self, order=None) -> None:
@@ -215,6 +222,30 @@ class _FakeViewerInteractionSession:
         if self._order is not None:
             self._order.append(("current_placement_context", None))
         return SimpleNamespace(placement_context=self.current_placement)
+
+    def move_signature_rect(self, signature_rect, *, delta_x_pt, delta_y_pt):
+        return SimpleNamespace(
+            signature_rect=SignatureRect(
+                page_index=signature_rect.page_index,
+                left_pt=signature_rect.left_pt + delta_x_pt,
+                bottom_pt=signature_rect.bottom_pt + delta_y_pt,
+                width_pt=signature_rect.width_pt,
+                height_pt=signature_rect.height_pt,
+            ),
+            error_message=None,
+        )
+
+    def resize_signature_rect(self, signature_rect, *, delta_width_pt, delta_height_pt):
+        return SimpleNamespace(
+            signature_rect=SignatureRect(
+                page_index=signature_rect.page_index,
+                left_pt=signature_rect.left_pt,
+                bottom_pt=signature_rect.bottom_pt,
+                width_pt=signature_rect.width_pt + delta_width_pt,
+                height_pt=signature_rect.height_pt + delta_height_pt,
+            ),
+            error_message=None,
+        )
 
 
 class _FakeViewerWorkflow:
@@ -691,6 +722,54 @@ def test_signing_workspace_runtime_applies_signature_rect_placement_and_testing_
         ("overlay", bound.draft_workflow.signature_rect),
         ("refresh_sign_button_state", None),
     ]
+
+
+def test_remove_placement_flushes_keyboard_batch_before_mutation() -> None:
+    bound = _bind_runtime()
+    bound.draft_workflow.signature_rect = SignatureRect(0, 10.0, 10.0, 20.0, 10.0)
+
+    assert bound.runtime.remove_signature_placement() is True
+    assert bound.viewer_widget.flush_keyboard_adjustment_calls == 1
+
+
+def test_page_navigation_flushes_pending_keyboard_placement_before_transition() -> None:
+    bound = _bind_runtime()
+    bound.draft_workflow.signature_rect = SignatureRect(0, 31.0, 10.0, 20.0, 10.0)
+
+    bound.runtime.refresh_review_jump_to_page_index(2)
+
+    assert bound.viewer_widget.flush_keyboard_adjustment_calls == 1
+
+
+def test_keyboard_placement_preview_defers_reconciliation_until_flush() -> None:
+    bound = _bind_runtime()
+    original = SignatureRect(
+        page_index=1,
+        left_pt=24.0,
+        bottom_pt=18.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+    bound.draft_workflow.signature_rect = original
+
+    moved = bound.runtime.move_keyboard_placement(1.0, 0.0)
+
+    assert moved == SignatureRect(
+        page_index=1,
+        left_pt=25.0,
+        bottom_pt=18.0,
+        width_pt=40.0,
+        height_pt=20.0,
+    )
+    assert bound.draft_workflow.signature_rect == moved
+    assert bound.viewer_widget.overlays == [moved]
+    assert bound.refresh_sign_button_state_calls == []
+    assert bound.properties_panel.set_signature_rect_calls == []
+
+    bound.runtime.flush_keyboard_placement(moved)
+
+    assert bound.refresh_sign_button_state_calls == ["refresh"]
+    assert bound.properties_panel.set_signature_rect_calls == [(moved, False)]
 
 
 def test_same_page_placement_skips_pdf_refresh() -> None:

@@ -133,16 +133,26 @@ class _FakeMouseEvent:
 
 
 class _FakeKeyEvent:
-    def __init__(self, *, key: int, modifiers: int = _FakeQt.NoModifier):
+    def __init__(
+        self,
+        *,
+        key: int,
+        modifiers: int = _FakeQt.NoModifier,
+        auto_repeat: bool = False,
+    ):
         self._key = key
         self.accepted = False
         self._modifiers = modifiers
+        self._auto_repeat = auto_repeat
 
     def key(self):
         return self._key
 
     def modifiers(self):
         return self._modifiers
+
+    def isAutoRepeat(self):  # noqa: N802
+        return self._auto_repeat
 
     def accept(self):
         self.accepted = True
@@ -1150,6 +1160,168 @@ def test_keyboard_place_ctrl_arrows_resize_exactly_and_only_in_place_mode(monkey
     preview.set_interaction_mode("pan")
     preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right, modifiers=_FakeQt.ControlModifier))
     assert resized == [(1.0, 0.0), (0.0, 10.0)]
+
+
+def test_keyboard_autorepeat_updates_overlay_and_flushes_one_history_step(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    current = [first]
+    flushed = []
+
+    def move(delta_x: float, delta_y: float) -> SignatureRect:
+        previous = current[0]
+        current[0] = SignatureRect(
+            page_index=previous.page_index,
+            left_pt=previous.left_pt + delta_x,
+            bottom_pt=previous.bottom_pt + delta_y,
+            width_pt=previous.width_pt,
+            height_pt=previous.height_pt,
+        )
+        return current[0]
+
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_move=move,
+        on_keyboard_flush=lambda rect: (flushed.append(rect) or rect),
+    )
+    preview.adopt_signature_overlay(first)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+    preview.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Right, auto_repeat=True)
+    )
+    preview.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Right, auto_repeat=True)
+    )
+    preview.keyReleaseEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Right, auto_repeat=True)
+    )
+
+    assert preview._overlay_signature_rect == current[0]
+    assert flushed == []
+    preview.keyReleaseEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+
+    assert flushed == [current[0]]
+    assert preview.can_undo_signature_placement() is True
+    assert preview.undo_signature_placement() == first
+    assert preview.can_undo_signature_placement() is False
+
+
+def test_keyboard_escape_cancels_unflushed_batch_without_history(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    original = SignatureRect(0, 10.0, 20.0, 30.0, 10.0)
+    moved = SignatureRect(0, 11.0, 20.0, 30.0, 10.0)
+    flushed = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_move=lambda _dx, _dy: moved,
+        on_keyboard_flush=lambda rect: (flushed.append(rect) or rect),
+    )
+    preview.adopt_signature_overlay(original)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+    assert preview._overlay_signature_rect == moved
+
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Escape))
+
+    assert preview._overlay_signature_rect == original
+    assert preview._interaction_mode == "pan"
+    assert flushed == []
+    assert preview.can_undo_signature_placement() is False
+
+
+def test_keyboard_physical_key_boundary_flushes_before_new_modifier_sequence(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    original = SignatureRect(0, 10.0, 20.0, 30.0, 10.0)
+    current = [original]
+    flushed = []
+
+    def move(delta_x, delta_y):
+        previous = current[0]
+        current[0] = SignatureRect(
+            previous.page_index,
+            previous.left_pt + delta_x,
+            previous.bottom_pt + delta_y,
+            previous.width_pt,
+            previous.height_pt,
+        )
+        return current[0]
+
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_move=move,
+        on_keyboard_flush=lambda rect: (flushed.append(rect) or rect),
+    )
+    preview.adopt_signature_overlay(original)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+    preview.keyPressEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Right, modifiers=_FakeQt.ControlModifier)
+    )
+
+    assert len(flushed) == 1
+    assert flushed[0].left_pt == 11.0
+    preview.keyReleaseEvent(
+        _FakeKeyEvent(key=_FakeQt.Key_Right, modifiers=_FakeQt.ControlModifier)
+    )
+    assert len(flushed) == 2
+
+
+def test_keyboard_callback_failure_cancels_and_restores_model_state(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    original = SignatureRect(0, 10.0, 20.0, 30.0, 10.0)
+    moved = SignatureRect(0, 11.0, 20.0, 30.0, 10.0)
+    applied = []
+    calls = [0]
+
+    def move(_dx, _dy):
+        calls[0] += 1
+        return moved if calls[0] == 1 else None
+
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_move=move,
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+    )
+    preview.adopt_signature_overlay(original)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right, auto_repeat=True))
+
+    assert preview._overlay_signature_rect == original
+    assert applied == [original]
+    assert preview.can_undo_signature_placement() is False
+
+
+def test_keyboard_flush_exception_restores_start_and_surfaces_error(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+    original = SignatureRect(0, 10.0, 20.0, 30.0, 10.0)
+    moved = SignatureRect(0, 11.0, 20.0, 30.0, 10.0)
+    applied = []
+    errors = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_move=lambda _dx, _dy: moved,
+        on_keyboard_flush=lambda _rect: (_ for _ in ()).throw(RuntimeError("flush failed")),
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+        on_error=errors.append,
+    )
+    preview.adopt_signature_overlay(original)
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+    preview.keyReleaseEvent(_FakeKeyEvent(key=_FakeQt.Key_Right))
+
+    assert preview._overlay_signature_rect == original
+    assert applied == [original]
+    assert preview.can_undo_signature_placement() is False
+    assert errors == ["Keyboard placement adjustment failed. (details: flush failed)"]
 
 
 def test_external_numeric_edit_enters_placement_history(monkeypatch):

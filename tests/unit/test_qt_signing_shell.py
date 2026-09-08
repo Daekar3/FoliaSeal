@@ -675,6 +675,7 @@ class _FakeViewerWidget(_FakeWidget):
         on_keyboard_resize=None,
         on_keyboard_recover=None,
         on_keyboard_apply=None,
+        on_keyboard_flush=None,
     ) -> None:
         super().__init__()
         self.workflow = workflow
@@ -687,6 +688,7 @@ class _FakeViewerWidget(_FakeWidget):
         self.on_keyboard_resize = on_keyboard_resize
         self.on_keyboard_recover = on_keyboard_recover
         self.on_keyboard_apply = on_keyboard_apply
+        self.on_keyboard_flush = on_keyboard_flush
         self.refresh_calls = []
         self.overlay_signature_rect = None
         self.text_highlight_page_index = None
@@ -723,6 +725,9 @@ class _FakeViewerWidget(_FakeWidget):
     def clear_signature_history(self):
         self._placement_history.clear()
         self._placement_redo.clear()
+
+    def flush_keyboard_adjustment(self):
+        return None
 
     def can_undo_signature_placement(self):
         return len(self._placement_history) > 1

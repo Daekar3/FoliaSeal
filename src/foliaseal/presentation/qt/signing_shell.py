@@ -607,6 +607,7 @@ class SigningWorkspaceWidget:
         return self._runtime.is_sign_action_enabled()
 
     def submit_sign_request(self) -> SigningRequest | None:
+        self._runtime.flush_pending_keyboard_placement()
         return self._shell_surface.submit_sign_request()
 
     def can_submit_sign_request(self) -> bool:

@@ -1710,9 +1710,24 @@ new history entry. The runtime and `SigningWorkspaceSessionPort` expose required
 methods to `FoliaSealAppFrame`, whose Edit action projection remains focus-sensitive between native
 text history and placement history.
 
-This source-level contract is covered by focused unit and composed offscreen Qt tests. The installed
-Cinnamon/X11 package identity and rendered human acceptance of the complete Gate 2 item 10 sequence
-remain external evidence requirements; source or offscreen results do not certify the installed GUI.
+Held keyboard adjustment is a viewer-owned `PlacementKeyboardAdjustmentSession`: each arrow or
+Ctrl-arrow press updates only the draft geometry and overlay, while the typed
+`SigningWorkspaceRuntime.flush_keyboard_placement(signature_rect)` operation performs the single full
+signing-panel/readiness reconciliation at physical key release. Typed session results distinguish
+accepted/no-op/flush/cancel/close outcomes; Qt synthetic autorepeat releases are ignored, physical
+key/modifier changes flush before a new sequence, and Escape restores the batch start without
+history. The viewer flushes an open batch before focus loss, mode or action boundaries, hide, close,
+Undo/Redo, and external placement adoption. Signing submission, removal, and direct page navigation
+invoke the public `flush_pending_keyboard_placement()` boundary directly. This keeps one held
+sequence as one `PlacementHistory` mutation and avoids repeated same-page PDF/certificate work.
+
+This source-level contract is covered by 199 focused unit and composed offscreen Qt tests; the full
+repository validation is 1660 passed, 20 skipped, and one existing warning. The configured disposable
+PKCS#12 path proves zero certificate-readiness reads during five autorepeat resize events and four
+bounded readiness reads at physical release; certificate parsing is deliberately deferred to the
+flush boundary. Only a fresh package rebuild/install and rendered Cinnamon/X11 human acceptance of
+the complete Gate 2 item 10 sequence remain external evidence requirements; source or offscreen
+results do not certify the installed GUI.
 
 `View -> Document Signatures` is also a typed registry action. When a workspace is active,
 `FoliaSealAppFrame.show_document_signatures()` creates or refreshes the single modeless
@@ -1951,6 +1966,7 @@ Default local validation from README:
 
 | Date | Change | Reason |
 |---|---|---|
+| 2026-09-07 | Added viewer-owned held-key placement batching. | Arrow and resize autorepeat updates remain immediate on the overlay while panel/readiness reconciliation and history commit occur once at physical release; synthetic releases and lifecycle boundaries are handled explicitly. The configured disposable PKCS#12 path proves certificate readiness is deferred until flush. Focused validation passes 199 tests and full validation passes 1660 with 20 skipped and one existing warning; fresh package rebuild/install and rendered Cinnamon/X11 human acceptance remain pending. |
 | 2026-09-07 | Reconciled the live placement interaction architecture after the Gate 10 recovery implementation. | `viewer_widget.py` now owns the authoritative Pan/Place/Text mode, strong canvas focus, mouse-grab cancellation, mode-dependent handles, and one viewer-owned `PlacementHistory`; runtime/session ports expose the required placement history capabilities and AppFrame keeps native text Undo separate from placement Undo. Focused source and offscreen evidence is complete, while fresh installed Cinnamon/X11 identity and human Gate 2 item 10 acceptance remain pending. |
 | 2026-09-04 | Stabilized preset selection and canonical-preview PDF lifecycle boundaries. | The signing-properties preset combo now delivers one user selection through `currentTextChanged` with an explicit reentrancy guard, avoiding duplicate session/coordinator/preview work. Canonical preview rendering reuses one computed layout for its generated `full`, `text`, and `stamp` roles, while `QtCanonicalPreviewLifecycle` removes a failed pixmap snapshot and its temporary directory before returning a neutral fallback. QtPdf load-status and generated-role tests document bounded behavior; the full suite and fresh package audits pass, but the corrected package still requires host installation and the repeat human Gate 2 preset/certificate workflow. |
 | 2026-08-20 | Reconciled the GUI defect-recovery slice across existing certificate, Library, signing-rail, viewer, and Debian-wrapper owners. | Certificate creation now exposes readable optional display-name copy and bounded wrong-password retry without clearing selection; the Library/Appearance editor has explicit minimum geometry and image-aware synthetic preview; placement adjustment reports only known disposed-viewer failures, duplicate drag positions avoid redundant repaints, and the visible Place guidance states the full keyboard contract. The package wrapper resolves its bundle relative to its own installed/extracted path, preventing an older host installation from contaminating private package audits. No new persistence schema, protocol, or ownership boundary was introduced; final live X11/HITL evidence remains in the owning ExecPlans. |

@@ -366,6 +366,7 @@ def _assemble_signing_workspace_composition(
         "on_keyboard_resize": runtime.resize_keyboard_placement,
         "on_keyboard_recover": runtime.recover_keyboard_placement,
         "on_keyboard_apply": runtime.apply_keyboard_placement,
+        "on_keyboard_flush": runtime.flush_keyboard_placement,
     }
     viewer_widget = viewer_widget_builder(**viewer_kwargs)
     viewer_widget.set_interaction_mode("pan")

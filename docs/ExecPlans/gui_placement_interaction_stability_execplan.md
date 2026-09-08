@@ -11,13 +11,18 @@ Signing and reopening/verification remain user-reported passes.
 Status reconciliation (2026-09-07): This plan is historical for the earlier placement stability and
 resource-spike work. Its remaining Gate 2 interaction implementation and retest responsibilities are
 owned by the [Gate 10 recovery family](gui_placement_gate10_recovery_parent_execplan.md). The source
-implementation now has focused/composed coverage; fresh installed package identity and human acceptance
-remain open in that family. Do not execute this plan as a competing implementation loop.
+implementation now has focused/composed coverage, including typed keyboard autorepeat batching; the
+earlier exact package/X11 launch evidence predates that final repair. Only a fresh package rebuild,
+installation, and rendered human interaction acceptance remain in the Gate 10 family. Do not execute
+this plan as a competing implementation loop.
 
-Acceptance handoff (2026-09-07): The Gate 10 family built and audited a fresh package from the repaired
-source, including an escalated display-backed XCB startup audit. The installed bundle remains an older
-payload because the worker shell could not complete the interactive sudo password prompt; rendered
-placement behavior therefore remains open and is owned exclusively by the Gate 10 acceptance child.
+Acceptance handoff (2026-09-07): The Gate 10 family built and audited a package from the pre-final
+autorepeat source, including an escalated display-backed XCB startup audit. The final source now has
+199 focused tests and a 1660-test full-suite result with 20 skips and one existing warning. The
+configured disposable PKCS#12 counter coverage proves readiness reads are deferred during repeats and
+bounded at physical release. Rebuild/install the final source before the compact rendered Adjust,
+keyboard, cancellation, mode, history, and held-key resource acceptance owned exclusively by the Gate
+10 acceptance child.
 
 This ExecPlan is a living document and must remain self-contained under
 `/home/daekar/.codex/skills/write-execplan/PLANS.md`. It is Child 3 of

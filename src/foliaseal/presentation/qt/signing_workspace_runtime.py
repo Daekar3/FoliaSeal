@@ -264,7 +264,7 @@ class SigningWorkspaceRuntime:
             self.emit_error(result.error_message)
             return None
         if result.signature_rect is not None:
-            self.apply_signature_rect_placement(result.signature_rect)
+            self._preview_keyboard_placement(result.signature_rect)
         return result.signature_rect
 
     def resize_keyboard_placement(
@@ -282,8 +282,20 @@ class SigningWorkspaceRuntime:
             self.emit_error(result.error_message)
             return None
         if result.signature_rect is not None:
-            self.apply_signature_rect_placement(result.signature_rect)
+            self._preview_keyboard_placement(result.signature_rect)
         return result.signature_rect
+
+    def flush_keyboard_placement(self, signature_rect: SignatureRect) -> SignatureRect | None:
+        """Reconcile one coalesced keyboard adjustment at physical key release."""
+
+        self.apply_signature_rect_placement(signature_rect)
+        return signature_rect
+
+    def _preview_keyboard_placement(self, signature_rect: SignatureRect) -> None:
+        """Update draft and overlay without rebuilding signing projections."""
+
+        self._draft_workflow.set_signature_rect(signature_rect)
+        self.sync_signature_overlay()
 
     def recover_keyboard_placement(self) -> SignatureRect | None:
         current = self._draft_workflow.signature_rect
@@ -312,6 +324,11 @@ class SigningWorkspaceRuntime:
             return None
         self.apply_signature_rect_placement(signature_rect)
         return signature_rect
+
+    def flush_pending_keyboard_placement(self) -> None:
+        """Flush viewer keyboard adjustment state before an external action."""
+
+        self._viewer_widget_required().flush_keyboard_adjustment()
 
     def can_undo_placement(self) -> bool:
         """Return whether the active viewer can undo a placement mutation."""
@@ -493,6 +510,7 @@ class SigningWorkspaceRuntime:
     def remove_signature_placement(self) -> bool:
         if not self.can_remove_signature_placement():
             return False
+        self.flush_pending_keyboard_placement()
         self._viewer_widget_required().record_signature_edit(None)
         self.apply_keyboard_placement(None)
         if self._on_status_change is not None:
@@ -522,6 +540,7 @@ class SigningWorkspaceRuntime:
         return transition.state.document_text.selection_state
 
     def set_logical_page_index(self, page_index: int) -> None:
+        self.flush_pending_keyboard_placement()
         self._viewer_interaction_session_required().set_logical_page_index(page_index)
         self._link_history.reset(page_index)
         self._refresh_page_navigation_state_required()()
@@ -702,6 +721,7 @@ class SigningWorkspaceRuntime:
         *,
         preserve_link_history: bool = False,
     ) -> None:
+        self.flush_pending_keyboard_placement()
         if self._viewer_workflow_required().session.current_page != page_index:
             self.clear_selected_document_text()
             self.clear_document_review_highlight()

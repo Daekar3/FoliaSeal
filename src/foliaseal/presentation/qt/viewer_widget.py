@@ -18,6 +18,9 @@ from foliaseal.application.coordinate_transform import (
     view_point_to_pdf,
 )
 from foliaseal.application.placement_history import PlacementHistory
+from foliaseal.application.placement_keyboard_adjustment import (
+    PlacementKeyboardAdjustmentSession,
+)
 from foliaseal.application.viewer_workflow import ViewerWorkflow
 from foliaseal.domain.models import SignatureRect
 
@@ -61,6 +64,7 @@ class PdfViewerWidgetAdapter:
         on_keyboard_resize: Callable[[float, float], SignatureRect | None] | None = None,
         on_keyboard_recover: Callable[[], SignatureRect | None] | None = None,
         on_keyboard_apply: Callable[[SignatureRect | None], SignatureRect | None] | None = None,
+        on_keyboard_flush: Callable[[SignatureRect], SignatureRect | None] | None = None,
     ) -> Any:
         bindings = self._bindings
 
@@ -77,6 +81,7 @@ class PdfViewerWidgetAdapter:
                 self._on_keyboard_resize = on_keyboard_resize
                 self._on_keyboard_recover = on_keyboard_recover
                 self._on_keyboard_apply = on_keyboard_apply
+                self._on_keyboard_flush = on_keyboard_flush
                 self._pixmap: Any | None = None
                 self._scroll_container: Any | None = None
                 self._drag_origin: Any | None = None
@@ -95,6 +100,7 @@ class PdfViewerWidgetAdapter:
                 self._overlay_drag_offset_y = 0.0
                 self._overlay_handle_half_size = 6.0
                 self._overlay_min_span_px = 8.0
+                self._keyboard_adjustment = PlacementKeyboardAdjustmentSession()
                 self._interaction_mode = "signature"
                 self._text_highlight_page_index: int | None = None
                 self._text_highlight_rects: tuple[PdfRect, ...] = ()
@@ -229,6 +235,8 @@ class PdfViewerWidgetAdapter:
                 key = event.key()
 
                 if key == bindings.qt.Key_Escape:
+                    if self._keyboard_adjustment.active:
+                        self._cancel_keyboard_adjustment()
                     if self._overlay_drag_handle is not None:
                         self._reset_overlay_drag_state()
                         self.update()
@@ -270,6 +278,7 @@ class PdfViewerWidgetAdapter:
                     if key_value is not None
                 )
                 if key in enter_keys and self._interaction_mode == "signature":
+                    self._flush_keyboard_adjustment()
                     if (
                         self._overlay_signature_rect is None
                         and self._on_keyboard_create is not None
@@ -290,6 +299,7 @@ class PdfViewerWidgetAdapter:
                     and self._overlay_signature_rect is not None
                     and self._on_keyboard_recover is not None
                 ):
+                    self._flush_keyboard_adjustment()
                     rect = self._on_keyboard_recover()
                     if rect is not None:
                         self._placement_history.commit(rect)
@@ -305,6 +315,7 @@ class PdfViewerWidgetAdapter:
                     and self._interaction_mode == "signature"
                     and self._overlay_signature_rect is not None
                 ):
+                    self._flush_keyboard_adjustment()
                     self._placement_history.commit(None)
                     if self._on_keyboard_apply is not None:
                         self._on_keyboard_apply(None)
@@ -320,6 +331,7 @@ class PdfViewerWidgetAdapter:
                     and self._interaction_mode == "signature"
                     and self._has_control_modifier(event)
                 ):
+                    self._flush_keyboard_adjustment()
                     target = (
                         self._placement_history.redo()
                         if self._has_shift_modifier(event)
@@ -343,6 +355,22 @@ class PdfViewerWidgetAdapter:
                     and self._overlay_signature_rect is not None
                     and key in arrow_deltas
                 ):
+                    modifiers = self._event_modifiers_value(event)
+                    if (
+                        self._keyboard_adjustment.active
+                        and not self._is_auto_repeat(event)
+                        and (
+                            key != self._keyboard_adjustment.key
+                            or modifiers != self._keyboard_adjustment.modifiers
+                        )
+                    ):
+                        self._flush_keyboard_adjustment()
+                    if not self._keyboard_adjustment.active:
+                        self._keyboard_adjustment.begin(
+                            self._overlay_signature_rect,
+                            key=key,
+                            modifiers=modifiers,
+                        )
                     delta_x, delta_y = arrow_deltas[key]
                     if self._has_control_modifier(event) and self._on_keyboard_resize is not None:
                         if key in (
@@ -364,9 +392,11 @@ class PdfViewerWidgetAdapter:
                     else:
                         rect = None
                     if rect is not None:
-                        self._placement_history.commit(rect)
+                        self._keyboard_adjustment.accept(rect)
                         self._overlay_signature_rect = rect
                         self.update()
+                    elif self._keyboard_adjustment.active:
+                        self._cancel_keyboard_adjustment()
                     if self._has_control_modifier(event) or self._on_keyboard_move is not None:
                         event.accept()
                         return
@@ -465,6 +495,83 @@ class PdfViewerWidgetAdapter:
                     return
 
                 super().keyPressEvent(event)
+
+            def keyReleaseEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                arrow_keys = {
+                    getattr(bindings.qt, "Key_Left", None),
+                    getattr(bindings.qt, "Key_Right", None),
+                    getattr(bindings.qt, "Key_Up", None),
+                    getattr(bindings.qt, "Key_Down", None),
+                }
+                if event.key() in arrow_keys and self._keyboard_adjustment.active:
+                    result = self._keyboard_adjustment.release(
+                        key=event.key(),
+                        modifiers=self._event_modifiers_value(event),
+                        auto_repeat=self._is_auto_repeat(event),
+                    )
+                    if result.status.value == "flushed":
+                        self._finish_keyboard_adjustment(result)
+                    event.accept()
+                    return
+                super_key_release = getattr(super(), "keyReleaseEvent", None)
+                if callable(super_key_release):
+                    super_key_release(event)
+
+            @staticmethod
+            def _is_auto_repeat(event: Any) -> bool:
+                value = getattr(event, "isAutoRepeat", None)
+                return bool(value()) if callable(value) else bool(value)
+
+            @staticmethod
+            def _event_modifiers_value(event: Any) -> int:
+                try:
+                    return int(event.modifiers())
+                except (TypeError, ValueError):
+                    return 0
+
+            def _flush_keyboard_adjustment(self) -> None:
+                if not self._keyboard_adjustment.active:
+                    return
+                result = self._keyboard_adjustment.flush()
+                self._finish_keyboard_adjustment(result)
+
+            def _finish_keyboard_adjustment(self, result: Any) -> None:
+                if not result.changed or result.current is None:
+                    return
+                committed = result.current
+                if self._on_keyboard_flush is not None:
+                    try:
+                        flushed = self._on_keyboard_flush(result.current)
+                    except Exception as exc:
+                        self._restore_canceled_keyboard_adjustment(result.start, exc)
+                        return
+                    if flushed is not None:
+                        committed = flushed
+                        self._overlay_signature_rect = committed
+                    else:
+                        self._restore_canceled_keyboard_adjustment(result.start)
+                        return
+                self._placement_history.commit(committed)
+                self.update()
+
+            def _cancel_keyboard_adjustment(self) -> None:
+                result = self._keyboard_adjustment.cancel()
+                if result.status.value == "ignored":
+                    return
+                self._restore_canceled_keyboard_adjustment(result.start)
+
+            def _restore_canceled_keyboard_adjustment(
+                self, start: SignatureRect | None, error: Exception | None = None
+            ) -> None:
+                if start != self._overlay_signature_rect and self._on_keyboard_apply is not None:
+                    try:
+                        self._on_keyboard_apply(start)
+                    except Exception as exc:
+                        self._emit_error("Unable to restore keyboard placement.", exc)
+                self._overlay_signature_rect = start
+                if error is not None:
+                    self._emit_error("Keyboard placement adjustment failed.", error)
+                self.update()
 
             def mousePressEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 if (
@@ -653,6 +760,7 @@ class PdfViewerWidgetAdapter:
 
             def adopt_signature_overlay(self, signature_rect: SignatureRect | None) -> None:
                 """Adopt externally loaded geometry at an explicit lifecycle boundary."""
+                self._flush_keyboard_adjustment()
                 self._placement_history.clear(current=signature_rect)
                 self._overlay_signature_rect = signature_rect
                 self.update()
@@ -786,6 +894,7 @@ class PdfViewerWidgetAdapter:
 
             def record_signature_edit(self, signature_rect: SignatureRect | None) -> None:
                 """Record a placement edit originating outside viewer keyboard input."""
+                self._flush_keyboard_adjustment()
                 self._placement_history.commit(signature_rect)
                 self._overlay_signature_rect = signature_rect
                 self.update()
@@ -803,6 +912,7 @@ class PdfViewerWidgetAdapter:
             def undo_signature_placement(self) -> SignatureRect | None:
                 """Restore one prior placement state through the typed runtime callback."""
 
+                self._flush_keyboard_adjustment()
                 target = self._placement_history.undo()
                 if self._on_keyboard_apply is not None:
                     self._on_keyboard_apply(target)
@@ -813,6 +923,7 @@ class PdfViewerWidgetAdapter:
             def redo_signature_placement(self) -> SignatureRect | None:
                 """Restore one newer placement state through the typed runtime callback."""
 
+                self._flush_keyboard_adjustment()
                 target = self._placement_history.redo()
                 if self._on_keyboard_apply is not None:
                     self._on_keyboard_apply(target)
@@ -822,8 +933,13 @@ class PdfViewerWidgetAdapter:
 
             def clear_signature_history(self) -> None:
                 """Clear placement history while preserving the visible overlay."""
+                self._flush_keyboard_adjustment()
                 self._placement_history.clear(current=self._overlay_signature_rect)
                 self.update()
+
+            def flush_keyboard_adjustment(self) -> None:
+                """Flush a pending keyboard batch at an external action boundary."""
+                self._flush_keyboard_adjustment()
 
             def fit_page_view(self) -> None:
                 self._fit_view(mode="page")
@@ -832,6 +948,7 @@ class PdfViewerWidgetAdapter:
                 self._fit_view(mode="width")
 
             def clear_signature_overlay(self) -> None:
+                self._flush_keyboard_adjustment()
                 self._placement_history.clear()
                 self._overlay_signature_rect = None
                 self.update()
@@ -887,6 +1004,8 @@ class PdfViewerWidgetAdapter:
             def set_interaction_mode(self, mode: str) -> None:
                 if mode not in {"pan", "signature", "text"}:
                     raise ValueError(f"Unsupported viewer interaction mode: {mode}")
+                if mode != "signature":
+                    self._flush_keyboard_adjustment()
                 self._interaction_mode = mode
                 self.update()
                 set_cursor = getattr(self, "setCursor", None)
@@ -945,11 +1064,24 @@ class PdfViewerWidgetAdapter:
                 self._sync_pan_from_scrollbars()
 
             def hideEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                self._flush_keyboard_adjustment()
                 if self._pan_origin is not None:
                     self._pan_origin = None
                     self._pan_click_candidate = False
                     self.releaseMouse()
                 super().hideEvent(event)
+
+            def focusOutEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                self._flush_keyboard_adjustment()
+                focus_out = getattr(super(), "focusOutEvent", None)
+                if callable(focus_out):
+                    focus_out(event)
+
+            def closeEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
+                self._flush_keyboard_adjustment()
+                close = getattr(super(), "closeEvent", None)
+                if callable(close):
+                    close(event)
 
             def showEvent(self, event: Any) -> None:  # noqa: N802 (Qt API name)
                 show_event = getattr(super(), "showEvent", None)
@@ -1014,6 +1146,11 @@ class PdfViewerWidgetAdapter:
                 self.refresh(navigation=False)
 
             def _navigate(self, *, action: Callable[[], Any], summary: str) -> None:
+                # Navigation is an action boundary: commit any held-key preview before
+                # changing page so the draft, overlay, and history remain on the page
+                # where the user made the adjustment.  Runtime command paths may already
+                # have flushed; the session makes this second call a cheap no-op.
+                self._flush_keyboard_adjustment()
                 start_time = perf_counter()
                 try:
                     result = action()
@@ -1450,6 +1587,7 @@ def build_qt_pdf_viewer_widget(
     on_keyboard_resize: Callable[[float, float], SignatureRect | None] | None = None,
     on_keyboard_recover: Callable[[], SignatureRect | None] | None = None,
     on_keyboard_apply: Callable[[SignatureRect | None], SignatureRect | None] | None = None,
+    on_keyboard_flush: Callable[[SignatureRect], SignatureRect | None] | None = None,
 ) -> Any:
     """Build a QWidget instance wired to the application viewer workflow."""
 
@@ -1465,6 +1603,7 @@ def build_qt_pdf_viewer_widget(
         on_keyboard_resize=on_keyboard_resize,
         on_keyboard_recover=on_keyboard_recover,
         on_keyboard_apply=on_keyboard_apply,
+        on_keyboard_flush=on_keyboard_flush,
     )
 
     class ScrollablePdfViewer(adapter._bindings.q_scroll_area):  # type: ignore[misc,valid-type]
@@ -1510,6 +1649,9 @@ def build_qt_pdf_viewer_widget(
 
         def clear_signature_history(self) -> None:
             preview_widget.clear_signature_history()
+
+        def flush_keyboard_adjustment(self) -> None:
+            preview_widget.flush_keyboard_adjustment()
 
         def can_undo_signature_placement(self) -> bool:
             return preview_widget.can_undo_signature_placement()

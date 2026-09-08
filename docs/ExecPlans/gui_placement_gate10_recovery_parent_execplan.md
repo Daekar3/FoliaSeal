@@ -11,7 +11,7 @@ The user must be able to adjust an existing signature rectangle, cancel an unfin
 ## Child ExecPlan Dependencies
 
 
-Execute gui_placement_mode_focus_cancel_execplan.md first, gui_placement_history_recovery_execplan.md second, and gui_placement_gate10_acceptance_execplan.md last, all in docs/ExecPlans/. The history work touches the same viewer/runtime files as mode work, so execute serially. The acceptance child requires both behavior children.
+Execute gui_placement_mode_focus_cancel_execplan.md first, gui_placement_history_recovery_execplan.md second, gui_placement_keyboard_repeat_performance_execplan.md third, and gui_placement_gate10_acceptance_execplan.md last, all in docs/ExecPlans/. The history and autorepeat work touch the same viewer/runtime files as mode work, so execute serially. The acceptance child requires all three behavior children.
 
 ## Progress
 
@@ -19,11 +19,14 @@ Execute gui_placement_mode_focus_cancel_execplan.md first, gui_placement_history
 - [x] (2026-09-07) Recorded user failures and inspected relevant source paths; authored plan.
 - [x] (2026-09-07) Incorporated three-agent review corrections and strengthened composed-event, history and package acceptance coverage.
 - [x] (2026-09-07) Reproduced the scoped history-loss callback ordering and completed the history child implementation.
-- [x] (2026-09-07) Completed mode/focus/cancellation implementation and composed Qt regressions; the shared placement-focused suite passes 276 tests.
+- [x] (2026-09-07) Completed mode/focus/cancellation implementation and composed Qt regressions; the authoritative Gate 10 focused suite passes 199 tests.
 - [x] (2026-09-07) Completed strict Gate 10 interface cleanup: composition preserves all keyboard callbacks, viewer mode transitions are required, and runtime/shell placement history no longer degrades to optional no-ops. Focused suites pass 147 and 113 tests respectively.
 - [x] (2026-09-07) Completed AppFrame history contract cleanup: Edit action enablement now calls the required session capability methods directly; focused app-frame and dependent integration tests pass 86 tests.
-- [ ] Complete the installed acceptance milestone. Fresh package/audit evidence exists, but the installed bundle hash still differs from the fresh payload and rendered placement behavior remains unverified; the worker's sudo install attempt required an interactive password.
-- [x] (2026-09-07) Reconciled the behavior children and older stability plan; source/full validation is green and only fresh installed Cinnamon/X11 plus bounded human acceptance remains open.
+- [x] (2026-09-07) Added the keyboard autorepeat performance child after installed acceptance exposed significant CPU spin-up while holding adjustment keys during resize; package acceptance now requires its callback counters, lifecycle tests, and fresh installed observation.
+- [x] (2026-09-07) Implemented held-key preview coalescing: arrow and resize repeats update only the draft/overlay, physical release performs one runtime reconciliation and one history commit, and synthetic releases are ignored. Focused source and real Qt autorepeat tests pass; fresh package/install and the user-reported sustained-resource observation remain with acceptance.
+- [x] (2026-09-07) Completed autorepeat compliance remediation: typed adjustment-session results now distinguish accepted/no-op/flush/cancel/close/ignored release, Escape restores the batch start without history, physical key/modifier boundaries flush before a new sequence, callback failures restore model state, Ctrl/Ctrl+Shift resize and mounted composition counters have real-Qt coverage, and signing/removal/direct viewer navigation invoke the public flush boundary. Targeted validation is 199 passed, including a configured disposable PKCS#12 counter path; fresh package/install remains with acceptance.
+- [ ] Complete the installed acceptance milestone. The user installed the exact package and installed-byte identity now matches the fresh payload. A bounded display-backed launch rendered a disposable PDF and placement overlay with no short-interval CPU spike; human Adjust, cancellation, mode, and history acceptance remains open.
+- [x] (2026-09-07) Reconciled the behavior children and older stability plan; authoritative validation is 199 focused tests and 1660 full-suite tests with 20 skips and one existing warning. Only fresh package rebuild/install and rendered Cinnamon/X11 human acceptance remain open.
 
 ## Surprises & Discoveries
 
@@ -39,6 +42,8 @@ History child implementation evidence (2026-09-07): viewer projection no longer 
 Strict-interface remediation evidence (2026-09-07): the composition now invokes the current viewer builder contract once, without a TypeError retry that strips keyboard callbacks. Runtime and shell-port Gate 10 history methods call required typed methods directly. Fakes were migrated to implement those callbacks and history operations. Ruff and `git diff --check` pass; installed acceptance remains open.
 
 AppFrame contract evidence (2026-09-07): `_sync_edit_history_actions` now invokes the typed session `can_undo_placement()` and `can_redo_placement()` methods directly whenever a workspace is active. The final optional-method fallback was removed so a missing history implementation cannot silently disable Gate 10. The app-frame and dependent integration tests pass 86 tests; installed acceptance remains open.
+
+Keyboard autorepeat finding (2026-09-07): individual Arrow adjustment passed the installed retest, but holding adjustment keys during resize caused significant CPU activity. Read-only tracing identifies `apply_signature_rect_placement`, properties-panel `load_from_workflow`, setup/coordinator refresh, signing readiness, and possibly PKCS#12 readiness parsing as repeated-work candidates. The autorepeat child owns measurement and repair; no performance claim is made until its counters and installed observation pass.
 
 Governing-document review (2026-09-07): `docs/SPEC.md`, `docs/SCHEMAS.md`, and `docs/UI_SPEC.md` were reviewed against the implementation and this family. No governing-document change is required: the repaired source follows the existing Pan/Place/Text, keyboard-focus, cancelable-drag, visible-overlay, and undoable-placement contract. The remaining discrepancy is evidence status for the installed GUI, which stays in the acceptance child.
 
@@ -58,7 +63,7 @@ Decision (2026-09-07): Enforce the required session history capability at the Ap
 ## Outcomes & Retrospective
 
 
-Mode/focus/cancellation and placement-history implementation plus composed regressions are complete in the current source tree. Focused placement validation passes 186 tests in the current checkout. A fresh amd64 package was built and passed both offscreen and escalated display-backed payload audits, including XCB startup. The installed bundle hash differs from the fresh payload, and bounded rendered placement acceptance remains open. This document does not certify the installed GUI.
+Mode/focus/cancellation, placement history, and keyboard autorepeat implementation plus composed regressions are complete in the current source tree. Authoritative validation passes 199 focused tests and 1660 full-suite tests with 20 skips and one existing warning. The configured disposable PKCS#12 coverage proves readiness reads are deferred during repeats and bounded at flush. Only a fresh package rebuild/install and rendered Cinnamon/X11 human acceptance remain before Gate 2 item 10 can close.
 
 Three-agent review corrections are incorporated. Keyboard commit-after-projection, pointer recording, explicit focus, authoritative mode projection, cancellation, AppFrame forwarding and same-page render preservation now have composed coverage. The acceptance child remains the sole owner of fresh package identity and rendered Cinnamon/X11 retest.
 
@@ -75,7 +80,7 @@ Behavior work is complete for both implementation children; generated package/ev
 ## Plan of Work
 
 
-Milestone 1 completes mode/focus/cancellation through the first child and proves actual Qt event delivery. Milestone 2 completes the second child and proves one history step per accepted edit through the full runtime callbacks. Milestone 3 executes the acceptance child against a fresh package on Cinnamon/X11, records rendered and behavioral evidence, and obtains the bounded human retest. Carry unresolved failures into the owning child and continue repair; a test-suite pass is not final GUI acceptance.
+Milestone 1 completes mode/focus/cancellation through the first child and proves actual Qt event delivery. Milestone 2 completes the second child and proves one history step per accepted edit through the full runtime callbacks. Milestone 3 coalesces keyboard autorepeat work while preserving exact final geometry, lifecycle safety, readiness/certificate correctness, and one-step history. Milestone 4 executes the acceptance child against a fresh package on Cinnamon/X11, records rendered and behavioral evidence, and obtains the bounded human retest. Carry unresolved failures into the owning child and continue repair; a test-suite pass is not final GUI acceptance.
 
 ## Concrete Steps
 
@@ -91,9 +96,9 @@ Expect tests to pass without new failures; record actual counts rather than copy
 ## Validation and Acceptance
 
 
-The whole family is complete only when real menu activation, keyboard move/resize, held-button Escape, idle Escape to Pan, pointer edit Undo/Redo, and Remove/Undo succeed in the composed application and the installed retest has an explicit result. Retain user-reported signing passes and record any new signing regression separately.
+The whole family is complete only when real menu activation, keyboard move/resize, held-button Escape, idle Escape to Pan, pointer edit Undo/Redo, and Remove/Undo succeed in the composed application; repeated held-key adjustment has bounded callback work and one-step history; and the installed retest has an explicit result including the 30-second CPU/disk observation. Retain user-reported signing passes and record any new signing regression separately.
 
-Also require creation Undo/Redo, Delete and menu removal separately, native-text versus canvas Undo routing, Pan/Place/Text handle visibility, released mouse grabs after cancellation, no delayed commit on release, and unchanged refreshes preserving history. Verify installed payload bytes and running-process identity before HITL. Preserve same-page performance through callback counts and bounded live observation. The children contain the concrete procedures; the older stability plan is historical evidence for this gate.
+Also require creation Undo/Redo, Delete and menu removal separately, native-text versus canvas Undo routing, Pan/Place/Text handle visibility, released mouse grabs after cancellation, no delayed commit on release, unchanged refreshes preserving history, autorepeat synthetic-release handling, focus/mode/close flushes, and no lost final state. Verify installed payload bytes and running-process identity before HITL. Preserve same-page performance through callback counts and bounded live observation. The children contain the concrete procedures; the older stability plan is historical evidence for this gate.
 
 ## Idempotence and Recovery
 
