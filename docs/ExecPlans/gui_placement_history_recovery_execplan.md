@@ -59,7 +59,7 @@ Decision (2026-09-07): Apply the same strict contract at AppFrame action project
 ## Outcomes & Retrospective
 
 
-Planning, implementation, focused regression validation, and the bounded installed Cinnamon/X11 acceptance are complete. Package `f800e6c...` from commit `8903512c9` passed one-step placement history and responsiveness checks. This child does not add a Ctrl+Y shortcut; that remains a future UX opportunity.
+Planning, implementation, focused regression validation, and the bounded installed Cinnamon/X11 acceptance are complete. Package `f800e6c...` from commit `8903512c9` passed one-step placement history and responsiveness checks. This historical child did not add a Ctrl+Y shortcut; the later `ctrl_y_redo_alias_execplan.md` follow-on superseded that deferred opportunity without changing this child's history evidence or ownership.
 
 The strict interface cleanup is validated by the authoritative focused suite (199 passed), the full repository suite (1660 passed, 20 skipped, one existing warning), plus Ruff and `git diff --check`. Installed package `f800e6c...` from commit `8903512c9` passed the bounded Cinnamon/X11 human acceptance.
 

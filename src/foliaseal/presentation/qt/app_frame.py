@@ -2242,6 +2242,7 @@ class FoliaSealAppFrame:
         callback: Callable[[], Any],
         *,
         shortcut: str | None = None,
+        alternate_shortcuts: tuple[str, ...] = (),
         enabled: bool = True,
         checkable: bool = False,
         icon_name: str | None = None,
@@ -2259,6 +2260,15 @@ class FoliaSealAppFrame:
         set_shortcut = getattr(action, "setShortcut", None)
         if shortcut is not None and callable(set_shortcut):
             set_shortcut(shortcut)
+        if alternate_shortcuts:
+            set_shortcuts = getattr(action, "setShortcuts", None)
+            if callable(set_shortcuts):
+                bindings = (
+                    [shortcut, *alternate_shortcuts]
+                    if shortcut
+                    else list(alternate_shortcuts)
+                )
+                set_shortcuts(bindings)
         set_enabled = getattr(action, "setEnabled", None)
         if callable(set_enabled):
             set_enabled(enabled)
@@ -2291,6 +2301,7 @@ class FoliaSealAppFrame:
             definition.mnemonic_text,
             callback,
             shortcut=definition.shortcut,
+            alternate_shortcuts=definition.alternate_shortcuts,
             enabled=enabled,
             checkable=checkable,
             icon_name=icon_name,

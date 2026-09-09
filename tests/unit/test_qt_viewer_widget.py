@@ -78,6 +78,7 @@ class _FakeQt:
     Key_Delete = 26
     Key_Z = 27
     Key_M = 28
+    Key_Y = 29
     AltModifier = 1 << 2
     ControlModifier = 1 << 1
 
@@ -1107,6 +1108,63 @@ def test_public_placement_undo_redo_replays_viewer_history(monkeypatch):
     assert preview.can_undo_signature_placement() is True
     assert preview.can_redo_signature_placement() is False
     assert applied[-2:] == [None, first]
+
+
+def test_ctrl_y_replays_viewer_placement_history_once(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    applied = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_create=lambda: first,
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+    )
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Return))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Z, modifiers=_FakeQt.ControlModifier))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Y, modifiers=_FakeQt.ControlModifier))
+
+    assert preview._overlay_signature_rect == first
+    assert applied == [None, first]
+
+
+def test_plain_y_and_ctrl_shift_y_do_not_replay_viewer_placement_history(monkeypatch):
+    monkeypatch.setattr(PdfViewerWidgetAdapter, "_load_bindings", lambda self: _fake_bindings())
+
+    first = SignatureRect(
+        page_index=0,
+        left_pt=10.0,
+        bottom_pt=20.0,
+        width_pt=30.0,
+        height_pt=10.0,
+    )
+    applied = []
+    preview = PdfViewerWidgetAdapter().create(
+        workflow=_build_workflow(),
+        on_keyboard_create=lambda: first,
+        on_keyboard_apply=lambda rect: (applied.append(rect) or rect),
+    )
+    preview.set_interaction_mode("signature")
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Return))
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Z, modifiers=_FakeQt.ControlModifier))
+
+    preview.keyPressEvent(_FakeKeyEvent(key=_FakeQt.Key_Y))
+    preview.keyPressEvent(
+        _FakeKeyEvent(
+            key=_FakeQt.Key_Y,
+            modifiers=_FakeQt.ControlModifier | _FakeQt.KeyboardModifier.ShiftModifier,
+        )
+    )
+
+    assert preview._overlay_signature_rect is None
+    assert applied == [None]
 
 
 def test_keyboard_place_ctrl_arrows_resize_exactly_and_only_in_place_mode(monkeypatch):

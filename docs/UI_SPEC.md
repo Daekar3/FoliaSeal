@@ -245,7 +245,8 @@ Escape dismissal, visible shortcut labels, and accessible disabled state.
 
 Conventional shortcuts include Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+W, Ctrl+Q, Ctrl+F, Ctrl+C,
 Ctrl+A, Ctrl+Z, Ctrl+Shift+Z, Ctrl++/Ctrl+-, Ctrl+0, Page Up/Down, Ctrl+Home/End, Alt+Left/Right,
-and F1. Platform-equivalent alternatives may be used when established conventions differ.
+and F1. Redo keeps Ctrl+Shift+Z as its primary and menu-visible shortcut and accepts Ctrl+Y as an
+alternate. Platform-equivalent alternatives may be used when established conventions differ.
 
 ## 8. Viewer and Placement Interaction
 

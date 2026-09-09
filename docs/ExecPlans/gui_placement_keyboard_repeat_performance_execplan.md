@@ -65,7 +65,7 @@ Source implementation, validation, fresh installation, and the installed Cinnamo
 
 Implementation note (2026-09-07): Arrow and resize presses now update the draft geometry and overlay synchronously without panel/readiness reconciliation. A physical non-autorepeat release invokes one typed runtime flush and commits one history step; synthetic autorepeat releases return an explicit ignored result. Mode changes, focus loss, hide, close, Undo/Redo, deletion, external edits, signing, removal, and both runtime and direct viewer page navigation flush the open batch first. Flush exceptions restore the starting geometry and surface through the existing error path without history divergence. The authoritative focused suite passes 199 tests and the full suite passes 1660 with 20 skips and one existing warning, including mounted composition coverage with a disposable configured PKCS#12: five autorepeat Ctrl-resize events caused zero certificate-readiness reads, while physical release caused four bounded reads. Installed package `f800e6c...` from commit `8903512c9` passed the final Cinnamon/X11 held-key and resource acceptance.
 
-Final acceptance note (2026-09-08): Ctrl+Y was discussed as a possible future redo shortcut but was not added to this slice. Existing Ctrl+Shift+Z behavior remains the accepted redo path.
+Final acceptance note (2026-09-08): This historical performance slice did not add Ctrl+Y. The later `ctrl_y_redo_alias_execplan.md` follow-on completed the approved alternate Redo binding; existing Ctrl+Shift+Z remains primary/menu-visible and the performance evidence here is unchanged.
 
 
 ## Context and Orientation

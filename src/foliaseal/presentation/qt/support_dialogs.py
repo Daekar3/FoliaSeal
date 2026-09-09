@@ -80,7 +80,10 @@ def shortcut_text() -> str:
     lines = ["FoliaSeal keyboard shortcuts", ""]
     for definition in ALL_COMMAND_DEFINITIONS:
         if definition.shortcut:
-            lines.append(f"{definition.text}: {definition.shortcut}")
+            shortcut = definition.shortcut
+            if definition.alternate_shortcuts:
+                shortcut += f" (alternate: {', '.join(definition.alternate_shortcuts)})"
+            lines.append(f"{definition.text}: {shortcut}")
     return "\n".join(lines)
 
 

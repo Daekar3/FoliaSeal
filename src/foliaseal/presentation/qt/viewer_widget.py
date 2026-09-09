@@ -325,16 +325,25 @@ class PdfViewerWidgetAdapter:
                     return
 
                 undo_key = getattr(bindings.qt, "Key_Z", None)
+                redo_alias_key = getattr(bindings.qt, "Key_Y", None)
                 if (
-                    undo_key is not None
-                    and key == undo_key
-                    and self._interaction_mode == "signature"
+                    (
+                        undo_key is not None
+                        and key == undo_key
+                    )
+                    or (
+                        redo_alias_key is not None
+                        and key == redo_alias_key
+                        and not self._has_shift_modifier(event)
+                    )
+                ) and (
+                    self._interaction_mode == "signature"
                     and self._has_control_modifier(event)
                 ):
                     self._flush_keyboard_adjustment()
                     target = (
                         self._placement_history.redo()
-                        if self._has_shift_modifier(event)
+                        if key == redo_alias_key or self._has_shift_modifier(event)
                         else self._placement_history.undo()
                     )
                     if self._on_keyboard_apply is not None:

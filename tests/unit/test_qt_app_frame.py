@@ -45,6 +45,7 @@ from foliaseal.presentation.qt.signing_shell_port import (
     SigningWorkspaceBundle,
 )
 from foliaseal.presentation.qt.single_instance import OpenRequest
+from foliaseal.presentation.qt.support_dialogs import shortcut_text
 from tests.support.signing_builders import (
     build_certificate_catalog,
     build_certificate_configuration,
@@ -105,6 +106,23 @@ def test_text_commands_are_typed_and_owned_by_normative_menus() -> None:
         "Ctrl+A",
     ]
     assert VIEW_COMMAND_DEFINITIONS[-1].menu == "View"
+
+
+def test_redo_command_exposes_ctrl_y_as_an_ordered_alternate_shortcut() -> None:
+    redo = next(
+        definition
+        for definition in EDIT_COMMAND_DEFINITIONS
+        if definition.command_id is AppFrameCommandId.REDO
+    )
+
+    assert redo.shortcut == "Ctrl+Shift+Z"
+    assert redo.alternate_shortcuts == ("Ctrl+Y",)
+
+
+def test_keyboard_shortcuts_help_lists_redo_alias_once() -> None:
+    lines = [line for line in shortcut_text().splitlines() if line.startswith("Redo:")]
+
+    assert lines == ["Redo: Ctrl+Shift+Z (alternate: Ctrl+Y)"]
 
 
 def test_view_fit_commands_are_typed_and_use_conventional_shortcuts() -> None:
@@ -217,6 +235,7 @@ class _FakeAction:
         self.parent = parent
         self.triggered = _FakeSignal()
         self.shortcut = None
+        self.shortcuts = []
         self.enabled = True
         self.checkable = False
         self.checked = False
@@ -227,6 +246,9 @@ class _FakeAction:
 
     def setShortcut(self, shortcut):  # noqa: N802
         self.shortcut = shortcut
+
+    def setShortcuts(self, shortcuts):  # noqa: N802
+        self.shortcuts = list(shortcuts)
 
     def setEnabled(self, enabled):  # noqa: N802
         self.enabled = bool(enabled)
@@ -1736,6 +1758,21 @@ def test_edit_undo_redo_routes_to_placement_history_unless_text_editor_has_focus
     undo_action.trigger()
     assert editor.undo_calls == 1
     assert shell.undo_placement_calls == 1
+
+
+def test_redo_action_registers_primary_and_alternate_shortcuts(tmp_path: Path) -> None:
+    frame = FoliaSealAppFrame(
+        bindings=_fake_bindings(),
+        app_settings=_settings(tmp_path),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        shell_factory=_FakeShellFactory(_FakeShell()),
+        render_backend_factory=lambda: object(),
+    )
+
+    redo_action = frame.command_actions()[AppFrameCommandId.REDO]
+
+    assert redo_action.shortcut == "Ctrl+Shift+Z"
+    assert redo_action.shortcuts == ["Ctrl+Shift+Z", "Ctrl+Y"]
 
 
 def test_native_edit_commands_follow_focused_editor_capabilities(tmp_path: Path) -> None:

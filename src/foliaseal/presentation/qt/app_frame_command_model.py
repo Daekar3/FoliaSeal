@@ -60,6 +60,7 @@ class AppFrameCommandDefinition:
     shortcut: str | None
     accessible_name: str
     mnemonic_text: str
+    alternate_shortcuts: tuple[str, ...] = ()
 
 
 FILE_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
@@ -122,6 +123,7 @@ EDIT_COMMAND_DEFINITIONS: tuple[AppFrameCommandDefinition, ...] = (
         shortcut="Ctrl+Shift+Z",
         accessible_name="Redo the last undone placement or text edit",
         mnemonic_text="&Redo",
+        alternate_shortcuts=("Ctrl+Y",),
     ),
     AppFrameCommandDefinition(
         command_id=AppFrameCommandId.CUT,

@@ -505,6 +505,10 @@ def test_keyboard_place_enter_and_shift_arrow_update_the_overlay() -> None:
         assert current[0] is None
 
         QTest.keyClick(viewer.widget(), Qt.Key_Z, Qt.KeyboardModifier.ControlModifier)
+        QTest.keyClick(viewer.widget(), Qt.Key_Y, Qt.KeyboardModifier.ControlModifier)
+        app.processEvents()
+        assert current[0] is None
+        QTest.keyClick(viewer.widget(), Qt.Key_Z, Qt.KeyboardModifier.ControlModifier)
         QTest.keyClick(viewer.widget(), Qt.Key_Escape)
         app.processEvents()
         assert viewer.widget()._interaction_mode == "pan"

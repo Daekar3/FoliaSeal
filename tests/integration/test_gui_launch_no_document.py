@@ -103,6 +103,11 @@ def test_real_qt_no_document_frame_exposes_primary_actions(tmp_path: Path) -> No
     assert [action.shortcut().toString() for action in edit_menu.actions()] == [
         definition.shortcut or "" for definition in EDIT_COMMAND_DEFINITIONS
     ]
+    redo_menu_action = edit_menu.actions()[1]
+    assert [shortcut.toString() for shortcut in redo_menu_action.shortcuts()] == [
+        "Ctrl+Shift+Z",
+        "Ctrl+Y",
+    ]
 
     view_menu = next(
         menu
@@ -441,6 +446,10 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     assert place_action.isEnabled() is True
     assert adjust_action.isEnabled() is False
     assert remove_action.isEnabled() is False
+    frame.window.activateWindow()
+    QTest.keyClick(frame.window, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+    app.processEvents()
+    assert shell.redo_calls == 0
 
     shell.undo_available = True
     shell.status_callback("signing_readiness_changed")
@@ -458,6 +467,23 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
         Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
     )
     assert shell.redo_calls == 1
+    assert undo_action.isEnabled() is True
+    assert redo_action.isEnabled() is False
+    undo_action.trigger()
+    app.processEvents()
+    frame.window.activateWindow()
+    QTest.keyClick(frame.window, Qt.Key.Key_Y)
+    QTest.keyClick(
+        frame.window,
+        Qt.Key.Key_Y,
+        Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+    )
+    app.processEvents()
+    assert shell.redo_calls == 1
+    assert redo_action.isEnabled() is True
+    QTest.keyClick(frame.window, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
+    app.processEvents()
+    assert shell.redo_calls == 2
     assert undo_action.isEnabled() is True
     assert redo_action.isEnabled() is False
 
@@ -478,12 +504,12 @@ def test_real_qt_view_history_actions_dispatch_through_open_workspace(tmp_path: 
     undo_action.trigger()
     app.processEvents()
     assert editor.text() == "12"
-    assert shell.undo_calls == 1
+    assert shell.undo_calls == 2
     assert redo_action.isEnabled() is True
-    redo_action.trigger()
+    QTest.keyClick(editor, Qt.Key.Key_Y, Qt.KeyboardModifier.ControlModifier)
     app.processEvents()
     assert editor.text() == "123"
-    assert shell.redo_calls == 1
+    assert shell.redo_calls == 2
     editor.deleteLater()
 
     place_action.trigger()

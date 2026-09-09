@@ -159,11 +159,19 @@ def test_real_qt_keyboard_accessibility_and_support_surfaces(
         help_viewer.close()
         app.processEvents()
 
-        support_dialogs = [
-            frame.show_keyboard_shortcuts(),
-            frame.show_data_locations(),
-            frame.show_about(),
+        keyboard_shortcuts = frame.show_keyboard_shortcuts()
+        app.processEvents()
+        assert keyboard_shortcuts.dialog.isVisible()
+        redo_lines = [
+            line
+            for line in keyboard_shortcuts.content.toPlainText().splitlines()
+            if line.startswith("Redo:")
         ]
+        assert redo_lines == ["Redo: Ctrl+Shift+Z (alternate: Ctrl+Y)"]
+        keyboard_shortcuts.close()
+        app.processEvents()
+
+        support_dialogs = [frame.show_data_locations(), frame.show_about()]
         for dialog in support_dialogs:
             assert dialog.dialog.isModal() is False
             assert dialog.dialog.minimumWidth() >= 520

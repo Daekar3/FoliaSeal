@@ -91,7 +91,7 @@ The canonical repository document split is:
 | `src/foliaseal/presentation/qt/pending_open_request_surface.py` | AppFrame-owned condition-only app-chrome surface for one deferred PDF open request. | Owns a `QStatusBar`-compatible container, queued basename label, and keyboard-accessible Cancel pending open button; it does not own request policy, persistence, workspace replacement, or signing state. |
 | `src/foliaseal/presentation/qt/app_frame_workspace_action_state.py` | Qt-free app-frame projection of workspace QAction policy. | `WorkspaceActionState` and its pure closed/open/selection-result/native-edit constructors describe whether Save, Save As, Close, Undo, Redo, Cut, Copy, Paste, Select All, Previous Page, Next Page, Back, Forward, Pan, text selection, and Copy selected text should be enabled or checked. Undo/Redo fields project the currently selected history owner; native Edit fields project focused-editor capabilities; the projection owns policy only, while `FoliaSealAppFrame` mutates the concrete QActions. |
 | `src/foliaseal/presentation/qt/external_link_confirmation.py` | Typed result boundary for AppFrame-owned external-link confirmation and launch outcomes. | Defines `ExternalLinkOutcome` and `ExternalLinkRequestResult`; dialog ownership, pending-request policy, and the injected Qt launcher remain at the AppFrame edge. |
-| `src/foliaseal/presentation/qt/app_frame_command_model.py` | Typed registry of top-level File, Edit, View, Signing, Settings, and Help commands. | `AppFrameCommandId` and immutable `AppFrameCommandDefinition` records provide stable IDs, menu text, shortcuts, unique mnemonic labels, and accessible names; the per-menu definition tuples and `ALL_COMMAND_DEFINITIONS` form one registry, and the frame maps these definitions to its owned Qt actions. Implemented File/Edit/View/Signing/Settings actions route through public workspace ports or native focused-editor behavior; View Pan is a typed no-shortcut action routed through `SigningWorkspaceSessionPort.set_viewer_interaction_mode("pan")` and enabled only for an open workspace; Help is a truthful `F1` action that opens the frame-owned modeless viewer. |
+| `src/foliaseal/presentation/qt/app_frame_command_model.py` | Typed registry of top-level File, Edit, View, Signing, Settings, and Help commands. | `AppFrameCommandId` and immutable `AppFrameCommandDefinition` records provide stable IDs, menu text, a primary shortcut plus ordered alternate shortcuts, unique mnemonic labels, and accessible names; the per-menu definition tuples and `ALL_COMMAND_DEFINITIONS` form one registry, and the frame maps these definitions to its owned Qt actions. Implemented File/Edit/View/Signing/Settings actions route through public workspace ports or native focused-editor behavior; View Pan is a typed no-shortcut action routed through `SigningWorkspaceSessionPort.set_viewer_interaction_mode("pan")` and enabled only for an open workspace; Help is a truthful `F1` action that opens the frame-owned modeless viewer. |
 | `src/foliaseal/infra/config/app_settings_ui.py` | Typed projection of application UI preferences. | `AppUiSettings` projects the known `AppSettings.ui` mapping into immutable appearance, main-window, Library-geometry, three-column splitter, catalog, sort, and rail-width values, and merges them back without discarding unknown/future UI keys. Invalid or legacy values safely fall back to absent/default state; `MainWindowGeometry` enforces 1100x700 and `LibraryGeometry` enforces 1000x650 with JSON-safe integer coordinates/dimensions plus maximized state. |
 | `src/foliaseal/presentation/qt/app_frame_theme.py` | Application-chrome palette controller. | `apply_appearance_mode()` applies System/Light/Dark colors to the Qt application palette while leaving document/PDF appearance outside the app theme; it starts from the current palette so native accent and other unrelated roles remain intact. |
 | `src/foliaseal/presentation/qt/signing_workspace_lifecycle.py` | App-frame-facing lifecycle coordinator for the active signing workspace. | `SigningWorkspaceLifecycle` composes a candidate `WorkspaceHandle` through `WorkspaceOpenPort`, mounts it through `WorkspaceMountPort`/`QtWorkspaceMount`, publishes the handle only after mounting, and disposes the prior widget only after replacement succeeds; `close()` disposes the active widget idempotently. |
@@ -1673,7 +1673,8 @@ performs zoom. The toolbar exposes the same two fit actions, and the page/overla
 snapshot remains page-local during fit and pan.
 
 `Edit -> Undo` and `Edit -> Redo` share the frame's typed command registry and use the
-`Ctrl+Z`/`Ctrl+Shift+Z` shortcuts. Their public boundary is deliberately focus-sensitive: when a
+`Ctrl+Z`/`Ctrl+Shift+Z` shortcuts. Redo retains `Ctrl+Shift+Z` as its primary/menu-visible binding
+and accepts `Ctrl+Y` as an ordered alternate from the same command definition. Their public boundary is deliberately focus-sensitive: when a
 native `QLineEdit` or `QTextEdit` owns focus, the frame invokes that editor's native undo/redo and
 projects its availability; with viewer or placement focus, the frame invokes
 `SigningWorkspaceSessionPort.undo_placement()`/`.redo_placement()` and projects the corresponding
@@ -1685,6 +1686,14 @@ replacement/close, and successful signing clear placement history while retainin
 overlay where appropriate. Runtime undo/redo reapplies the restored rectangle through the existing
 typed placement callback and emits readiness/status synchronization; the frame never reaches into
 the viewer's private history object.
+
+The command registry's `AppFrameCommandDefinition.alternate_shortcuts` metadata is the single
+typed source for alternate bindings. `FoliaSealAppFrame` applies the ordered primary/alternate
+list to the one Redo `QAction`, while `support_dialogs.shortcut_text()` derives one help entry from
+the same definition. When the viewer owns placement focus, its direct canvas fallback recognizes
+`Ctrl+Y` and `Ctrl+Shift+Z` as the same Redo operation, preserving the existing flush, history, and
+overlay path. No second action, callback, or history owner exists; native-editor focus remains
+under the AppFrame's existing local-history routing.
 
 ### Live placement interaction and history
 
@@ -1722,7 +1731,10 @@ invoke the public `flush_pending_keyboard_placement()` boundary directly. This k
 sequence as one `PlacementHistory` mutation and avoids repeated same-page PDF/certificate work.
 
 This source-level contract is covered by 199 focused unit and composed offscreen Qt tests; the full
-repository validation is 1660 passed, 20 skipped, and one existing warning. The configured disposable
+repository validation for the Gate 10 source family is 1660 passed, 20 skipped, and one existing warning.
+The later Ctrl+Y follow-on's authoritative complete-suite run is 1665 passed, 20 skipped, and one
+existing warning; its real offscreen KeyboardShortcutsDialog smoke passed and showed one Redo line
+with `Ctrl+Shift+Z` primary and `Ctrl+Y` alternate. The configured disposable
 PKCS#12 path proves zero certificate-readiness reads during five autorepeat resize events and four
 bounded readiness reads at physical release; certificate parsing is deliberately deferred to the
 flush boundary. Installed package `f800e6c...`, built from commit `8903512c9`, then passed the
@@ -1952,6 +1964,11 @@ Default local validation from README:
 | PySide6 is dynamically imported and now listed only in the optional `gui` and `dev` extras, not the base runtime dependencies. | A fresh base install may still run CLI helpers but fail GUI/harness commands until the extra is installed. | Runtime diagnostics report unavailable Qt bindings; `foliaseal gui` is the supported launch path once the extra is present. | Keep the GUI dependency optional unless packaging work requires the desktop stack in every install. |
 | Checked-in artifact docs include historical status and roadmap notes. | README warns some narrative notes may be stale. | Current gate status should come from latest checked-in summaries/artifacts. | Keep live status in generated summaries or curated release notes, not scattered narratives. |
 
+The historical/default-local-validation placement row above records the pre-alias Gate 10 snapshot.
+The completed Ctrl+Y follow-on
+supersedes its deferred wording: `Ctrl+Shift+Z` remains the primary/menu-visible Redo binding and
+`Ctrl+Y` is accepted as its alternate through the same typed, focus-sensitive command/history path.
+
 ## 13. Open questions
 
 | Question | Why it matters | Options | Recommendation |
@@ -1967,6 +1984,7 @@ Default local validation from README:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-09-08 | Closed installed Gate 2 item 10 acceptance for held placement adjustment. | Package `f800e6c...` from commit `8903512c9` passed Cinnamon/X11 held movement, Ctrl/Ctrl+Shift resize, one-step Undo/Redo, responsiveness, and sustained CPU/disk checks after the typed batching repair. |
+| 2026-09-08 | Added Ctrl+Y as the alternate Redo binding. | `AppFrameCommandDefinition` now carries ordered alternate-shortcut metadata; the single Redo QAction, keyboard-shortcuts help, native-editor routing, and viewer placement fallback preserve the existing focus-sensitive history path. Focused validation recorded 151 passes; the authoritative full suite recorded 1665 passes, 20 skips, and one warning. The real offscreen KeyboardShortcutsDialog smoke passed and showed `Redo: Ctrl+Shift+Z (alternate: Ctrl+Y)`. |
 | 2026-09-07 | Added viewer-owned held-key placement batching. | Arrow and resize autorepeat updates remain immediate on the overlay while panel/readiness reconciliation and history commit occur once at physical release; synthetic releases and lifecycle boundaries are handled explicitly. The configured disposable PKCS#12 path proves certificate readiness is deferred until flush. Focused validation passes 199 tests and full validation passes 1660 with 20 skipped and one existing warning. |
 | 2026-09-07 | Reconciled the live placement interaction architecture after the Gate 10 recovery implementation. | `viewer_widget.py` now owns the authoritative Pan/Place/Text mode, strong canvas focus, mouse-grab cancellation, mode-dependent handles, and one viewer-owned `PlacementHistory`; runtime/session ports expose the required placement history capabilities and AppFrame keeps native text Undo separate from placement Undo. Focused source and offscreen evidence was followed by the installed Cinnamon/X11 acceptance recorded on 2026-09-08. |
 | 2026-09-04 | Stabilized preset selection and canonical-preview PDF lifecycle boundaries. | The signing-properties preset combo now delivers one user selection through `currentTextChanged` with an explicit reentrancy guard, avoiding duplicate session/coordinator/preview work. Canonical preview rendering reuses one computed layout for its generated `full`, `text`, and `stamp` roles, while `QtCanonicalPreviewLifecycle` removes a failed pixmap snapshot and its temporary directory before returning a neutral fallback. QtPdf load-status and generated-role tests document bounded behavior; the full suite and fresh package audits pass, but the corrected package still requires host installation and the repeat human Gate 2 preset/certificate workflow. |
