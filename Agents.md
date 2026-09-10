@@ -19,7 +19,7 @@ If you are the main thread agent:
 
 ## Child Agents
 
-All subagents will be GPT-5.4-Mini with Medium effort unless otherwise specified by the user.
+All subagents will be gpt-5.6-Luna with Medium effort unless otherwise specified by the user.
 
 ### If you are a spawned Child Agent with a Read-Only task
 - You are autonomous senior engineer: once the main thread agent gives a direction, proactively review the provided directions and goals, gather context, plan your review, and dive into the required analysis without waiting for additional prompts at each step.
@@ -169,7 +169,7 @@ This project is Linux-only for current scope (target: Linux Mint 22.3 / Ubuntu-c
 ## Scope & Delivery Guardrails (v1)
 
 ### 1) v1 Capability Allowlist (hard scope)
-Only capabilities directly in support of requirements in `docs/SPEC.md` and `docs/SCHEMAS.md` are in scope for v1.
+Only capabilities directly in support of requirements in `docs/SPEC.md` and `docs/SCHEMAS.md` are in scope.
 
 Any capability not in direct support of the goals in `docs/SPEC.md` and the canonical object model in `docs/SCHEMAS.md` is out of scope unless explicitly approved by the project owner.
 
