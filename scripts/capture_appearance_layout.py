@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from PySide6.QtGui import QFontMetrics, QPalette
+from PySide6.QtGui import QColor, QFontMetrics, QImage, QPainter, QPalette
 from PySide6.QtWidgets import QApplication
 
 from foliaseal.application.signature_library_session import LibraryCatalog
@@ -34,7 +35,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts-dir", required=True, type=Path)
     parser.add_argument("--phase", required=True)
-    parser.add_argument("--state", required=True, choices=("default", "scrolled"))
+    parser.add_argument("--state", required=True, choices=("default", "scrolled", "image"))
     args = parser.parse_args()
     if re.fullmatch(r"[a-z][a-z0-9-]*", args.phase) is None:
         parser.error("--phase must contain only lower-case letters, digits, and hyphens")
@@ -44,6 +45,7 @@ def main() -> int:
     if app.platformName() != "xcb":
         raise RuntimeError("display-backed capture requires the Qt xcb platform")
 
+    original_cwd = Path.cwd()
     with TemporaryDirectory(prefix="foliaseal-appearance-capture-") as temp:
         storage = Path(temp)
         frame = QtAppFrameAdapter().create_frame(
@@ -71,6 +73,20 @@ def main() -> int:
             editor = library.controls.appearance_editor
             if editor is None:
                 raise RuntimeError("Appearance editor did not open")
+            if args.state == "image":
+                image_path = storage / "synthetic-signature.png"
+                sample = QImage(360, 72, QImage.Format.Format_ARGB32)
+                sample.fill(QColor("white"))
+                painter = QPainter(sample)
+                painter.setPen(QColor("#17365d"))
+                painter.drawLine(12, 52, 348, 12)
+                painter.drawLine(12, 59, 210, 59)
+                painter.end()
+                if not sample.save(str(image_path), "PNG"):
+                    raise RuntimeError("could not create synthetic image")
+                os.chdir(storage)
+                editor.controls.setup_form.set_image_stamp_path(image_path.name)
+                app.processEvents()
             dialog = library.controls.dialog
             dialog.resize(1000, 650)
             if library.controls.splitter is not None:
@@ -136,10 +152,17 @@ def main() -> int:
                     "cancel": _rect(editor.controls.cancel_button, dialog),
                     "save": _rect(editor.controls.save_button, dialog),
                 },
+                "sample_pixmap": (
+                    [editor.controls.sample_preview_image.pixmap().width(),
+                     editor.controls.sample_preview_image.pixmap().height()]
+                    if editor.controls.sample_preview_image.pixmap() is not None
+                    else None
+                ),
             }
             report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
             print(json.dumps({"image": str(image_path), "report": str(report_path)}))
         finally:
+            os.chdir(original_cwd)
             if "library" in locals():
                 library.controls.dialog.close()
             frame.window.close()

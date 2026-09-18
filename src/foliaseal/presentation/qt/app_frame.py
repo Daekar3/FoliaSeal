@@ -154,6 +154,7 @@ class QtAppFrameBindings:
     q_palette: type[Any] | None = None
     q_color: type[Any] | None = None
     q_pixmap: type[Any] | None = None
+    qt: Any | None = None
     q_local_server: type[Any] | None = None
     q_local_socket: type[Any] | None = None
     q_widget: type[Any] | None = None
@@ -3194,6 +3195,7 @@ class QtAppFrameAdapter:
             q_palette=getattr(qt_gui, "QPalette"),
             q_color=getattr(qt_gui, "QColor"),
             q_pixmap=getattr(qt_gui, "QPixmap"),
+            qt=getattr(qt_core, "Qt"),
             q_local_server=getattr(qt_network, "QLocalServer"),
             q_local_socket=getattr(qt_network, "QLocalSocket"),
             q_widget=getattr(qt_widgets, "QWidget"),

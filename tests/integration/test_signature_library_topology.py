@@ -215,6 +215,7 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
+    from PySide6.QtGui import QImage
     from PySide6.QtWidgets import QApplication, QMessageBox
 
     from foliaseal.application.signature_library_session import LibraryCatalog
@@ -271,6 +272,19 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         assert editor.controls.cancel_button.width() < 200
         assert editor.controls.save_button.width() < 200
         assert editor.controls.form_scroll_area.horizontalScrollBar().maximum() == 0
+        image_path = tmp_path / "synthetic-preview.png"
+        image = QImage(360, 72, QImage.Format.Format_ARGB32)
+        image.fill(0xFFFFFFFF)
+        assert image.save(str(image_path), "PNG")
+        editor.controls.setup_form.set_image_stamp_path(str(image_path))
+        app.processEvents()
+        pixmap = editor.controls.sample_preview_image.pixmap()
+        assert editor.controls.sample_preview_image.isVisible()
+        assert pixmap is not None
+        assert (pixmap.width(), pixmap.height()) == (240, 48)
+        editor.controls.setup_form.set_image_stamp_path(None)
+        app.processEvents()
+        assert not editor.controls.sample_preview_image.isVisible()
 
         def top_left(widget):
             point = widget.mapTo(dialog, widget.rect().topLeft())

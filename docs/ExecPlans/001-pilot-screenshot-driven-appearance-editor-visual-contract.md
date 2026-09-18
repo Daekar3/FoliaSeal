@@ -165,3 +165,5 @@ Revision note (2026-09-18): The owner relayed final review guidance. The guide i
 Revision note (2026-09-18): Recorded the three-candidate capture findings, focused and full validation, and the owner decision gate without claiming visual acceptance or completing the plan.
 
 Revision note (2026-09-18): The owner approved one more focused pass. Candidate 4 corrected button hierarchy and blank-image visibility, the X11 capture was made geometry-stable, the main-thread PNG gate passed, and final test/evidence results closed the plan.
+
+Post-completion evidence addendum (2026-09-18): A selected-image capture exposed aspect-ratio distortion that the no-image pilot states could not show. The app-frame Qt binding now supplies the existing KeepAspectRatio option; a focused Qt test checks that a 360 by 72 synthetic source renders at 240 by 48. Direct review of `docs/visual-evidence/appearance-pilot/after-image.png` found the image, synthetic text sample, content controls, and footer readable at the same 1000 by 650 X11 conditions. This addendum does not reopen the completed pilot or claim release/HITL acceptance.
