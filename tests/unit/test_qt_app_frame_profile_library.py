@@ -98,7 +98,9 @@ def test_appearance_editor_exposes_reachable_preview_and_minimum_geometry() -> N
     editor = dialog.controls.appearance_editor
     assert editor is not None
     assert editor.controls.container.minimum_size == (500, 560)
-    assert editor.controls.sample_preview_image.fixed_size == (240, 96)
+    assert editor.controls.sample_preview_image.fixed_size is None
+    assert editor.controls.form_scroll_area is not None
+    assert editor.controls.cancel_button._text == "Cancel"
     assert editor.controls.sample_preview_image.visible is False
     assert "Image: none" in editor.controls.sample_preview_label.text()
 

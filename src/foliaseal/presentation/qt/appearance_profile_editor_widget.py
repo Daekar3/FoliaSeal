@@ -40,6 +40,8 @@ class AppearanceProfileEditorWidgetControls:
     setup_form: QtVisibleSignatureSetupForm
     save_button: Any
     cancel_button: Any
+    form_scroll_area: Any | None = None
+    action_row: Any | None = None
 
 
 def _compose_row(bindings: Any, *widgets: Any) -> Any:
@@ -47,6 +49,8 @@ def _compose_row(bindings: Any, *widgets: Any) -> Any:
     layout = bindings.q_hbox_layout(container)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
+    if hasattr(layout, "addStretch"):
+        layout.addStretch()
     for widget in widgets:
         layout.addWidget(widget)
     return container
@@ -209,8 +213,26 @@ class AppearanceProfileEditorWidget:
             breadcrumb.setAccessibleName("Appearance editor breadcrumb")
         layout.addWidget(breadcrumb)
 
+        body = bindings.q_widget()
+        body_layout = bindings.q_hbox_layout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(8)
+        content_side = bindings.q_widget()
+        content_layout = bindings.q_vbox_layout(content_side)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(4)
+        preview_side = bindings.q_widget()
+        preview_layout = bindings.q_vbox_layout(preview_side)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(4)
+        body_layout.addWidget(content_side, 3)
+        body_layout.addWidget(preview_side, 2)
+        layout.addWidget(body)
+
         preview_heading = bindings.q_label("Sample preview (synthetic data — never saved)")
-        layout.addWidget(preview_heading)
+        if hasattr(preview_heading, "setWordWrap"):
+            preview_heading.setWordWrap(True)
+        preview_layout.addWidget(preview_heading)
         sample_preview = bindings.q_label("")
         if hasattr(sample_preview, "setWordWrap"):
             sample_preview.setWordWrap(True)
@@ -218,12 +240,13 @@ class AppearanceProfileEditorWidget:
             sample_preview.setMinimumHeight(72)
         if hasattr(sample_preview, "setStyleSheet"):
             sample_preview.setStyleSheet(
-                "border: 1px solid #9ca3af; padding: 8px; background: #ffffff;"
+                "border: 1px solid #9ca3af; padding: 8px;"
+                " background: #ffffff; color: #111827;"
             )
-        layout.addWidget(sample_preview)
+        preview_layout.addWidget(sample_preview)
         sample_preview_image = bindings.q_label("")
-        if hasattr(sample_preview_image, "setFixedSize"):
-            sample_preview_image.setFixedSize(240, 96)
+        if hasattr(sample_preview_image, "setMinimumHeight"):
+            sample_preview_image.setMinimumHeight(72)
         if hasattr(sample_preview_image, "setAlignment"):
             alignment = getattr(getattr(bindings, "qt", None), "AlignCenter", None)
             if alignment is not None:
@@ -232,18 +255,21 @@ class AppearanceProfileEditorWidget:
             sample_preview_image.setStyleSheet(
                 "border: 1px solid #9ca3af; padding: 4px; background: #ffffff;"
             )
-        layout.addWidget(sample_preview_image)
+        preview_layout.addWidget(sample_preview_image)
+        if hasattr(preview_layout, "addStretch"):
+            preview_layout.addStretch()
 
         name_input = bindings.q_line_edit()
         name_input.setPlaceholderText("Appearance name")
-        layout.addWidget(bindings.q_label("Name"))
-        layout.addWidget(name_input)
+        content_layout.addWidget(bindings.q_label("Name"))
+        content_layout.addWidget(name_input)
 
         setup_form = QtVisibleSignatureSetupForm(
             bindings=bindings,
             on_change=self._mark_dirty,
             on_image_import=self._import_image,
             on_image_remove=self._remove_image,
+            appearance_compact=True,
         )
         setup_form.load(
             VisibleSignatureSetupDraft(
@@ -258,23 +284,27 @@ class AppearanceProfileEditorWidget:
                 ),
             )
         )
-        content_container = bindings.q_widget()
-        content_layout = bindings.q_vbox_layout(content_container)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.addWidget(setup_form.appearance_controls.container)
-        content_layout.addWidget(setup_form.visible_text_controls.container)
+        form_container = bindings.q_widget()
+        form_layout = bindings.q_vbox_layout(form_container)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        form_layout.addWidget(setup_form.appearance_controls.container)
+        form_layout.addWidget(setup_form.visible_text_controls.container)
         scroll_factory = getattr(bindings, "q_scroll_area", None)
+        scroll_area = None
         if callable(scroll_factory):
             scroll_area = scroll_factory()
             scroll_area.setWidgetResizable(True)
-            scroll_area.setWidget(content_container)
-            layout.addWidget(scroll_area)
+            scroll_area.setWidget(form_container)
+            content_layout.addWidget(scroll_area)
         else:
-            layout.addWidget(content_container)
+            content_layout.addWidget(form_container)
 
         save_button = bindings.q_push_button("Save")
-        cancel_button = bindings.q_push_button("Back")
-        layout.addWidget(_compose_row(bindings, cancel_button, save_button))
+        cancel_button = bindings.q_push_button("Cancel")
+        if hasattr(save_button, "setDefault"):
+            save_button.setDefault(True)
+        action_row = _compose_row(bindings, cancel_button, save_button)
+        layout.addWidget(action_row)
         name_input.textChanged.connect(self._on_name_changed)  # type: ignore[attr-defined]
         save_button.clicked.connect(self.save)  # type: ignore[attr-defined]
         cancel_button.clicked.connect(self.request_cancel)  # type: ignore[attr-defined]
@@ -289,6 +319,8 @@ class AppearanceProfileEditorWidget:
             setup_form=setup_form,
             save_button=save_button,
             cancel_button=cancel_button,
+            form_scroll_area=scroll_area,
+            action_row=action_row,
         )
 
     def _on_name_changed(self, *_args: object) -> None:
@@ -399,12 +431,22 @@ class AppearanceProfileEditorWidget:
         )
         self._refresh_preview_image(appearance.image_stamp_path)
 
+    def refresh_preview_after_mount(self) -> None:
+        """Apply preview visibility after the host becomes visible in the Library."""
+
+        self._refresh_preview()
+
     def _refresh_preview_image(self, image_path: str | None) -> None:
         preview_image = self.controls.sample_preview_image
+        if not image_path:
+            set_visible = getattr(preview_image, "setVisible", None)
+            if callable(set_visible):
+                set_visible(False)
+            return
         pixmap_factory = getattr(self._bindings, "q_pixmap", None)
         if not callable(pixmap_factory):
             return
-        pixmap = pixmap_factory(image_path or "")
+        pixmap = pixmap_factory(image_path)
         is_null = getattr(pixmap, "isNull", None)
         if image_path and callable(is_null) and not is_null():
             scaled = getattr(pixmap, "scaled", None)

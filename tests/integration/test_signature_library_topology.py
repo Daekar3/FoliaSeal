@@ -211,6 +211,98 @@ def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None
     app.processEvents()
 
 
+def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication, QMessageBox
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    class DiscardQuestion:
+        Save = QMessageBox.StandardButton.Save
+        Discard = QMessageBox.StandardButton.Discard
+        Cancel = QMessageBox.StandardButton.Cancel
+        calls = 0
+
+        @classmethod
+        def question(cls, *_args: object) -> QMessageBox.StandardButton:
+            cls.calls += 1
+            return cls.Discard
+
+    app = QApplication.instance() or QApplication(["foliaseal-appearance-layout"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._bindings = replace(frame._bindings, q_message_box=DiscardQuestion)  # noqa: SLF001
+    frame.window.show()
+    library = frame.show_reusable_object_library()
+    try:
+        library.controls.catalog_selector.setCurrentRow(
+            list(LibraryCatalog).index(LibraryCatalog.APPEARANCES)
+        )
+        library.controls.create_button.click()
+        dialog = library.controls.dialog
+        dialog.resize(1000, 650)
+        library.controls.splitter.setSizes([120, 180, 700])
+        for _ in range(3):
+            app.processEvents()
+        editor = library.controls.appearance_editor
+        assert editor is not None
+        assert (dialog.width(), dialog.height()) == (1000, 650)
+        assert editor.controls.cancel_button.text() == "Cancel"
+        assert library.controls.appearance_footer_host.isVisible()
+        assert not editor.controls.sample_preview_image.isVisible()
+        assert editor.controls.save_button.isDefault()
+        assert editor.controls.cancel_button.width() < 200
+        assert editor.controls.save_button.width() < 200
+        assert editor.controls.form_scroll_area.horizontalScrollBar().maximum() == 0
+
+        def top_left(widget):
+            point = widget.mapTo(dialog, widget.rect().topLeft())
+            return point.x(), point.y()
+
+        preview_before = top_left(editor.controls.sample_preview_label)
+        cancel_before = top_left(editor.controls.cancel_button)
+        save_before = top_left(editor.controls.save_button)
+        bar = editor.controls.form_scroll_area.verticalScrollBar()
+        assert bar.maximum() > 0
+        bar.setValue(bar.maximum())
+        app.processEvents()
+        assert bar.value() > 0
+        assert top_left(editor.controls.sample_preview_label) == preview_before
+        assert top_left(editor.controls.cancel_button) == cancel_before
+        assert top_left(editor.controls.save_button) == save_before
+        assert library.controls.appearance_footer_host.width() > dialog.width() * 0.9
+        assert cancel_before[0] > dialog.width() // 2
+        assert save_before[0] > cancel_before[0]
+        assert cancel_before[1] > editor.controls.container.y()
+        editor.controls.name_input.setText("Unsaved appearance")
+        editor.controls.cancel_button.click()
+        app.processEvents()
+        assert DiscardQuestion.calls == 1
+        assert library.controls.appearance_editor is None
+        assert frame._reusable_objects.view().appearance_names == ()  # noqa: SLF001
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
 def test_real_offscreen_library_mutation_protects_active_placed_signature(
     tmp_path: Path,
 ) -> None:

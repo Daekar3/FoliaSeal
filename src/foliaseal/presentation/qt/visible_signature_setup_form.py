@@ -285,12 +285,14 @@ class QtVisibleSignatureSetupForm:
         on_page_change: Callable[[int], None] | None = None,
         on_image_import: Callable[[], None] | None = None,
         on_image_remove: Callable[[], None] | None = None,
+        appearance_compact: bool = False,
     ) -> None:
         self._bindings = bindings
         self._on_change = on_change
         self._on_page_change = on_page_change
         self._on_image_import = on_image_import
         self._on_image_remove = on_image_remove
+        self._appearance_compact = appearance_compact
         self._suspend_updates = False
         self._placement_enabled = False
         self._field_order = SIGNATURE_FIELD_DISPLAY_ORDER
@@ -486,11 +488,15 @@ class QtVisibleSignatureSetupForm:
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
-        if hasattr(summary_label, "setStyleSheet"):
+        if hasattr(summary_label, "setStyleSheet") and not self._appearance_compact:
             summary_label.setStyleSheet("color: #374151;")
 
         text_group = bindings.q_group_box("Text and layout")
-        text_layout = bindings.q_form_layout(text_group)
+        text_layout = (
+            bindings.q_vbox_layout(text_group)
+            if self._appearance_compact
+            else bindings.q_form_layout(text_group)
+        )
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(4)
 
@@ -551,40 +557,33 @@ class QtVisibleSignatureSetupForm:
         background_color = bindings.q_line_edit()
         background_color.setPlaceholderText("#RRGGBB")
 
-        text_layout.addRow(
-            "Signer label / Stamp Position",
-            _compose_row(bindings, signer_label_prefix, stamp_position),
+        rows = (
+            ("Signer label / Stamp Position", (signer_label_prefix, stamp_position)),
+            ("Layout / Timezone", (layout_template, timezone_display_mode, datetime_format)),
+            ("Font / Size", (font_family, font_size)),
+            ("Weight / Labels", (bold, italic, show_field_names)),
+            ("Image", (image_path_label, browse_image_button, remove_image_button)),
+            ("Image prominence", (image_prominence, preserve_image_alpha)),
+            ("Field order", (field_order, move_field_up, move_field_down)),
+            ("Text color", (text_color,)),
+            ("Border", (border_show, border_color, border_width)),
+            ("Background color", (background_color,)),
         )
-        text_layout.addRow(
-            "Layout / Timezone",
-            _compose_row(bindings, layout_template, timezone_display_mode, datetime_format),
-        )
-        text_layout.addRow(
-            "Font / Size",
-            _compose_row(bindings, font_family, font_size),
-        )
-        text_layout.addRow(
-            "Weight / Labels",
-            _compose_row(bindings, bold, italic, show_field_names),
-        )
-        text_layout.addRow(
-            "Image",
-            _compose_row(bindings, image_path_label, browse_image_button, remove_image_button),
-        )
-        text_layout.addRow(
-            "Image prominence",
-            _compose_row(bindings, image_prominence, preserve_image_alpha),
-        )
-        text_layout.addRow(
-            "Field order",
-            _compose_row(bindings, field_order, move_field_up, move_field_down),
-        )
-        text_layout.addRow("Text color", text_color)
-        text_layout.addRow(
-            "Border",
-            _compose_row(bindings, border_show, border_color, border_width),
-        )
-        text_layout.addRow("Background color", background_color)
+        for title, controls in rows:
+            if self._appearance_compact:
+                title_label = bindings.q_label(title)
+                if hasattr(title_label, "setWordWrap"):
+                    title_label.setWordWrap(True)
+                text_layout.addWidget(title_label)
+                for control in controls:
+                    text_layout.addWidget(control)
+            else:
+                content = (
+                    controls[0]
+                    if len(controls) == 1
+                    else _compose_row(bindings, *controls)
+                )
+                text_layout.addRow(title, content)
 
         layout.addWidget(summary_label)
         layout.addWidget(text_group)
@@ -654,12 +653,12 @@ class QtVisibleSignatureSetupForm:
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
-        if hasattr(summary_label, "setStyleSheet"):
+        if hasattr(summary_label, "setStyleSheet") and not self._appearance_compact:
             summary_label.setStyleSheet("color: #374151;")
         detail_label = bindings.q_label("")
         if hasattr(detail_label, "setWordWrap"):
             detail_label.setWordWrap(True)
-        if hasattr(detail_label, "setStyleSheet"):
+        if hasattr(detail_label, "setStyleSheet") and not self._appearance_compact:
             detail_label.setStyleSheet("color: #4b5563;")
         field_checks_container = bindings.q_widget()
         field_checks_layout = bindings.q_vbox_layout(field_checks_container)

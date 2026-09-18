@@ -110,6 +110,7 @@ class ReusableObjectLibraryControls:
     detail_scroll_area: Any | None = None
     appearance_editor: AppearanceProfileEditorWidget | None = None
     preset_editor: SignaturePresetEditorWidget | None = None
+    appearance_footer_host: Any | None = None
 
 
 class ReusableObjectLibraryDialog:
@@ -447,7 +448,7 @@ class ReusableObjectLibraryDialog:
         resize = getattr(dialog, "resize", None)
         if callable(resize):
             resize(1100, 700)
-        layout = self._bindings.q_hbox_layout(dialog)
+        layout = self._bindings.q_vbox_layout(dialog)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
@@ -457,7 +458,7 @@ class ReusableObjectLibraryDialog:
             else self._bindings.q_combo_box()
         )
         if hasattr(navigation, "setMinimumWidth"):
-            navigation.setMinimumWidth(130)
+            navigation.setMinimumWidth(120)
         search = self._bindings.q_line_edit()
         search.setPlaceholderText("Search saved objects")
         sort_selector = self._bindings.q_combo_box()
@@ -509,7 +510,7 @@ class ReusableObjectLibraryDialog:
         master_column = self._bindings.q_widget()
         set_master_minimum_width = getattr(master_column, "setMinimumWidth", None)
         if callable(set_master_minimum_width):
-            set_master_minimum_width(240)
+            set_master_minimum_width(180)
         master_layout = self._bindings.q_vbox_layout(master_column)
         master_layout.setContentsMargins(0, 0, 0, 0)
         master_layout.addWidget(self._bindings.q_label("Saved objects"))
@@ -580,6 +581,12 @@ class ReusableObjectLibraryDialog:
             layout.addWidget(master_column)
             layout.addWidget(detail)
 
+        appearance_footer_host = self._bindings.q_widget()
+        self._appearance_footer_layout = self._bindings.q_hbox_layout(appearance_footer_host)
+        self._appearance_footer_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(appearance_footer_host)
+        appearance_footer_host.setVisible(False)
+
         if hasattr(navigation, "currentRowChanged"):
             navigation.currentRowChanged.connect(self._handle_catalog_row_changed)
         else:
@@ -634,6 +641,7 @@ class ReusableObjectLibraryDialog:
             close_button=close,
             splitter=splitter,
             detail_scroll_area=detail_scroll_area,
+            appearance_footer_host=appearance_footer_host,
         )
 
     def _edit_selected_placement(self) -> bool:
@@ -692,6 +700,17 @@ class ReusableObjectLibraryDialog:
             self.controls.detail_scroll_area.setVisible(False)
         self.controls.appearance_editor_host.setVisible(True)
         self._appearance_editor_host_layout.addWidget(editor.controls.container)
+        action_row = editor.controls.action_row
+        if action_row is not None:
+            container_layout = getattr(editor.controls.container, "layout", None)
+            remove_action = getattr(
+                container_layout() if callable(container_layout) else None, "removeWidget", None
+            )
+            if callable(remove_action):
+                remove_action(action_row)
+            self._appearance_footer_layout.addWidget(action_row)
+            self.controls.appearance_footer_host.setVisible(True)
+        editor.refresh_preview_after_mount()
         return True
 
     def _display_name_for_ref(self, ref: ReusableObjectRef) -> str:
@@ -869,6 +888,15 @@ class ReusableObjectLibraryDialog:
         if editor is not None:
             if saved_ref is None:
                 editor.discard_staged_images()
+            action_row = editor.controls.action_row
+            if action_row is not None:
+                remove_action = getattr(self._appearance_footer_layout, "removeWidget", None)
+                if callable(remove_action):
+                    remove_action(action_row)
+                delete_action = getattr(action_row, "deleteLater", None)
+                if callable(delete_action):
+                    delete_action()
+            self.controls.appearance_footer_host.setVisible(False)
             editor_container = editor.controls.container
             remove_widget = getattr(self._appearance_editor_host_layout, "removeWidget", None)
             if callable(remove_widget):
