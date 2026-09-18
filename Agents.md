@@ -106,17 +106,9 @@ When using the planning tool:
 
 # Frontend tasks
 
-When doing frontend design tasks, avoid collapsing into "AI slop" or safe, average-looking layouts.
-Aim for interfaces that feel intentional, bold, and a bit surprising.
-- Typography: Use expressive, purposeful fonts and avoid default stacks (Inter, Roboto, Arial, system).
-- Color & Look: Choose a clear visual direction; define CSS variables; avoid purple-on-white defaults. No purple bias or dark mode bias.
-- Motion: Use a few meaningful animations (page-load, staggered reveals) instead of generic micro-motions.
-- Background: Don't rely on flat, single-color backgrounds; use gradients, shapes, or subtle patterns to build atmosphere.
-- Overall: Avoid boilerplate layouts and interchangeable UI patterns. Vary themes, type families, and visual languages across outputs.
-- Ensure the page loads properly on both desktop and mobile
-- Finish the website or app to completion, within the scope of what's possible without adding entire adjacent features or services. It should be in a working state for a user to run and test.
-
-Exception: If working within an existing website or design system, preserve the established patterns, structure, and visual language.
+When doing frontend design tasks, you must read `/home/daekar/FoliaSeal/docs/UI_SPEC.md`.
+- Prefer native Qt/system conventions
+- Preserve system font/scaling/palette behavior unless `UI_SPEC.md` requires something else.
 
 
 # Presenting your work and final message
