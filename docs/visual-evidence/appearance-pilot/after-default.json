@@ -1,0 +1,99 @@
+{
+  "actual_size": [
+    1000,
+    650
+  ],
+  "actual_splitter_sizes": [
+    120,
+    180,
+    676
+  ],
+  "device_pixel_ratio": 1.0,
+  "font": {
+    "family": "Ubuntu",
+    "height": 14,
+    "pixel_size": -1,
+    "point_size": 10
+  },
+  "image_pixels": [
+    1000,
+    650
+  ],
+  "palette_window": "#323232",
+  "phase": "candidate-4",
+  "qt_platform": "xcb",
+  "requested_size": [
+    1000,
+    650
+  ],
+  "requested_splitter_sizes": [
+    120,
+    180,
+    700
+  ],
+  "screen": "DP-4",
+  "scrollbar": {
+    "maximum": 637,
+    "value": 0
+  },
+  "state": "default",
+  "style": "fusion",
+  "widgets": {
+    "breadcrumb": {
+      "height": 15,
+      "visible": true,
+      "width": 676,
+      "x": 316,
+      "y": 8
+    },
+    "cancel": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 828,
+      "y": 597
+    },
+    "editor": {
+      "height": 560,
+      "visible": true,
+      "width": 676,
+      "x": 316,
+      "y": 8
+    },
+    "name": {
+      "height": 22,
+      "visible": true,
+      "width": 401,
+      "x": 316,
+      "y": 50
+    },
+    "sample_image": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 725,
+      "y": 31
+    },
+    "sample_text": {
+      "height": 138,
+      "visible": true,
+      "width": 267,
+      "x": 725,
+      "y": 65
+    },
+    "save": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 912,
+      "y": 597
+    },
+    "scroll_area": {
+      "height": 492,
+      "visible": true,
+      "width": 401,
+      "x": 316,
+      "y": 76
+    }
+  }
+}
