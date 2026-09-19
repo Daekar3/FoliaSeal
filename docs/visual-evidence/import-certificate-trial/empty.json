@@ -1,0 +1,107 @@
+{
+  "actual_size": [
+    600,
+    460
+  ],
+  "device_pixel_ratio": 1.0,
+  "font": {
+    "family": "Ubuntu",
+    "height": 14,
+    "pixel_size": -1,
+    "point_size": 10
+  },
+  "image_pixels": [
+    600,
+    460
+  ],
+  "palette_window": "#323232",
+  "password_echo_mode": 2,
+  "phase": "candidate-1",
+  "qt_platform": "xcb",
+  "requested_size": [
+    600,
+    460
+  ],
+  "screen": "DP-4",
+  "state": "empty",
+  "style": "fusion",
+  "widgets": {
+    "cancel": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 422,
+      "y": 406
+    },
+    "certificate_path": {
+      "height": 22,
+      "visible": true,
+      "width": 390,
+      "x": 103,
+      "y": 89
+    },
+    "choose": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 499,
+      "y": 89
+    },
+    "dialog": {
+      "height": 460,
+      "visible": true,
+      "width": 600,
+      "x": 0,
+      "y": 0
+    },
+    "display_name": {
+      "height": 22,
+      "visible": true,
+      "width": 474,
+      "x": 105,
+      "y": 295
+    },
+    "import": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 508,
+      "y": 406
+    },
+    "inspect": {
+      "height": 23,
+      "visible": true,
+      "width": 576,
+      "x": 12,
+      "y": 167
+    },
+    "inspection": {
+      "height": 18,
+      "visible": true,
+      "width": 558,
+      "x": 21,
+      "y": 251
+    },
+    "introduction": {
+      "height": 60,
+      "visible": true,
+      "width": 576,
+      "x": 12,
+      "y": 12
+    },
+    "password": {
+      "height": 22,
+      "visible": true,
+      "width": 474,
+      "x": 105,
+      "y": 323
+    },
+    "remember_password": {
+      "height": 20,
+      "visible": true,
+      "width": 474,
+      "x": 105,
+      "y": 351
+    }
+  }
+}
