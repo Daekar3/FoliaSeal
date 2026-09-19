@@ -149,6 +149,9 @@ supporting evidence only.
   PDF refresh while cross-page placement performs one refresh. Full validation is
   `1617 passed, 20 skipped, 1 warning`; the rebuilt package passed the offline audit,
   while the installed placement and Appearance gates remain pending until replacement.
+- [x] (2026-09-19) The installed package built from `ff14d7851c012bc86a24ab68d0cc5b074eb22425` showed `Development checkout` in Help > About. The human matrix was paused at this release-blocking observation; focused ExecPlan `003-show-packaged-version-in-about.md` owned the correction, rebuild, and installed retest.
+- [x] (2026-09-19) Built corrected package `/tmp/foliaseal-about-version-tYIwnn/dist/foliaseal_0.1.0_amd64.deb` from commit `158777339782b3b5b97dd28dec58f2c4e6561568` with SHA-256 `3a34429ecbb627bc201fd1abd906ff2040be43c1b8738356760fd837d373c4ae`. Offline, private install-root, and display-backed audits passed; the display-backed audit reported Qt `xcb` startup `started`.
+- [x] (2026-09-19) Installed the corrected package through authenticated `pkexec dpkg -i`; `dpkg --audit` and `dpkg --verify foliaseal` were clean. Human review of Help > About showed exactly `FoliaSeal\nVersion 0.1.0`, with no `Development checkout` label. The matrix resumes at the remaining incomplete HITL gates below.
 - [ ] Perform the installed-package HITL matrix and record pass/fail notes,
   screenshots or speech observations where appropriate, and exact cleanup.
 - [ ] Resolve any user-visible failures in narrowly scoped child plans; do not
