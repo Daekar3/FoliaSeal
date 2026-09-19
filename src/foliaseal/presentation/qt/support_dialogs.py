@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from foliaseal import __version__
 from foliaseal.application.support_diagnostics import SupportLocations
 from foliaseal.presentation.qt.app_frame_command_model import ALL_COMMAND_DEFINITIONS
 
@@ -134,7 +135,7 @@ class AboutDialog(SupportDialog):
             bindings=bindings,
             parent=parent,
             title="About FoliaSeal",
-            text="FoliaSeal\nDevelopment checkout",
+            text=f"FoliaSeal\nVersion {__version__}",
             object_name="about_dialog",
             on_closed=on_closed,
         )

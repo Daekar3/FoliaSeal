@@ -19,6 +19,7 @@ def test_real_qt_keyboard_accessibility_and_support_surfaces(
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication, QMenu, QPushButton
 
+    from foliaseal import __version__
     from foliaseal.application.support_diagnostics import SupportLocations
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
     from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -171,7 +172,12 @@ def test_real_qt_keyboard_accessibility_and_support_surfaces(
         keyboard_shortcuts.close()
         app.processEvents()
 
-        support_dialogs = [frame.show_data_locations(), frame.show_about()]
+        data_locations = frame.show_data_locations()
+        about = frame.show_about()
+        support_dialogs = [data_locations, about]
+        about_text = about.content.toPlainText()
+        assert f"Version {__version__}" in about_text
+        assert "Development checkout" not in about_text
         for dialog in support_dialogs:
             assert dialog.dialog.isModal() is False
             assert dialog.dialog.minimumWidth() >= 520
