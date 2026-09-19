@@ -16,12 +16,18 @@ routine horizontal scrolling. Long forms may scroll vertically. A preview
 marked as sticky and the action footer must remain in place while form
 controls scroll.
 
-The Library keeps catalog navigation, saved-object list, and detail editor as
-three stable columns. In the Appearance editor, Name and content controls
-occupy the content side and the labeled synthetic preview occupies a separate
-adjacent area. Cancel and Save form a stable bottom footer beneath the Library
-content; Save is the primary action. Do not substitute a reachable button
-inside a scroll area for that footer.
+The Library keeps catalog navigation, saved-object selection, sorting, and
+object-management actions in a compact header. The fixed four-catalog choice
+and normally small saved-object collection must not consume permanent
+navigation columns. The active editor receives nearly all remaining space.
+Search belongs inside the saved-object selector popup; pinned-first sorting and
+the selected sort remain visible without an always-open master list.
+
+In the Appearance editor, Name and content controls occupy the content side
+and the labeled synthetic preview occupies a substantial separate adjacent
+area. Cancel and Save form a stable bottom footer beneath the Library content;
+Save is the primary action. Do not substitute a reachable button inside a
+scroll area for that footer.
 
 ## Text and color
 

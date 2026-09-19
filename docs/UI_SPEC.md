@@ -87,9 +87,9 @@ FoliaSeal process (single instance)
 │   │   └── Signing status
 │   └── Bottom application status
 ├── Signature Library (modeless, at most one)
-│   ├── Catalog navigation
-│   ├── Searchable master list
-│   └── Transactional detail/editor
+│   ├── Compact catalog and saved-object selectors
+│   ├── Contextual object-management actions
+│   └── Full-width transactional editor
 ├── Document Signatures (modeless)
 └── Modal settings, confirmations, passwords, and destructive decisions
 ```
@@ -101,7 +101,9 @@ FoliaSeal process (single instance)
 - **LAY03.** On 16:9/16:10 displays, the PDF canvas owns available space and the signing rail stays
   vertically on the right. The toolbar owns commands; it must not own signing status.
 - **LAY04.** The Library is modeless and independent of an open PDF. Presets are its dominant
-  landing catalog; Certificates, Appearances, and Placements are secondary catalogs.
+  landing catalog; Certificates, Appearances, and Placements are secondary catalogs. Catalog and
+  saved-object navigation occupy a compact header rather than permanent columns, so the active
+  editor owns nearly all remaining window space.
 
 ## 5. Primary Workflows
 
@@ -166,9 +168,10 @@ has signed and verified successfully.
 
 ### WF06 — Manage reusable objects
 
-The Library uses explicit Save/Cancel transactions. Switching a dirty editor or closing prompts
-Save, Discard, or Continue editing. A nested component editor replaces the detail pane with a
-breadcrumb; the parent draft remains suspended. Exit resolves child, parent, then document draft.
+The Library uses explicit Save/Cancel transactions. Switching a dirty editor, catalog, or saved
+object, or closing the window, prompts Save, Discard, or Continue editing. A nested component editor
+replaces the main editor with a breadcrumb; the parent draft remains suspended. Exit resolves child,
+parent, then document draft.
 
 Names are trimmed, required, and case-insensitively unique within each catalog. Presets,
 Appearances, and Placements support Rename, Duplicate, Delete; Certificates support Rename/Delete.
@@ -199,9 +202,18 @@ opens Save As first when no explicit destination has been confirmed; cancel is l
 
 ### SUR03 — Signature Library
 
-Modeless three-column master-detail window: stable catalog navigation, searchable/sortable object
-list, and detail editor with fixed Save/Cancel footer. The detail column absorbs resizing and scrolls
-vertically. Presets are the landing view. Normative reference:
+Modeless editor window with a compact context header and one dominant editor surface. The header
+contains a catalog selector for the fixed Presets, Appearances, Placements, and Certificates
+catalogs; a searchable saved-object selector for the active catalog; the applicable sort choice; and
+contextual New, Duplicate, Rename, Pin/Unpin, and Delete actions. Unsupported actions are absent or
+disabled for the active catalog. The selector popup may show rich status summaries, but the closed
+selector remains compact and the saved-object collection never consumes a permanent column.
+
+The editor below the header owns nearly all remaining width and height. It has a stable breadcrumb or
+title, vertically scrollable content where needed, and a fixed Save/Cancel footer across the Library.
+Changing catalog or saved object follows the dirty-editor transaction in WF06. Presets are the
+landing catalog. Empty catalogs keep the header and show one clear create action in the editor.
+Normative reference:
 `ui/signature-library-presets-exploratory.svg`.
 
 ### SUR04 — Appearance editor
@@ -350,8 +362,8 @@ preservation.
 ## 12. Resizing, Theme, and Visual Language
 
 - Main minimum is 1100×700 logical pixels; Library minimum 1000×650. Below this V1 has no alternate
-  compact/mobile layout. Toolbar overflows rather than wraps; Library preserves three columns and
-  avoids ordinary horizontal scrolling.
+  compact/mobile layout. Toolbar overflows rather than wraps. The Library keeps its selector/action
+  header compact, gives the editor the remaining space, and avoids ordinary horizontal scrolling.
 - Follow system scale and device-pixel ratio; rerender PDF/preview while preserving semantic zoom
   and overlay alignment. Restore/clamp window geometry to available monitors.
 - Settings offers System (default), Light, Dark. Use native palette and system accent. PDF and
@@ -359,9 +371,10 @@ preservation.
 - Use system UI font/metrics, neutral surfaces, familiar symbolic icons plus text for important
   actions, restrained borders/spacing, strong focus, and minimal nonmoving fades. No branded title
   bar, gradients, heavy shadows, dense web cards, or unnecessary motion.
-- Persist window geometry/maximized state, rail width/divider, Library geometry/column widths, theme,
-  default folders, and last Library catalog/sort. Do not reopen documents, drafts, dialogs, or the
-  Library automatically.
+- Persist window geometry/maximized state, rail width/divider, Library geometry, theme, default
+  folders, and last Library catalog/sort. Do not reopen documents, drafts, dialogs, or the Library
+  automatically. Legacy saved Library column widths may be ignored after the compact-header
+  topology replaces the master-detail columns.
 
 ## 13. Accessibility and Privacy
 
@@ -386,10 +399,11 @@ links, and machine-readable index. The modeless in-app viewer renders safe local
 corpus with search, Back/Forward, and contextual F1. No JavaScript or remote assets. CLI discovery is
 `foliaseal help --list`, `foliaseal help <topic>`, `--format markdown`, and `--path`.
 
-Catalog search is case-insensitive and live. Default sort is Name A–Z, optional Z–A; Certificates
-also offer Expiration soonest. Search lasts only while Library is open. Persistent pins exist in all
-catalogs, sort first, survive rename, and are retained in merged search results. No tags, folders,
-usage counts, recent ordering, individual profile import/export, or separate Image Library in V1.
+Saved-object selection provides case-insensitive live search within the selector popup. Default sort
+is Name A–Z, optional Z–A; Certificates also offer Expiration soonest. Search lasts only while the
+Library is open. Persistent pins exist in all catalogs, sort first, survive rename, and are retained
+in filtered results. No tags, folders, usage counts, recent ordering, individual profile
+import/export, or separate Image Library in V1.
 
 ## 15. Certificate Workflows
 
@@ -463,8 +477,8 @@ post-confirmation transaction deliberately favors file integrity over a conventi
 |---|---|---|
 | [`ui/main-workspace-document-open-exploratory.svg`](ui/main-workspace-document-open-exploratory.svg) | Normative topology | Open-document frame, toolbar/canvas/right rail/status hierarchy |
 | [`ui/main-workspace-no-document-exploratory.svg`](ui/main-workspace-no-document-exploratory.svg) | Normative topology | Direct-launch stable frame and empty state |
-| [`ui/signature-library-presets-exploratory.svg`](ui/signature-library-presets-exploratory.svg) | Normative topology | Preset-dominant three-column Library |
-| [`ui/appearance-profile-editor-exploratory.svg`](ui/appearance-profile-editor-exploratory.svg) | Normative topology | Content-first Appearance editor and sticky preview |
+| [`ui/signature-library-presets-exploratory.svg`](ui/signature-library-presets-exploratory.svg) | Normative topology | Compact selectors and dominant Library editor |
+| [`ui/appearance-profile-editor-exploratory.svg`](ui/appearance-profile-editor-exploratory.svg) | Normative topology | Compact navigation, wide Appearance editor, and sticky preview |
 | [`ui/placement-profile-editor-exploratory.svg`](ui/placement-profile-editor-exploratory.svg) | Normative topology | Fixed-page Placement editor |
 | [`ui/sign-and-save-states-exploratory.svg`](ui/sign-and-save-states-exploratory.svg) | Normative state hierarchy | Confirmation, active transaction, verification recovery |
 
@@ -508,3 +522,4 @@ status copy, right-rail proportions, or V2 scope; it does not silently alter thi
 | 2026-08-09 | Fixed-page reusable Placement | Current-page semantic; automatic scaling | Controlled multi-page forms require deterministic page/geometry |
 | 2026-08-09 | Explicit source overwrite allowed | Refuse source destination | Respect deliberate intent while preserving original until verified |
 | 2026-08-09 | No printing or general PDF properties in V1 | General viewer parity | Keep product focused on review/sign/save/verify |
+| 2026-09-19 | Compact Library selectors above one dominant editor | Permanent catalog and saved-object columns | Four fixed catalogs and normally small object collections do not justify consuming most of the editing window |
