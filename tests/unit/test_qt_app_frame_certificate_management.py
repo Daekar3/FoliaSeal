@@ -296,6 +296,22 @@ def test_certificate_import_dialog_has_readable_default_geometry_and_title(tmp_p
     assert dialog.controls.dialog.title == "Import Certificate"
     assert dialog.controls.dialog.minimum_size == (600, 460)
     assert dialog.controls.dialog.resize_value == (680, 520)
+    assert dialog.controls.passphrase.echo_mode == bindings.q_line_edit.EchoMode.Password
+    assert dialog.controls.import_button.default is True
+    assert dialog.controls.import_button.auto_default is True
+    assert dialog.controls.cancel_button.auto_default is False
+
+
+def test_certificate_import_cancel_leaves_catalog_unchanged(tmp_path: Path) -> None:
+    _, certificate_store, _, _, service = _build_service(tmp_path)
+
+    dialog = service.show_import_dialog().compatibility.import_dialog
+    dialog.controls.display_name.setText("Unsaved certificate")
+    dialog.cancel()
+
+    assert dialog.controls.dialog.result == dialog.controls.dialog.Rejected
+    assert certificate_store.load_catalog().certificate_configurations == ()
+    assert certificate_store.load_catalog().managed_certificates == ()
 
 
 def test_certificate_management_dialog_saves_and_refreshes(tmp_path: Path) -> None:

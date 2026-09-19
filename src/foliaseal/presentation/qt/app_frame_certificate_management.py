@@ -47,6 +47,17 @@ def _compose_row(bindings: Any, *widgets: Any) -> Any:
     return container
 
 
+def _compose_action_row(bindings: Any, *widgets: Any) -> Any:
+    container = bindings.q_widget()
+    layout = bindings.q_hbox_layout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(6)
+    layout.addStretch()
+    for widget in widgets:
+        layout.addWidget(widget)
+    return container
+
+
 @dataclass(frozen=True)
 class CertificateImportDialogControls:
     """Controls used by the certificate import dialog."""
@@ -268,6 +279,11 @@ class CertificateImportDialog:
         certificate_path = self._bindings.q_line_edit("")
         display_name = self._bindings.q_line_edit("")
         passphrase = self._bindings.q_line_edit("")
+        setter = getattr(passphrase, "setEchoMode", None)
+        echo_mode = getattr(self._bindings.q_line_edit, "EchoMode", None)
+        password_mode = getattr(echo_mode, "Password", None)
+        if callable(setter) and password_mode is not None:
+            setter(password_mode)
         save_password = self._bindings.q_check_box("Save password securely")
         choose_button = self._bindings.q_push_button("Choose...")
         inspect_button = self._bindings.q_push_button("Inspect")
@@ -277,6 +293,16 @@ class CertificateImportDialog:
         inspection_label.setWordWrap(True)
         import_button = self._bindings.q_push_button("Import")
         cancel_button = self._bindings.q_push_button("Cancel")
+        for secondary_button in (choose_button, inspect_button, cancel_button):
+            set_auto_default = getattr(secondary_button, "setAutoDefault", None)
+            if callable(set_auto_default):
+                set_auto_default(False)
+        set_auto_default = getattr(import_button, "setAutoDefault", None)
+        if callable(set_auto_default):
+            set_auto_default(True)
+        set_default = getattr(import_button, "setDefault", None)
+        if callable(set_default):
+            set_default(True)
 
         layout.addWidget(introduction_label)
         file_container = self._bindings.q_widget()
@@ -298,7 +324,7 @@ class CertificateImportDialog:
         form_layout.addRow("Password", passphrase)
         form_layout.addRow("", save_password)
         layout.addWidget(form_container)
-        layout.addWidget(_compose_row(self._bindings, cancel_button, import_button))
+        layout.addWidget(_compose_action_row(self._bindings, cancel_button, import_button))
 
         choose_button.clicked.connect(self.choose_certificate_file)  # type: ignore[attr-defined]
         inspect_button.clicked.connect(self.inspect_certificate)  # type: ignore[attr-defined]

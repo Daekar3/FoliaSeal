@@ -490,6 +490,9 @@ class _FakeFormLayout:
 
 
 class _FakeLineEdit:
+    class EchoMode:
+        Password = "password"
+
     def __init__(self, text="") -> None:
         self._text = text
         self.textChanged = _FakeSignal()
@@ -504,6 +507,7 @@ class _FakeLineEdit:
         self.copy_calls = 0
         self.selected = False
         self.paste_available = True
+        self.echo_mode = None
 
     def setText(self, text):  # noqa: N802
         self._text = text
@@ -514,6 +518,9 @@ class _FakeLineEdit:
 
     def setPlaceholderText(self, text):  # noqa: N802
         self.placeholder_text = text
+
+    def setEchoMode(self, mode):  # noqa: N802
+        self.echo_mode = mode
 
     def isUndoAvailable(self):  # noqa: N802
         return self.undo_available
@@ -622,6 +629,8 @@ class _FakePushButton:
         self.tooltip = None
         self.object_name = ""
         self.accessible_name = ""
+        self.default = False
+        self.auto_default = None
 
     def click(self) -> None:
         self.clicked.emit()
@@ -637,6 +646,12 @@ class _FakePushButton:
 
     def setAccessibleName(self, name):  # noqa: N802
         self.accessible_name = name
+
+    def setDefault(self, value):  # noqa: N802
+        self.default = bool(value)
+
+    def setAutoDefault(self, value):  # noqa: N802
+        self.auto_default = bool(value)
 
 
 class _FakeStatusBar:
