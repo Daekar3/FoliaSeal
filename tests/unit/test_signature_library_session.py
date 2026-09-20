@@ -9,6 +9,9 @@ from foliaseal.application.certificate_models import (
 from foliaseal.application.reusable_signing_models import SignaturePresetCatalog
 from foliaseal.application.reusable_signing_objects import (
     InMemoryCatalogRepository,
+    ReusableObjectKind,
+    ReusableObjectRef,
+    ReusableObjectSummary,
     ReusableSigningObjects,
     SaveAppearance,
     SavePreset,
@@ -41,6 +44,50 @@ def test_session_starts_on_presets_and_projects_searchable_rows() -> None:
     assert [row.display_name for row in session.rows()] == ["Board approval"]
     session.set_search("missing")
     assert session.rows() == ()
+
+
+def test_session_distinguishes_true_empty_catalog_from_filtered_no_match() -> None:
+    session = _session()
+
+    assert session.unfiltered_row_count() == 1
+    session.set_search("missing")
+    assert session.rows() == ()
+    assert session.unfiltered_row_count() == 1
+
+    session.select_catalog(LibraryCatalog.CERTIFICATES)
+    assert session.unfiltered_row_count() == 0
+    assert session.rows() == ()
+
+
+def test_session_preserves_typed_identity_when_filtering_duplicate_labels() -> None:
+    session = _session()
+    duplicate_rows = (
+        ReusableObjectSummary(
+            ref=ReusableObjectRef(ReusableObjectKind.APPEARANCE, "appearance-first"),
+            display_name="Shared appearance",
+            details="First",
+        ),
+        ReusableObjectSummary(
+            ref=ReusableObjectRef(ReusableObjectKind.APPEARANCE, "appearance-second"),
+            display_name="Shared appearance",
+            details="Second",
+        ),
+    )
+    session._summaries_for_catalog = lambda: duplicate_rows  # type: ignore[method-assign]  # noqa: SLF001
+    session.select_catalog(LibraryCatalog.APPEARANCES)
+
+    session.set_search("shared")
+    rows = session.rows()
+    assert len(rows) == 2
+    assert rows[0].display_name == rows[1].display_name
+    session.select(rows[1].ref)
+
+    assert session.selected_ref == rows[1].ref
+    assert session.selected_row() is not None
+    assert session.selected_row().ref == ReusableObjectRef(
+        ReusableObjectKind.APPEARANCE,
+        "appearance-second",
+    )
 
 
 def test_session_switches_catalog_and_keeps_selection_typed() -> None:

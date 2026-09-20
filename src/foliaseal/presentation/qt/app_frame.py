@@ -171,6 +171,13 @@ class QtAppFrameBindings:
     q_desktop_services: Any | None = None
     q_url: type[Any] | None = None
     q_status_bar: type[Any] | None = None
+    q_object: type[Any] | None = None
+    q_event: type[Any] | None = None
+    q_completer: type[Any] | None = None
+    q_standard_item_model: type[Any] | None = None
+    q_standard_item: type[Any] | None = None
+    q_sort_filter_proxy_model: type[Any] | None = None
+    q_searchable_combo_box: type[Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -3167,6 +3174,9 @@ class QtAppFrameAdapter:
             ) from exc
 
         q_main_window_base = getattr(qt_widgets, "QMainWindow")
+        q_dialog_base = getattr(qt_widgets, "QDialog")
+        q_combo_box_base = getattr(qt_widgets, "QComboBox")
+        q_line_edit_base = getattr(qt_widgets, "QLineEdit")
 
         class _FoliaSealMainWindow(q_main_window_base):
             def closeEvent(self, event: Any) -> None:  # noqa: N802
@@ -3176,9 +3186,43 @@ class QtAppFrameAdapter:
                     return
                 super().closeEvent(event)
 
+        class _FoliaSealDialog(q_dialog_base):
+            def closeEvent(self, event: Any) -> None:  # noqa: N802
+                handler = getattr(self, "_foliaseal_close_event_handler", None)
+                if callable(handler):
+                    handler(event)
+                    return
+                super().closeEvent(event)
+
+        class _LibraryQueryLineEdit(q_line_edit_base):
+            def keyPressEvent(self, event: Any) -> None:  # noqa: N802
+                callback_name = {
+                    getattr(qt_core.Qt.Key, "Key_Down"): "_foliaseal_down",
+                    getattr(qt_core.Qt.Key, "Key_Return"): "_foliaseal_enter",
+                    getattr(qt_core.Qt.Key, "Key_Enter"): "_foliaseal_enter",
+                    getattr(qt_core.Qt.Key, "Key_Escape"): "_foliaseal_escape",
+                }.get(event.key())
+                callback = getattr(self, callback_name, None) if callback_name else None
+                if callable(callback):
+                    callback()
+                    return
+                super().keyPressEvent(event)
+
+            def focusOutEvent(self, event: Any) -> None:  # noqa: N802
+                callback = getattr(self, "_foliaseal_focus_out", None)
+                if callable(callback):
+                    callback()
+                super().focusOutEvent(event)
+
+        class _SearchableComboBox(q_combo_box_base):
+            def __init__(self, parent: Any = None) -> None:
+                super().__init__(parent)
+                self.setEditable(True)
+                self.setLineEdit(_LibraryQueryLineEdit(self))
+
         return QtAppFrameBindings(
             q_main_window=_FoliaSealMainWindow,
-            q_dialog=getattr(qt_widgets, "QDialog"),
+            q_dialog=_FoliaSealDialog,
             q_form_layout=getattr(qt_widgets, "QFormLayout"),
             q_label=getattr(qt_widgets, "QLabel"),
             q_line_edit=getattr(qt_widgets, "QLineEdit"),
@@ -3212,6 +3256,13 @@ class QtAppFrameAdapter:
             q_desktop_services=getattr(qt_gui, "QDesktopServices", None),
             q_url=getattr(qt_core, "QUrl", None),
             q_status_bar=getattr(qt_widgets, "QStatusBar"),
+            q_object=getattr(qt_core, "QObject"),
+            q_event=getattr(qt_core, "QEvent"),
+            q_completer=getattr(qt_widgets, "QCompleter"),
+            q_standard_item_model=getattr(qt_gui, "QStandardItemModel"),
+            q_standard_item=getattr(qt_gui, "QStandardItem"),
+            q_sort_filter_proxy_model=getattr(qt_core, "QSortFilterProxyModel"),
+            q_searchable_combo_box=_SearchableComboBox,
         )
 
 

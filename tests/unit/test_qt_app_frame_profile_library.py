@@ -1,3 +1,7 @@
+from dataclasses import replace
+
+import pytest
+
 from foliaseal.application.certificate_models import CertificateCatalog
 from foliaseal.application.reusable_signing_models import (
     PlacementProfileRect,
@@ -23,6 +27,40 @@ from tests.support.signing_builders import (
     build_signature_appearance,
 )
 from tests.unit.test_qt_signing_shell import _fake_bindings
+
+
+def _compact_fake_bindings():
+    """Add only the editable-combo surface needed by the compact-header tests."""
+    bindings = _fake_bindings()
+    combo_base = bindings.q_combo_box
+    line_edit_factory = bindings.q_line_edit
+
+    class _EditableComboBox(combo_base):
+        def __init__(self) -> None:
+            super().__init__()
+            self._editable = False
+            self._line_edit = line_edit_factory()
+
+        def setEditable(self, value):  # noqa: N802
+            self._editable = bool(value)
+
+        def isEditable(self):  # noqa: N802
+            return self._editable
+
+        def lineEdit(self):  # noqa: N802
+            return self._line_edit
+
+        def setCurrentText(self, text):  # noqa: N802
+            changed = self.currentText() != text
+            if changed:
+                super().setCurrentText(text)
+
+        def setCurrentIndex(self, index):  # noqa: N802
+            changed = self.currentIndex() != index
+            if changed:
+                super().setCurrentIndex(index)
+
+    return replace(bindings, q_combo_box=_EditableComboBox)
 
 
 def test_library_exposes_reachable_create_and_edit_placement_actions() -> None:
@@ -57,6 +95,106 @@ def test_library_exposes_reachable_create_and_edit_placement_actions() -> None:
     dialog.controls.edit_placement_button.click()
 
     assert [profile.display_name for profile in edited] == ["Board"]
+
+
+def test_library_fake_surface_uses_compact_selector_contract() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_compact_fake_bindings(),
+        parent=None,
+        library=service,
+    )
+
+    assert dialog.controls.catalog_selector.currentText() == "Presets"
+    assert dialog.controls.object_selector.isEditable() is True
+    assert dialog.controls.search_input is dialog.controls.object_selector.lineEdit()
+    assert dialog.controls.splitter is None
+    assert dialog.controls.library_footer_host is not None
+
+
+def test_library_legacy_splitter_setting_is_not_rewritten_by_fake_surface() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    from foliaseal.infra.config.schemas import AppSettings
+
+    stale_sizes = (123, 234, 345)
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory="/tmp/foliaseal-test-home",
+        default_open_directory="/tmp/foliaseal-test-home",
+        linux_packaging_channel="primary",
+        ui={"library_splitter_sizes": list(stale_sizes)},
+    )
+    dialog = ReusableObjectLibraryDialog(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        library_splitter_sizes=stale_sizes,
+    )
+
+    captured = dialog.capture_ui_settings(settings)
+    assert captured.ui_settings.library_splitter_sizes == stale_sizes
+
+
+@pytest.mark.parametrize("decision", ["Save", "Discard", "Cancel"])
+def test_library_resolves_dirty_detail_once_before_object_selection(
+    decision: str,
+) -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    service.execute(SaveAppearance("Board", build_signature_appearance()))
+    bindings = _compact_fake_bindings()
+    dialog = ReusableObjectLibraryDialog(
+        bindings=bindings,
+        parent=None,
+        library=service,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.name_input.setText("Approval revised")
+    bindings.q_message_box.next_result = getattr(bindings.q_message_box, decision)
+    dialog.controls.object_selector.setCurrentIndex(1)
+
+    assert len(bindings.q_message_box.calls) == 1
+    if decision == "Cancel":
+        assert dialog._session.selected_ref == dialog._rows[0].ref  # noqa: SLF001
+        assert dialog._session.detail_dirty is True  # noqa: SLF001
+    else:
+        assert dialog._session.selected_ref == dialog._rows[1].ref  # noqa: SLF001
+        assert dialog._session.detail_dirty is False  # noqa: SLF001
+    if decision == "Save":
+        assert service.view().appearance_names == ("Approval revised", "Board")
+    else:
+        assert service.view().appearance_names == ("Approval", "Board")
+
+
+def test_library_close_resolves_ordinary_dirty_detail_once() -> None:
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    service.execute(SaveAppearance("Approval", build_signature_appearance()))
+    bindings = _fake_bindings()
+    dialog = ReusableObjectLibraryDialog(
+        bindings=bindings,
+        parent=None,
+        library=service,
+    )
+
+    dialog.controls.catalog_selector.setCurrentText("Appearances")
+    dialog.controls.object_selector.setCurrentIndex(0)
+    dialog.controls.name_input.setText("Unsaved approval")
+    bindings.q_message_box.next_result = bindings.q_message_box.Cancel
+    dialog.controls.close_button.click()
+
+    assert len(bindings.q_message_box.calls) == 1
+    assert dialog._session.detail_dirty is True  # noqa: SLF001
+    assert dialog.controls.dialog.result == dialog.controls.dialog.Rejected
 
 
 def test_library_pin_and_duplicate_controls_use_typed_catalog_commands() -> None:

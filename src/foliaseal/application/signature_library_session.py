@@ -16,7 +16,7 @@ from foliaseal.application.reusable_signing_objects import (
 
 
 class LibraryCatalog(StrEnum):
-    """Catalogs shown by the Library navigation column."""
+    """Catalogs available from the Library context selector."""
 
     PRESETS = "Presets"
     APPEARANCES = "Appearances"
@@ -34,7 +34,7 @@ class LibrarySort(StrEnum):
 
 @dataclass(frozen=True)
 class SignatureLibraryRow:
-    """One searchable, display-ready row in the Library master list."""
+    """One searchable, display-ready saved-object choice."""
 
     ref: ReusableObjectRef | CertificateLibraryRef
     display_name: str
@@ -119,7 +119,7 @@ class SignatureLibrarySession:
         snapshot = self._library.refresh()
         if self._selected_ref is not None:
             if isinstance(self._selected_ref, CertificateLibraryRef):
-                if not any(row.ref == self._selected_ref for row in self.rows()):
+                if not any(row.ref == self._selected_ref for row in self.unfiltered_rows()):
                     self._selected_ref = None
             else:
                 try:
@@ -132,8 +132,20 @@ class SignatureLibrarySession:
         self._certificate_catalog = catalog
 
     def rows(self) -> tuple[SignatureLibraryRow, ...]:
-        summaries = self._summaries_for_catalog()
         query = self._search.casefold()
+        rows = tuple(
+            row
+            for row in self.unfiltered_rows()
+            if not query
+            or query in row.display_name.casefold()
+            or query in row.details.casefold()
+        )
+
+        return rows
+
+    def unfiltered_rows(self) -> tuple[SignatureLibraryRow, ...]:
+        """Return sorted active-catalog rows without changing or applying search."""
+
         rows = tuple(
             SignatureLibraryRow(
                 ref=summary.ref,
@@ -143,10 +155,7 @@ class SignatureLibrarySession:
                 configured=getattr(summary, "configured", False),
                 expiration=getattr(summary, "expiration", None),
             )
-            for summary in summaries
-            if not query
-            or query in summary.display_name.casefold()
-            or query in summary.details.casefold()
+            for summary in self._summaries_for_catalog()
         )
         if self._sort is LibrarySort.EXPIRATION_SOONEST:
             name_sorted = sorted(
@@ -159,13 +168,18 @@ class SignatureLibrarySession:
         configured_sorted = sorted(name_sorted, key=lambda row: not row.configured)
         return tuple(sorted(configured_sorted, key=lambda row: not row.pinned))
 
+    def unfiltered_row_count(self) -> int:
+        """Return the active catalog size without disturbing the search query."""
+
+        return len(self.unfiltered_rows())
+
     def select(
         self, ref: ReusableObjectRef | CertificateLibraryRef | None
     ) -> SignatureLibraryRow | None:
         if ref is None:
             self._selected_ref = None
             return None
-        row = next((row for row in self.rows() if row.ref == ref), None)
+        row = next((row for row in self.unfiltered_rows() if row.ref == ref), None)
         self._selected_ref = ref if row is not None else None
         self._original_name = None if row is None else row.display_name
         self._draft_name = self._original_name
@@ -174,7 +188,10 @@ class SignatureLibrarySession:
     def selected_row(self) -> SignatureLibraryRow | None:
         if self._selected_ref is None:
             return None
-        return next((row for row in self.rows() if row.ref == self._selected_ref), None)
+        return next(
+            (row for row in self.unfiltered_rows() if row.ref == self._selected_ref),
+            None,
+        )
 
     def cancel_detail(self) -> None:
         """Discard the current detail selection/draft without a catalog write."""
@@ -182,6 +199,11 @@ class SignatureLibrarySession:
         self._selected_ref = None
         self._draft_name = None
         self._original_name = None
+
+    def discard_detail_changes(self) -> None:
+        """Restore the selected object's original name without clearing selection."""
+
+        self._draft_name = self._original_name
 
     def set_draft_name(self, value: str) -> None:
         if self._selected_ref is not None:

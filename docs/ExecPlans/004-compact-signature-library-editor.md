@@ -1,6 +1,6 @@
 ---
 role: standalone
-state: planned
+state: active
 depends_on: []
 ---
 
@@ -20,12 +20,12 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
 
 ## Progress
 
-- [ ] Migrate topology tests to the approved compact-header contract and prove they fail against the current three-column implementation.
-- [ ] Replace permanent catalog/master columns and the active splitter with compact selectors and contextual actions.
-- [ ] Preserve search, sort, selection identity, dirty transitions, nested editors, catalog-specific mutations, and preferences.
-- [ ] Prove the dominant editor, sticky Appearance preview, and stable footer at 1000×650 through real-Qt geometry tests.
-- [ ] Run the focused and full automated validation and complete requirements/compliance review.
-- [ ] Run a bounded screenshot feedback loop for Presets and Appearance default, selected-image, and scrolled states.
+- [x] (2026-09-20) Migrate topology tests to the approved compact-header contract and prove they fail against the current three-column implementation. The focused red run produced 15 failures and 47 passes; the smallest new-contract subset produced two failures and one pass before production edits.
+- [x] (2026-09-20) Replace permanent catalog/master columns and the active splitter with compact selectors and contextual actions.
+- [x] (2026-09-20) Preserve search, sort, selection identity, dirty transitions, nested editors, catalog-specific mutations, and preferences in the initial green implementation.
+- [x] (2026-09-20) Prove the dominant editor, sticky Appearance preview, and stable footer at 1000×650 through real-Qt geometry tests in the initial green implementation.
+- [x] (2026-09-20) Run the focused and full automated validation and complete requirements/compliance review. The corrected focused suite passed 71 tests; integration passed 70 with one skip; unit passed 1,613 with 19 skips and one existing Pillow warning. Independent code and governing-document reviews found and drove corrections for stable-reference search activation, dirty transitions, footer composition, title-bar close, Rename behavior, empty states, and inert legacy settings.
+- [x] (2026-09-20) Run a bounded screenshot feedback loop for Presets and Appearance default, selected-image, and scrolled states. Candidate 1 exposed stretched footer actions and a missing Certificate create path; candidate 2 exposed duplicate Placement creation and stale empty-state fields; candidate 3 passed and is retained under `docs/visual-evidence/compact-library/`.
 - [ ] Commit the source correction, build and audit a fresh package, install it, and complete human Library acceptance.
 - [ ] Reconcile this plan and the installed-package release matrix, commit final evidence/status, and resume the remaining release gates.
 
@@ -37,6 +37,14 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
   Evidence: `src/foliaseal/application/signature_library_session.py`; code exploration before this plan.
 - Observation: Splitter widths are persisted in `AppUiSettings`, but the revised `UI_SPEC.md` explicitly permits the new topology to ignore legacy saved Library column widths.
   Evidence: `src/foliaseal/infra/config/app_settings_ui.py` and `docs/UI_SPEC.md` section 12.
+- Observation: The focused red suite separated the intended contract from existing behavior before production edits: 47 tests passed and 15 failed, while a minimal new-contract subset produced two failures and one pass.
+  Evidence: 2026-09-20 red-test worker transcript for `tests/unit/test_qt_app_frame_profile_library.py`, `tests/integration/test_signature_library_topology.py`, and `tests/unit/test_signature_library_session.py`.
+- Observation: The initial compact implementation passed the 62-test focused suite, a 136-test adjacent Library/AppFrame suite, and the full suite with 1,674 passes, 20 skips, and one existing Pillow warning before independent review and visual evidence.
+  Evidence: 2026-09-20 implementation worker transcript; Ruff on owned files and `git diff --check` also passed.
+- Observation: Independent review found interaction defects that the initial green suite did not cover: filtered combo indices could resolve the wrong row, ordinary query changes could enter dirty-transition logic, title-bar close could bypass the resolver, and Rename committed immediately instead of focusing the transactional Name field.
+  Evidence: 2026-09-20 code and compliance review reports; corrected tests in `tests/integration/test_signature_library_topology.py` and `tests/unit/test_qt_app_frame_profile_library.py`.
+- Observation: The screenshot loop caught material composition defects after deterministic geometry tests were green.
+  Evidence: Candidate 1 had half-window footer buttons and no Certificate create action; candidate 2 had duplicate Placement create actions. Candidate 3 and the equivalent retained `final-*` captures passed actual image inspection as recorded in `docs/visual-evidence/compact-library/REVIEW.md`.
 
 ## Decision Log
 
@@ -73,17 +81,17 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
 
 ## Outcomes & Retrospective
 
-Implementation has not started. Completion requires installed human acceptance; source geometry tests and screenshot review cannot substitute for that gate.
+Implementation, independent code/compliance review, documentation reconciliation, automated validation, and the bounded visual loop are complete. The visual process materially improved the result twice after behavior tests were green, then passed on candidate 3. The outcome remains open pending a clean source commit, package build and audits, installation, and human acceptance; source geometry tests and screenshot review cannot substitute for that gate.
 
 ## Context and Orientation
 
 `docs/UI_SPEC.md` is the frozen interface authority. Commit `9e66bd593` revised LAY04, WF06, SUR03, resizing rules, Library scale rules, the decision log, and the normative Library/Appearance wireframes. The approved Library has a compact context header above one dominant editor. `docs/GUI_STYLE_GUIDE.md` maps this contract to native Qt behavior.
 
-`src/foliaseal/presentation/qt/app_frame_profile_library.py` owns `ReusableObjectLibraryDialog` and `ReusableObjectLibraryControls`. Its current `_build_controls()` constructs a catalog list, a separate search field, a saved-object list, a detail column, and a three-widget `QSplitter`. Rendering and signal handlers assume list row indexes. The same class also mounts nested Appearance and Preset editors and moves their action row into a stable footer host.
+`src/foliaseal/presentation/qt/app_frame_profile_library.py` owns `ReusableObjectLibraryDialog` and `ReusableObjectLibraryControls`. The active implementation builds a compact catalog selector, searchable saved-object selector, sort and contextual actions above one dominant editor host, with a stable Library-wide footer. The saved-object selector carries typed references through completion activation rather than inferring identity from a filtered row index. The same class mounts nested Appearance and Preset editors and moves their action rows into the stable footer host.
 
-`src/foliaseal/application/signature_library_session.py` owns the UI-independent state. `SignatureLibrarySession` selects catalogs and objects, filters rows, sorts them, stages a draft name, and commits or cancels detail transactions. `SignatureLibraryRow.ref` contains stable `ReusableObjectRef` or `CertificateLibraryRef` identity. The Qt migration must store those references as combo item data rather than infer identity from a filtered row index.
+`src/foliaseal/application/signature_library_session.py` owns the UI-independent state. `SignatureLibrarySession` selects catalogs and objects, filters rows, sorts them, stages a draft name, and commits or cancels detail transactions. `SignatureLibraryRow.ref` contains stable `ReusableObjectRef` or `CertificateLibraryRef` identity. The compact Qt selector stores those references as combo item data rather than inferring identity from a filtered row index.
 
-`src/foliaseal/infra/config/app_settings_ui.py` and `src/foliaseal/presentation/qt/app_frame.py` currently pass and store `library_splitter_sizes`. Preserve the settings schema and unrelated geometry/catalog/sort preferences, but make splitter sizes inert for the new Library. `tests/unit/test_qt_app_frame_profile_library.py` uses fake bindings for behavior, while `tests/integration/test_signature_library_topology.py` uses real Qt for composition, geometry, nested editor, and persistence evidence.
+`src/foliaseal/infra/config/app_settings_ui.py` and `src/foliaseal/presentation/qt/app_frame.py` still pass and store `library_splitter_sizes` for compatibility, while the compact Library neither applies nor recaptures them. The settings schema and unrelated geometry/catalog/sort preferences remain unchanged. `tests/unit/test_qt_app_frame_profile_library.py` uses fake bindings for behavior, while `tests/integration/test_signature_library_topology.py` uses real Qt for composition, geometry, nested editor, and persistence evidence.
 
 The allowed change classes are behavior change in the Qt Library shell and test fakes, evidence refresh in focused tests and visual captures, and documentation/status updates in this plan and the release matrix. Do not change catalog persistence schemas, signing semantics, object identity, certificate storage, placement coordinates, Appearance content rules, or application-layer policy. Do not create a general theme, layout metrics framework, model/view framework, or new runtime dependency.
 
@@ -206,3 +214,5 @@ Revision note: Created on 2026-09-19 after installed human review rejected the t
 Revision note: Revised after independent plan review to define query-versus-selection signals, ordinary-detail dirty resolution, the shared footer, Rename and empty-state behavior, inert legacy splitter persistence, mandatory architecture reconciliation, deterministic accessibility checks, durable visual evidence, clean-tree package identity, and the normal-theme boundary of this focused plan.
 
 Revision note: Revised again after re-review to select a concrete completer-backed selector with explicit keyboard/Escape/focus behavior, distinguish true empty catalogs from filtered no-match results, and require the full rebuild/audit/install/review loop after any installed correction.
+
+Revision note: Activated on 2026-09-20 after red topology evidence. The initial compact implementation and automated green pass are recorded; independent review, retained visual evidence, package audits, installation, and human acceptance remain open.

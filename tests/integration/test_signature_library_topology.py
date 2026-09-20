@@ -41,11 +41,11 @@ class _StaticRenderBackend:
         return None
 
 
-def test_library_is_modeless_three_column_and_document_independent(tmp_path: Path) -> None:
+def test_library_is_modeless_compact_header_and_document_independent(tmp_path: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
-    from PySide6.QtWidgets import QApplication, QLineEdit, QListWidget, QScrollArea, QSplitter
+    from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QScrollArea, QSplitter
 
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
     from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -72,12 +72,13 @@ def test_library_is_modeless_three_column_and_document_independent(tmp_path: Pat
 
     assert library.controls.dialog.isModal() is False
     assert library.controls.dialog.isVisible() is True
-    assert isinstance(library.controls.catalog_selector, QListWidget)
+    assert isinstance(library.controls.catalog_selector, QComboBox)
     assert library.controls.catalog_selector.count() == 4
-    assert library.controls.catalog_selector.currentItem().text() == "Presets"
-    assert isinstance(library.controls.object_selector, QListWidget)
+    assert library.controls.catalog_selector.currentText() == "Presets"
+    assert isinstance(library.controls.object_selector, QComboBox)
     assert isinstance(library.controls.search_input, QLineEdit)
-    assert len(library.controls.dialog.findChildren(QSplitter)) == 1
+    assert library.controls.splitter is None
+    assert len(library.controls.dialog.findChildren(QSplitter)) == 0
     assert isinstance(library.controls.detail_scroll_area, QScrollArea)
     assert library.controls.detail_scroll_area.widget() is library.controls.detail_view
 
@@ -86,11 +87,321 @@ def test_library_is_modeless_three_column_and_document_independent(tmp_path: Pat
     app.processEvents()
 
 
-def test_library_geometry_and_columns_persist_through_frame_store_reload(tmp_path: Path) -> None:
+def test_library_uses_compact_selectors_without_active_splitter(tmp_path: Path) -> None:
+    """The Library header owns selection; the editor owns the window's space."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QSplitter
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-compact-header"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    library = frame.show_reusable_object_library()
+    app.processEvents()
+    try:
+        assert isinstance(library.controls.catalog_selector, QComboBox)
+        assert isinstance(library.controls.object_selector, QComboBox)
+        assert library.controls.object_selector.isEditable() is True
+        assert library.controls.search_input is library.controls.object_selector.lineEdit()
+        assert library.controls.splitter is None
+        assert library.controls.dialog.findChildren(QSplitter) == []
+
+        footer = library.controls.library_footer_host
+        assert footer.isVisible() is True
+        assert footer.width() >= library.controls.dialog.width() * 0.9
+        assert library.controls.detail_container.width() > library.controls.dialog.width() * 0.6
+        assert isinstance(library.controls.search_input, QLineEdit)
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_library_legacy_splitter_setting_is_readable_but_inert(tmp_path: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
     from PySide6.QtWidgets import QApplication, QSplitter
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-inert-splitter"])
+    stale_sizes = [123, 234, 345]
+    settings = AppSettings(
+        schema_version=1,
+        default_output_directory=str(tmp_path / "home"),
+        default_open_directory=str(tmp_path / "home"),
+        linux_packaging_channel="primary",
+        ui={"library_splitter_sizes": stale_sizes},
+    )
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=settings,
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    library = frame.show_reusable_object_library()
+    app.processEvents()
+    try:
+        assert library.controls.splitter is None
+        assert library.controls.dialog.findChildren(QSplitter) == []
+        captured = library.capture_ui_settings(settings)
+        assert captured.ui["library_splitter_sizes"] == stale_sizes
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_saved_object_selector_keeps_query_separate_from_activation(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-search-selector"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))  # noqa: SLF001
+    frame._reusable_objects.execute(SaveAppearance("Board", build_signature_appearance()))  # noqa: SLF001
+    library = frame.show_reusable_object_library(initial_catalog="appearances")
+    app.processEvents()
+    try:
+        selected = library._session.selected_ref  # noqa: SLF001 - state contract under test
+        assert selected is not None
+        query = library.controls.search_input
+        query.setFocus()
+        query.clear()
+        QTest.keyClicks(query, "board")
+        app.processEvents()
+
+        assert library._session.selected_ref == selected  # noqa: SLF001
+        assert library._session.search == "board"  # noqa: SLF001
+        QTest.keyClick(query, Qt.Key.Key_Escape)
+        app.processEvents()
+        assert library.controls.object_selector.currentText() == "Approval"
+        assert library._session.selected_ref == selected  # noqa: SLF001
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_saved_object_query_restores_label_on_focus_loss_without_dirty_transition(
+    tmp_path: Path,
+) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-query-focus"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))  # noqa: SLF001
+    frame._reusable_objects.execute(SaveAppearance("Board", build_signature_appearance()))  # noqa: SLF001
+    library = frame.show_reusable_object_library(initial_catalog="appearances")
+    app.processEvents()
+    try:
+        selected = library._session.selected_ref  # noqa: SLF001
+        assert selected is not None
+        query = library.controls.search_input
+        query.setText("board")
+        app.processEvents()
+        assert library._session.search == "board"  # noqa: SLF001
+
+        library.controls.sort_selector.setFocus()
+        app.processEvents()
+
+        assert library._session.search == ""  # noqa: SLF001
+        assert library.controls.object_selector.currentText() == "Approval"
+        assert library._session.selected_ref == selected  # noqa: SLF001
+        assert library._session.detail_dirty is False  # noqa: SLF001
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_saved_object_completer_enter_activates_exactly_once_after_navigation(
+    tmp_path: Path,
+) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-completer-activation"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))  # noqa: SLF001
+    frame._reusable_objects.execute(SaveAppearance("Board", build_signature_appearance()))  # noqa: SLF001
+    library = frame.show_reusable_object_library(initial_catalog="appearances")
+    app.processEvents()
+    try:
+        query = library.controls.search_input
+        popup = library._object_completer.popup()  # noqa: SLF001
+        activation_count = 0
+
+        def observe_activation(_index: object) -> None:
+            nonlocal activation_count
+            activation_count += 1
+
+        popup.activated.connect(observe_activation)
+        query.setFocus()
+        QTest.keyClicks(query, "board")
+        app.processEvents()
+        QTest.keyClick(query, Qt.Key.Key_Down)
+        popup.setFocus()
+        QTest.keyClick(popup, Qt.Key.Key_Return)
+        app.processEvents()
+
+        assert activation_count == 1
+        assert library._session.selected_row().display_name == "Board"  # noqa: SLF001
+        assert library._session.search == ""  # noqa: SLF001
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_library_controls_expose_accessible_names_and_catalog_action_visibility(
+    tmp_path: Path,
+) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-accessibility"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    library = frame.show_reusable_object_library(initial_catalog="appearances")
+    app.processEvents()
+    try:
+        assert library.controls.catalog_selector.accessibleName() == "Library catalog"
+        assert library.controls.object_selector.accessibleName() == "Saved object"
+        assert library.controls.sort_selector.accessibleName() == "Saved object sort"
+        assert library.controls.create_button.accessibleName() == "Create saved object"
+        assert library.controls.rename_button.accessibleName() == "Rename saved object"
+        assert library.controls.duplicate_button.accessibleName() == "Duplicate saved object"
+        assert library.controls.pin_button.accessibleName() == "Pin saved object"
+        assert library.controls.delete_button.accessibleName() == "Delete saved object"
+        assert library.controls.create_button.isVisible() is False
+        assert library.controls.empty_create_button.isVisible() is True
+
+        frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))  # noqa: SLF001
+        library.refresh()
+        app.processEvents()
+        library.controls.search_input.setText("does-not-match")
+        app.processEvents()
+        assert library.controls.details_label.text().startswith("No matches")
+        assert library.controls.create_button.isVisible() is True
+        assert library.controls.empty_create_button.isVisible() is False
+        assert library._session.catalog is LibraryCatalog.APPEARANCES  # noqa: SLF001
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_library_geometry_persists_while_legacy_splitter_setting_stays_inert(
+    tmp_path: Path,
+) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
 
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
     from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
@@ -112,16 +423,17 @@ def test_library_geometry_and_columns_persist_through_frame_store_reload(tmp_pat
         default_output_directory=str(tmp_path / "home"),
         default_open_directory=str(tmp_path / "home"),
         linux_packaging_channel="primary",
-        ui={"future_preference": "keep"},
+        ui={
+            "future_preference": "keep",
+            "library_splitter_sizes": [123, 234, 345],
+        },
     )
     first_frame = QtAppFrameAdapter().create_frame(app_settings=initial, **common)
     first_library = first_frame.show_reusable_object_library()
     app.processEvents()
     try:
         first_library.controls.dialog.setGeometry(48, 64, 1120, 700)
-        splitter = first_library.controls.splitter
-        assert isinstance(splitter, QSplitter)
-        splitter.setSizes([180, 300, 560])
+        assert first_library.controls.splitter is None
         show_maximized = getattr(first_library.controls.dialog, "showMaximized", None)
         assert callable(show_maximized)
         show_maximized()
@@ -133,7 +445,7 @@ def test_library_geometry_and_columns_persist_through_frame_store_reload(tmp_pat
         expected_sizes = captured.ui_settings.library_splitter_sizes
         assert expected_geometry is not None
         assert expected_geometry.maximized is True
-        assert expected_sizes == tuple(splitter.sizes())
+        assert expected_sizes == (123, 234, 345)
     finally:
         first_library.controls.dialog.close()
         first_frame.window.close()
@@ -153,9 +465,8 @@ def test_library_geometry_and_columns_persist_through_frame_store_reload(tmp_pat
         assert second_library.controls.dialog.isMaximized() is True
         restored = second_library.capture_ui_settings(loaded)
         assert restored.ui_settings.library_geometry == expected_geometry
-        restored_splitter = second_library.controls.splitter
-        assert isinstance(restored_splitter, QSplitter)
-        assert tuple(restored_splitter.sizes()) == expected_sizes
+        assert second_library.controls.splitter is None
+        assert restored.ui_settings.library_splitter_sizes == expected_sizes
     finally:
         second_library.controls.dialog.close()
         second_frame.window.close()
@@ -190,7 +501,7 @@ def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None
     library = frame.show_reusable_object_library()
     app.processEvents()
 
-    library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.APPEARANCES))
+    library.controls.catalog_selector.setCurrentText(LibraryCatalog.APPEARANCES.value)
     app.processEvents()
     library.controls.create_button.click()
     app.processEvents()
@@ -253,20 +564,17 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
     frame.window.show()
     library = frame.show_reusable_object_library()
     try:
-        library.controls.catalog_selector.setCurrentRow(
-            list(LibraryCatalog).index(LibraryCatalog.APPEARANCES)
-        )
+        library.controls.catalog_selector.setCurrentText(LibraryCatalog.APPEARANCES.value)
         library.controls.create_button.click()
         dialog = library.controls.dialog
         dialog.resize(1000, 650)
-        library.controls.splitter.setSizes([120, 180, 700])
         for _ in range(3):
             app.processEvents()
         editor = library.controls.appearance_editor
         assert editor is not None
         assert (dialog.width(), dialog.height()) == (1000, 650)
         assert editor.controls.cancel_button.text() == "Cancel"
-        assert library.controls.appearance_footer_host.isVisible()
+        assert library.controls.library_footer_host.isVisible()
         assert not editor.controls.sample_preview_image.isVisible()
         assert editor.controls.save_button.isDefault()
         assert editor.controls.cancel_button.width() < 200
@@ -278,6 +586,7 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         assert image.save(str(image_path), "PNG")
         editor.controls.setup_form.set_image_stamp_path(str(image_path))
         app.processEvents()
+
         pixmap = editor.controls.sample_preview_image.pixmap()
         assert editor.controls.sample_preview_image.isVisible()
         assert pixmap is not None
@@ -301,7 +610,7 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         assert top_left(editor.controls.sample_preview_label) == preview_before
         assert top_left(editor.controls.cancel_button) == cancel_before
         assert top_left(editor.controls.save_button) == save_before
-        assert library.controls.appearance_footer_host.width() > dialog.width() * 0.9
+        assert library.controls.library_footer_host.width() > dialog.width() * 0.9
         assert cancel_before[0] > dialog.width() // 2
         assert save_before[0] > cancel_before[0]
         assert cancel_before[1] > editor.controls.container.y()
@@ -311,6 +620,60 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         assert DiscardQuestion.calls == 1
         assert library.controls.appearance_editor is None
         assert frame._reusable_objects.view().appearance_names == ()  # noqa: SLF001
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
+def test_repeated_preset_editor_open_close_keeps_shared_footer_and_width(tmp_path: Path) -> None:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication
+
+    from foliaseal.application.signature_library_session import LibraryCatalog
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-preset-footer-stability"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    frame._reusable_objects.execute(SaveAppearance("Approval", build_signature_appearance()))  # noqa: SLF001
+    library = frame.show_reusable_object_library(initial_catalog="presets")
+    app.processEvents()
+    try:
+        library.controls.dialog.resize(1000, 650)
+        library.controls.catalog_selector.setCurrentText(LibraryCatalog.PRESETS.value)
+        app.processEvents()
+        for _ in ("First preset", "Second preset"):
+            library.controls.create_button.click()
+            app.processEvents()
+            editor = library.controls.preset_editor
+            assert editor is not None
+            footer = library.controls.library_footer_host
+            footer_position = footer.mapTo(library.controls.dialog, footer.rect().topLeft())
+            assert footer.isVisible() is True
+            if library.controls.detail_scroll_area is not None:
+                assert library.controls.detail_scroll_area.horizontalScrollBar().maximum() == 0
+            editor.controls.cancel_button.click()
+            app.processEvents()
+            assert library.controls.preset_editor is None
+            assert footer.mapTo(library.controls.dialog, footer.rect().topLeft()) == footer_position
+            assert library.controls.library_footer_host.isVisible() is True
     finally:
         library.controls.dialog.close()
         frame.window.close()
@@ -394,10 +757,8 @@ def test_real_offscreen_library_mutation_protects_active_placed_signature(
         assert active_session.selected_appearance_profile_id() == appearance_ref.object_id
 
         library = frame.show_reusable_object_library(initial_catalog="appearances")
-        library.controls.catalog_selector.setCurrentRow(
-            list(LibraryCatalog).index(LibraryCatalog.APPEARANCES)
-        )
-        library.controls.object_selector.setCurrentRow(0)
+        library.controls.catalog_selector.setCurrentText(LibraryCatalog.APPEARANCES.value)
+        library.controls.object_selector.setCurrentIndex(0)
         library.controls.edit_button.click()
         app.processEvents()
         editor = library.controls.appearance_editor
@@ -474,7 +835,7 @@ def test_library_real_qt_returns_from_appearance_child_to_preset_editor(tmp_path
     library = frame.show_reusable_object_library()
     app.processEvents()
 
-    library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
+    library.controls.catalog_selector.setCurrentText(LibraryCatalog.PRESETS.value)
     library.controls.create_button.click()
     app.processEvents()
     preset_editor = library.controls.preset_editor
@@ -547,7 +908,7 @@ def test_library_real_qt_nested_preset_attaches_created_blank_placement(tmp_path
     library = frame.show_reusable_object_library()
     app.processEvents()
     try:
-        library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
+        library.controls.catalog_selector.setCurrentText(LibraryCatalog.PRESETS.value)
         library.controls.create_button.click()
         app.processEvents()
 
@@ -624,7 +985,7 @@ def test_library_real_qt_nested_preset_attaches_created_certificate(tmp_path: Pa
     library = frame.show_reusable_object_library()
     app.processEvents()
     try:
-        library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
+        library.controls.catalog_selector.setCurrentText(LibraryCatalog.PRESETS.value)
         library.controls.create_button.click()
         app.processEvents()
         editor = library.controls.preset_editor
@@ -708,7 +1069,7 @@ def test_library_real_qt_nested_preset_captures_current_placement(tmp_path: Path
     library = frame.show_reusable_object_library()
     app.processEvents()
     try:
-        library.controls.catalog_selector.setCurrentRow(list(LibraryCatalog).index(LibraryCatalog.PRESETS))
+        library.controls.catalog_selector.setCurrentText(LibraryCatalog.PRESETS.value)
         library.controls.create_button.click()
         app.processEvents()
         editor = library.controls.preset_editor

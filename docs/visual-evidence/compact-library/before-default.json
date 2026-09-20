@@ -1,0 +1,28 @@
+{
+  "actual_client_size": null,
+  "capture_method": "X11 window capture retained from installed-package HITL",
+  "captured_at_local": "2026-09-19T18:29:18-04:00",
+  "device_pixel_ratio": null,
+  "font": null,
+  "image_pixels": [
+    1100,
+    732
+  ],
+  "image_sha256": "2b01b6272f5b0443b9d8b17186fd0c41e24997568c1eb8378c4ddbf7332a99a1",
+  "package": {
+    "filename": "foliaseal_0.1.0_amd64.deb",
+    "sha256": "3a34429ecbb627bc201fd1abd906ff2040be43c1b8738356760fd837d373c4ae",
+    "source_commit": "158777339782b3b5b97dd28dec58f2c4e6561568",
+    "version": "0.1.0"
+  },
+  "palette_window": null,
+  "qt_platform": "xcb",
+  "requested_client_size": [
+    1100,
+    700
+  ],
+  "screen": null,
+  "state": "Appearance catalog, new Appearance editor, no selected image",
+  "style": null,
+  "unavailable_metrics_reason": "The installed baseline was captured before the compact-Library harness existed. It has no matching QWidget geometry or Qt environment report. The 32-pixel difference between the requested client height and image height is consistent with X11 window decoration, but is not treated as measured client geometry."
+}

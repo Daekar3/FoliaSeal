@@ -1,0 +1,133 @@
+{
+  "active_splitter": false,
+  "actual_size": [
+    1000,
+    650
+  ],
+  "catalog": "Certificates",
+  "device_pixel_ratio": 1.0,
+  "font": {
+    "family": "Ubuntu",
+    "height": 14,
+    "pixel_size": -1,
+    "point_size": 10
+  },
+  "image_pixels": [
+    1000,
+    650
+  ],
+  "palette_window": "#323232",
+  "phase": "final",
+  "qt_platform": "xcb",
+  "requested_size": [
+    1000,
+    650
+  ],
+  "sample_pixmap": null,
+  "saved_object_count": 0,
+  "saved_object_text": "",
+  "screen": "DP-4",
+  "scrollbar": null,
+  "state": "certificates",
+  "style": "fusion",
+  "widgets": {
+    "cancel": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 826,
+      "y": 619
+    },
+    "catalog_selector": {
+      "height": 23,
+      "visible": true,
+      "width": 192,
+      "x": 206,
+      "y": 8
+    },
+    "create": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "delete": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "detail": {
+      "height": 572,
+      "visible": true,
+      "width": 984,
+      "x": 8,
+      "y": 39
+    },
+    "detail_view": {
+      "height": 570,
+      "visible": true,
+      "width": 982,
+      "x": 9,
+      "y": 40
+    },
+    "duplicate": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "empty_create": {
+      "height": 23,
+      "visible": true,
+      "width": 982,
+      "x": 9,
+      "y": 82
+    },
+    "footer": {
+      "height": 23,
+      "visible": true,
+      "width": 984,
+      "x": 8,
+      "y": 619
+    },
+    "object_selector": {
+      "height": 23,
+      "visible": true,
+      "width": 192,
+      "x": 602,
+      "y": 8
+    },
+    "pin": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "rename": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "save": {
+      "height": 23,
+      "visible": true,
+      "width": 80,
+      "x": 912,
+      "y": 619
+    },
+    "sort_selector": {
+      "height": 23,
+      "visible": true,
+      "width": 192,
+      "x": 800,
+      "y": 8
+    }
+  }
+}

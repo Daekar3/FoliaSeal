@@ -1,0 +1,181 @@
+{
+  "active_splitter": false,
+  "actual_size": [
+    1000,
+    650
+  ],
+  "catalog": "Appearances",
+  "device_pixel_ratio": 1.0,
+  "font": {
+    "family": "Ubuntu",
+    "height": 14,
+    "pixel_size": -1,
+    "point_size": 10
+  },
+  "image_pixels": [
+    1000,
+    650
+  ],
+  "palette_window": "#323232",
+  "phase": "final",
+  "qt_platform": "xcb",
+  "requested_size": [
+    1000,
+    650
+  ],
+  "sample_pixmap": [
+    240,
+    48
+  ],
+  "saved_object_count": 0,
+  "saved_object_text": "",
+  "screen": "DP-4",
+  "scrollbar": {
+    "maximum": 595,
+    "value": 0
+  },
+  "state": "appearance-image",
+  "style": "fusion",
+  "widgets": {
+    "breadcrumb": {
+      "height": 15,
+      "visible": true,
+      "width": 984,
+      "x": 8,
+      "y": 39
+    },
+    "cancel": {
+      "height": 23,
+      "visible": false,
+      "width": 80,
+      "x": 926,
+      "y": 719
+    },
+    "catalog_selector": {
+      "height": 23,
+      "visible": true,
+      "width": 192,
+      "x": 206,
+      "y": 8
+    },
+    "create": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "delete": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "detail": {
+      "height": 572,
+      "visible": true,
+      "width": 984,
+      "x": 8,
+      "y": 39
+    },
+    "detail_view": {
+      "height": 620,
+      "visible": false,
+      "width": 1082,
+      "x": 9,
+      "y": 40
+    },
+    "duplicate": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "editor": {
+      "height": 572,
+      "visible": true,
+      "width": 984,
+      "x": 8,
+      "y": 39
+    },
+    "empty_create": {
+      "height": 23,
+      "visible": false,
+      "width": 1082,
+      "x": 9,
+      "y": 82
+    },
+    "footer": {
+      "height": 23,
+      "visible": true,
+      "width": 984,
+      "x": 8,
+      "y": 619
+    },
+    "name": {
+      "height": 22,
+      "visible": true,
+      "width": 586,
+      "x": 8,
+      "y": 81
+    },
+    "object_selector": {
+      "height": 23,
+      "visible": true,
+      "width": 192,
+      "x": 602,
+      "y": 8
+    },
+    "pin": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "rename": {
+      "height": 480,
+      "visible": false,
+      "width": 640,
+      "x": 8,
+      "y": 8
+    },
+    "sample_image": {
+      "height": 72,
+      "visible": true,
+      "width": 390,
+      "x": 602,
+      "y": 193
+    },
+    "sample_text": {
+      "height": 108,
+      "visible": true,
+      "width": 390,
+      "x": 602,
+      "y": 81
+    },
+    "save": {
+      "height": 23,
+      "visible": false,
+      "width": 80,
+      "x": 1012,
+      "y": 719
+    },
+    "scroll_area": {
+      "height": 504,
+      "visible": true,
+      "width": 586,
+      "x": 8,
+      "y": 107
+    },
+    "sort_selector": {
+      "height": 23,
+      "visible": true,
+      "width": 192,
+      "x": 800,
+      "y": 8
+    }
+  }
+}

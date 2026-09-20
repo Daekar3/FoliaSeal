@@ -41,6 +41,7 @@ class SignaturePresetEditorWidgetControls:
     save_button: Any
     cancel_button: Any
     child_host: Any
+    action_row: Any | None = None
 
 
 def _compose_row(bindings: Any, *widgets: Any) -> Any:
@@ -298,8 +299,9 @@ class SignaturePresetEditorWidget:
             set_visible(False)
 
         save_button = bindings.q_push_button("Save")
-        cancel_button = bindings.q_push_button("Back")
-        layout.addWidget(_compose_row(bindings, cancel_button, save_button))
+        cancel_button = bindings.q_push_button("Cancel")
+        action_row = _compose_row(bindings, cancel_button, save_button)
+        layout.addWidget(action_row)
 
         name_input.textChanged.connect(self._mark_dirty)  # type: ignore[attr-defined]
         appearance_selector.currentIndexChanged.connect(self._mark_dirty)  # type: ignore[attr-defined]
@@ -329,6 +331,7 @@ class SignaturePresetEditorWidget:
             save_button=save_button,
             cancel_button=cancel_button,
             child_host=child_host,
+            action_row=action_row,
         )
 
     def _populate_selectors(
