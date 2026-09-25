@@ -26,6 +26,8 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
 - [x] (2026-09-20) Prove the dominant editor, sticky Appearance preview, and stable footer at 1000×650 through real-Qt geometry tests in the initial green implementation.
 - [x] (2026-09-20) Run the focused and full automated validation and complete requirements/compliance review. The corrected focused suite passed 71 tests; integration passed 70 with one skip; unit passed 1,613 with 19 skips and one existing Pillow warning. Independent code and governing-document reviews found and drove corrections for stable-reference search activation, dirty transitions, footer composition, title-bar close, Rename behavior, empty states, and inert legacy settings.
 - [x] (2026-09-20) Run a bounded screenshot feedback loop for Presets and Appearance default, selected-image, and scrolled states. Candidate 1 exposed stretched footer actions and a missing Certificate create path; candidate 2 exposed duplicate Placement creation and stale empty-state fields; candidate 3 passed and is retained under `docs/visual-evidence/compact-library/`.
+- [x] (2026-09-24) Complete the first installed-package HITL review. The compact topology was accepted, but the owner found detached Catalog/Saved object labels, inefficient Appearance editor grouping, and prototype/MVP/preset-centric copy that was inappropriate for users; this reopened implementation under the same plan.
+- [x] (2026-09-24) Run the bounded source visual loop for the installed-review findings. Candidate 1 corrected header label attachment, regrouped the Appearance controls, and replaced the most visible internal language; candidate 2 corrected the remaining spacing and copy issues; compliance review found the Saved object field still expanded internally, so candidate 3 added control stretch and enforced a strict 0–12 px label/control gap. All six refreshed retained PNG/JSON captures passed actual image inspection.
 - [ ] Commit the source correction, build and audit a fresh package, install it, and complete human Library acceptance.
 - [ ] Reconcile this plan and the installed-package release matrix, commit final evidence/status, and resume the remaining release gates.
 
@@ -45,6 +47,10 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
   Evidence: 2026-09-20 code and compliance review reports; corrected tests in `tests/integration/test_signature_library_topology.py` and `tests/unit/test_qt_app_frame_profile_library.py`.
 - Observation: The screenshot loop caught material composition defects after deterministic geometry tests were green.
   Evidence: Candidate 1 had half-window footer buttons and no Certificate create action; candidate 2 had duplicate Placement create actions. Candidate 3 and the equivalent retained `final-*` captures passed actual image inspection as recorded in `docs/visual-evidence/compact-library/REVIEW.md`.
+- Observation: Installed human review found a second class of defects that source geometry and the first screenshot loop did not expose: labels in the compact header read as detached from their controls, and the Appearance editor still presented too much internal grouping and implementation language. The user-facing copy `Refine the preset's visible signature with the bounded choices used by the MVP` was especially inappropriate outside an implementation discussion.
+  Evidence: 2026-09-24 installed-package HITL review; follow-up source candidates and refreshed retained evidence in `docs/visual-evidence/compact-library/`.
+- Observation: The first follow-up correction attached the header fields visually, but compliance review found the Saved object field could still expand internally and leave its label effectively detached. A one-sided test did not protect the relationship. Candidate 3 added stretch inside the grouped field and a strict 0–12 px gap assertion; all six final captures were refreshed and re-inspected.
+  Evidence: 2026-09-24 compliance review; `tests/integration/test_signature_library_topology.py`; refreshed `final-*` evidence set.
 
 ## Decision Log
 
@@ -81,7 +87,7 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
 
 ## Outcomes & Retrospective
 
-Implementation, independent code/compliance review, documentation reconciliation, automated validation, and the bounded visual loop are complete. The visual process materially improved the result twice after behavior tests were green, then passed on candidate 3. The outcome remains open pending a clean source commit, package build and audits, installation, and human acceptance; source geometry tests and screenshot review cannot substitute for that gate.
+Implementation, independent code/compliance review, documentation reconciliation, automated validation, and the bounded visual loops are complete. The first loop corrected the compact topology; installed human review then reopened the slice for header-label attachment, Appearance grouping, and user-facing copy. Follow-up candidate 3 corrected the remaining Saved object field expansion and passed actual PNG inspection after all six retained captures were refreshed. The outcome remains open pending a clean source commit, package build and audits, installation, and repeat human acceptance; source geometry tests and screenshot review cannot substitute for that gate.
 
 ## Context and Orientation
 
@@ -216,3 +222,5 @@ Revision note: Revised after independent plan review to define query-versus-sele
 Revision note: Revised again after re-review to select a concrete completer-backed selector with explicit keyboard/Escape/focus behavior, distinguish true empty catalogs from filtered no-match results, and require the full rebuild/audit/install/review loop after any installed correction.
 
 Revision note: Activated on 2026-09-20 after red topology evidence. The initial compact implementation and automated green pass are recorded; independent review, retained visual evidence, package audits, installation, and human acceptance remain open.
+
+Revision note: Reopened on 2026-09-24 after installed human review accepted the compact topology but identified detached header labels, inefficient Appearance grouping, and prototype/MVP/preset-centric user-facing copy. Candidate 1 and candidate 2 corrected those findings; compliance review then found the Saved object field could still expand internally, and candidate 3 fixed the control stretch and added a strict 0–12 px gap assertion. All six final captures passed actual PNG inspection; a new source commit, package, audits, reinstall, and installed HITL remain pending.

@@ -134,6 +134,64 @@ def test_library_uses_compact_selectors_without_active_splitter(tmp_path: Path) 
         app.processEvents()
 
 
+def test_library_header_labels_stay_with_their_selectors_at_supported_size(
+    tmp_path: Path,
+) -> None:
+    """Header labels must read as captions for the controls beside them."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+
+    from PySide6.QtWidgets import QApplication, QLabel
+
+    from foliaseal.infra.config.app_settings_storage import AppSettingsStore
+    from foliaseal.infra.config.certificate_storage import CertificateCatalogStore
+    from foliaseal.infra.config.profile_storage import SignaturePresetCatalogStore
+    from foliaseal.infra.config.schemas import AppSettings
+    from foliaseal.presentation.qt.app_frame import QtAppFrameAdapter
+
+    app = QApplication.instance() or QApplication(["foliaseal-library-header-labels"])
+    frame = QtAppFrameAdapter().create_frame(
+        app_settings=AppSettings(
+            schema_version=1,
+            default_output_directory=str(tmp_path / "home"),
+            default_open_directory=str(tmp_path / "home"),
+            linux_packaging_channel="primary",
+            ui={},
+        ),
+        app_settings_store=AppSettingsStore(storage_dir=tmp_path / "config"),
+        certificate_catalog_store=CertificateCatalogStore(storage_dir=tmp_path / "certificates"),
+        preset_catalog_store=SignaturePresetCatalogStore(storage_dir=tmp_path / "profiles"),
+    )
+    library = frame.show_reusable_object_library()
+    library.controls.dialog.resize(1000, 650)
+    app.processEvents()
+    try:
+        labels = {
+            label.text(): label
+            for label in library.controls.dialog.findChildren(QLabel)
+            if label.text() in {"Catalog", "Saved object"}
+        }
+        assert set(labels) == {"Catalog", "Saved object"}
+
+        def rect_in_dialog(widget):
+            origin = widget.mapTo(library.controls.dialog, widget.rect().topLeft())
+            return widget.rect().translated(origin)
+
+        for caption, control in (
+            ("Catalog", library.controls.catalog_selector),
+            ("Saved object", library.controls.object_selector),
+        ):
+            caption_rect = rect_in_dialog(labels[caption])
+            control_rect = rect_in_dialog(control)
+            gap = control_rect.left() - caption_rect.right()
+            assert 0 <= gap <= 12
+            assert abs(caption_rect.center().y() - control_rect.center().y()) <= 12
+    finally:
+        library.controls.dialog.close()
+        frame.window.close()
+        app.processEvents()
+
+
 def test_library_legacy_splitter_setting_is_readable_but_inert(tmp_path: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
@@ -476,7 +534,7 @@ def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
 
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QGroupBox
 
     from foliaseal.application.signature_library_session import LibraryCatalog
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -509,7 +567,20 @@ def test_library_real_qt_mounts_nested_appearance_editor(tmp_path: Path) -> None
     editor = library.controls.appearance_editor
     assert editor is not None
     assert editor.controls.breadcrumb_label.text().endswith("New Appearance")
-    assert "Sample preview (synthetic data" in editor.controls.sample_preview_label.text()
+    editor_copy = "\n".join(
+        widget.text()
+        for widget in editor.findChildren(QGroupBox)
+        if hasattr(widget, "text")
+    ).lower()
+    assert "signature style" not in editor_copy
+    assert not any(
+        phrase in editor_copy for phrase in ("prototype", "synthetic", "mvp", "preset's")
+    )
+    preview_copy = editor.controls.sample_preview_label.text().lower()
+    assert not any(
+        phrase in preview_copy
+        for phrase in ("synthetic", "mvp", "preset's", "never saved", "never persisted")
+    )
 
     editor.controls.name_input.setText("Offscreen appearance")
     editor.controls.save_button.click()
@@ -527,7 +598,7 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
     pytest.importorskip("PySide6")
 
     from PySide6.QtGui import QImage
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QCheckBox, QMessageBox
 
     from foliaseal.application.signature_library_session import LibraryCatalog
     from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -580,6 +651,39 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         assert editor.controls.cancel_button.width() < 200
         assert editor.controls.save_button.width() < 200
         assert editor.controls.form_scroll_area.horizontalScrollBar().maximum() == 0
+
+        # Visible content and image controls are primary inputs. Secondary
+        # typography and decoration choices follow them in the scrollable form.
+        appearance_controls = editor.controls.setup_form.appearance_controls
+        visible_text = editor.controls.setup_form.visible_text_controls
+
+        field_checks = visible_text.field_checks_container.findChildren(QCheckBox)
+        assert len(field_checks) == 8
+        field_x = sorted(
+            {
+                check.mapTo(visible_text.field_checks_container, check.rect().topLeft()).x()
+                for check in field_checks
+            }
+        )
+        assert len(field_x) >= 2
+        assert field_x[-1] - field_x[0] > 24
+        field_y = [
+            check.mapTo(visible_text.field_checks_container, check.rect().topLeft()).y()
+            for check in field_checks
+        ]
+        tallest_check = max(check.height() for check in field_checks)
+        assert max(field_y) - min(field_y) <= tallest_check * 5
+
+        def top_in_form(widget):
+            form = editor.controls.form_scroll_area.widget()
+            return widget.mapTo(form, widget.rect().topLeft()).y()
+
+        image_y = top_in_form(appearance_controls.browse_image_button)
+        layout_y = top_in_form(appearance_controls.layout_template)
+        typography_y = top_in_form(appearance_controls.font_family)
+        color_y = top_in_form(appearance_controls.text_color)
+        assert image_y < layout_y < typography_y < color_y
+
         image_path = tmp_path / "synthetic-preview.png"
         image = QImage(360, 72, QImage.Format.Format_ARGB32)
         image.fill(0xFFFFFFFF)

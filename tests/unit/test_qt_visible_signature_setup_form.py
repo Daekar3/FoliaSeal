@@ -57,7 +57,7 @@ def test_setup_form_loads_visible_signature_draft_into_controls() -> None:
     assert form.appearance_controls.border_show.isChecked() is True
     assert form.appearance_controls.border_color.text() == "#333333"
     assert form.appearance_controls.background_color.text() == "#FFFFFF"
-    assert form.appearance_controls.image_path_label.text() == "/tmp/stamp.png"
+    assert form.appearance_controls.image_path_label.text() == "stamp.png"
     assert form.appearance_controls.image_prominence.currentText() == "Primary"
     assert form.appearance_controls.preserve_image_alpha.isChecked() is True
     assert not hasattr(form.appearance_controls, "image_stamp_path")

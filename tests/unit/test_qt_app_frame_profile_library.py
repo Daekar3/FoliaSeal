@@ -512,7 +512,7 @@ def test_library_owns_nested_appearance_editor_and_discards_dirty_child() -> Non
         "Signature Library / Appearances / New Appearance"
         in editor.controls.breadcrumb_label.text()
     )
-    assert "Sample preview (synthetic data" in editor.controls.sample_preview_label.text()
+    assert "Sample preview using example signer data" in editor.controls.sample_preview_label.text()
 
     editor.controls.name_input.setText("Discarded appearance")
     assert editor.dirty is True

@@ -111,6 +111,14 @@ class AppearanceProfileEditorWidget:
     def initial_ref(self) -> ReusableObjectRef | None:
         return self._initial_ref
 
+    def findChildren(self, child_type: Any) -> list[Any]:  # noqa: N802
+        """Expose the mounted Qt tree for visual and accessibility inspection."""
+
+        finder = getattr(self.controls.container, "findChildren", None)
+        if not callable(finder):
+            return []
+        return list(finder(child_type))
+
     def save(self) -> bool:
         """Validate and commit the isolated draft, leaving navigation to the owner."""
 
@@ -225,36 +233,25 @@ class AppearanceProfileEditorWidget:
         preview_layout = bindings.q_vbox_layout(preview_side)
         preview_layout.setContentsMargins(0, 0, 0, 0)
         preview_layout.setSpacing(4)
-        body_layout.addWidget(content_side, 3)
-        body_layout.addWidget(preview_side, 2)
+        body_layout.addWidget(content_side, 4)
+        body_layout.addWidget(preview_side, 3)
         layout.addWidget(body)
 
-        preview_heading = bindings.q_label("Sample preview (synthetic data — never saved)")
-        if hasattr(preview_heading, "setWordWrap"):
-            preview_heading.setWordWrap(True)
+        preview_heading = bindings.q_label("Preview")
         preview_layout.addWidget(preview_heading)
         sample_preview = bindings.q_label("")
         if hasattr(sample_preview, "setWordWrap"):
             sample_preview.setWordWrap(True)
         if hasattr(sample_preview, "setMinimumHeight"):
-            sample_preview.setMinimumHeight(72)
-        if hasattr(sample_preview, "setStyleSheet"):
-            sample_preview.setStyleSheet(
-                "border: 1px solid #9ca3af; padding: 8px;"
-                " background: #ffffff; color: #111827;"
-            )
+            sample_preview.setMinimumHeight(112)
         preview_layout.addWidget(sample_preview)
         sample_preview_image = bindings.q_label("")
         if hasattr(sample_preview_image, "setMinimumHeight"):
-            sample_preview_image.setMinimumHeight(72)
+            sample_preview_image.setMinimumHeight(140)
         if hasattr(sample_preview_image, "setAlignment"):
             alignment = getattr(getattr(bindings, "qt", None), "AlignCenter", None)
             if alignment is not None:
                 sample_preview_image.setAlignment(alignment)
-        if hasattr(sample_preview_image, "setStyleSheet"):
-            sample_preview_image.setStyleSheet(
-                "border: 1px solid #9ca3af; padding: 4px; background: #ffffff;"
-            )
         preview_layout.addWidget(sample_preview_image)
         if hasattr(preview_layout, "addStretch"):
             preview_layout.addStretch()
@@ -287,8 +284,8 @@ class AppearanceProfileEditorWidget:
         form_container = bindings.q_widget()
         form_layout = bindings.q_vbox_layout(form_container)
         form_layout.setContentsMargins(0, 0, 0, 0)
-        form_layout.addWidget(setup_form.appearance_controls.container)
         form_layout.addWidget(setup_form.visible_text_controls.container)
+        form_layout.addWidget(setup_form.appearance_controls.container)
         scroll_factory = getattr(bindings, "q_scroll_area", None)
         scroll_area = None
         if callable(scroll_factory):
@@ -422,12 +419,12 @@ class AppearanceProfileEditorWidget:
         has_image = appearance.image_stamp_path is not None
         _set_text(
             self.controls.sample_preview_label,
-            "Sample preview (synthetic data — never saved)\n"
+            "Sample preview using example signer data.\n"
             "Sample signer: Ada Example\n"
             f"{signer_label} Ada Example\n"
             f"Layout: {layout} · Image position: {stamp}\n"
             f"Image: {'selected' if has_image else 'none'}\n"
-            "This preview uses synthetic data and is never persisted.",
+            "Changes here are not saved to a document.",
         )
         self._refresh_preview_image(appearance.image_stamp_path)
 

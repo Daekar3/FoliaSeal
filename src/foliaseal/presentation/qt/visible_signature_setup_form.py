@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 
 from foliaseal.application.signature_font_registry import validate_signature_font_request
@@ -479,26 +480,18 @@ class QtVisibleSignatureSetupForm:
 
     def _build_appearance_controls(self) -> AppearanceControls:
         bindings = self._bindings
-        container = bindings.q_group_box("Signature style")
+        container_title = "Appearance" if self._appearance_compact else "Signature style"
+        container = bindings.q_group_box(container_title)
         layout = bindings.q_vbox_layout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
         summary_label = bindings.q_label(
-            "Refine the preset's visible signature with the bounded choices used by the MVP."
+            "Choose the content, image, and styling for the visible signature."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
         if hasattr(summary_label, "setStyleSheet") and not self._appearance_compact:
             summary_label.setStyleSheet("color: #374151;")
-
-        text_group = bindings.q_group_box("Text and layout")
-        text_layout = (
-            bindings.q_vbox_layout(text_group)
-            if self._appearance_compact
-            else bindings.q_form_layout(text_group)
-        )
-        text_layout.setContentsMargins(0, 0, 0, 0)
-        text_layout.setSpacing(4)
 
         signer_label_prefix = bindings.q_line_edit()
         signer_label_prefix.setPlaceholderText("Digitally signed by")
@@ -557,36 +550,51 @@ class QtVisibleSignatureSetupForm:
         background_color = bindings.q_line_edit()
         background_color.setPlaceholderText("#RRGGBB")
 
-        rows = (
-            ("Signer label / Stamp Position", (signer_label_prefix, stamp_position)),
-            ("Layout / Timezone", (layout_template, timezone_display_mode, datetime_format)),
-            ("Font / Size", (font_family, font_size)),
-            ("Weight / Labels", (bold, italic, show_field_names)),
-            ("Image", (image_path_label, browse_image_button, remove_image_button)),
-            ("Image prominence", (image_prominence, preserve_image_alpha)),
-            ("Field order", (field_order, move_field_up, move_field_down)),
-            ("Text color", (text_color,)),
-            ("Border", (border_show, border_color, border_width)),
-            ("Background color", (background_color,)),
+        image_rows = (
+            (
+                "Image",
+                _compose_row(bindings, image_path_label, browse_image_button, remove_image_button),
+            ),
+            ("Prominence", _compose_row(bindings, image_prominence, preserve_image_alpha)),
         )
-        for title, controls in rows:
-            if self._appearance_compact:
-                title_label = bindings.q_label(title)
-                if hasattr(title_label, "setWordWrap"):
-                    title_label.setWordWrap(True)
-                text_layout.addWidget(title_label)
-                for control in controls:
-                    text_layout.addWidget(control)
-            else:
-                content = (
-                    controls[0]
-                    if len(controls) == 1
-                    else _compose_row(bindings, *controls)
-                )
-                text_layout.addRow(title, content)
+        text_rows = (
+            ("Signer label", signer_label_prefix),
+            ("Layout", layout_template),
+            ("Stamp position", stamp_position),
+            ("Time zone", timezone_display_mode),
+            ("Date and time", datetime_format),
+            ("Field order", _compose_row(bindings, field_order, move_field_up, move_field_down)),
+        )
+        style_rows = (
+            ("Font", font_family),
+            ("Font size", font_size),
+            ("Text style", _compose_row(bindings, bold, italic)),
+            ("Text color", text_color),
+            ("Border", _compose_row(bindings, border_show, border_color, border_width)),
+            ("Background", background_color),
+        )
 
-        layout.addWidget(summary_label)
-        layout.addWidget(text_group)
+        def add_rows(group: Any, rows: tuple[tuple[str, Any], ...]) -> None:
+            group_layout = bindings.q_form_layout(group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(4)
+            for title, control in rows:
+                group_layout.addRow(title, control)
+
+        if self._appearance_compact:
+            for title, rows in (
+                ("Image", image_rows),
+                ("Text and layout", text_rows),
+                ("Typography and style", style_rows),
+            ):
+                group = bindings.q_group_box(title)
+                add_rows(group, rows)
+                layout.addWidget(group)
+        else:
+            text_group = bindings.q_group_box("Text and layout")
+            add_rows(text_group, image_rows + text_rows + style_rows)
+            layout.addWidget(summary_label)
+            layout.addWidget(text_group)
 
         for control in (
             signer_label_prefix,
@@ -649,7 +657,7 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         summary_label = bindings.q_label(
-            "Use the preset's standard signing details, and hide fields only when needed."
+            "Choose which signing details appear in the visible signature."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
@@ -662,14 +670,24 @@ class QtVisibleSignatureSetupForm:
             detail_label.setStyleSheet("color: #4b5563;")
         field_checks_container = bindings.q_widget()
         field_checks_layout = bindings.q_vbox_layout(field_checks_container)
-        field_checks_layout.setContentsMargins(12, 0, 0, 0)
-        field_checks_layout.setSpacing(3)
+        field_checks_layout.setContentsMargins(0, 0, 0, 0)
+        field_checks_layout.setSpacing(2)
 
+        field_checks: list[Any] = []
         for field_key in SIGNATURE_FIELD_DISPLAY_ORDER:
             check_box = bindings.q_check_box(_field_label(field_key))
             self._field_visibility_checks[field_key] = check_box
+            field_checks.append(check_box)
             check_box.stateChanged.connect(self._on_any_control_changed)  # type: ignore[attr-defined]
-            field_checks_layout.addWidget(check_box)
+        for row_start in range(0, len(field_checks), 2):
+            field_checks_layout.addWidget(
+                _compose_row(bindings, *field_checks[row_start : row_start + 2])
+            )
+
+        set_tab_order = getattr(container, "setTabOrder", None)
+        if callable(set_tab_order):
+            for first, second in zip(field_checks, field_checks[1:]):
+                set_tab_order(first, second)
 
         layout.addWidget(summary_label)
         layout.addWidget(self._appearance_controls.show_field_names)
@@ -691,7 +709,7 @@ class QtVisibleSignatureSetupForm:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         summary_label = bindings.q_label(
-            "Start from a signature preset, then adjust the visible approval signature as needed."
+            "Choose a saved appearance, then adjust it for this signature if needed."
         )
         if hasattr(summary_label, "setWordWrap"):
             summary_label.setWordWrap(True)
@@ -830,10 +848,14 @@ class QtVisibleSignatureSetupForm:
         )
 
     def _set_image_path_label(self, image_path: str | None) -> None:
+        display_text = "No image selected" if image_path is None else Path(image_path).name
         _set_text(
             self._appearance_controls.image_path_label,
-            "No image selected" if image_path is None else str(image_path),
+            display_text,
         )
+        set_tool_tip = getattr(self._appearance_controls.image_path_label, "setToolTip", None)
+        if callable(set_tool_tip):
+            set_tool_tip("" if image_path is None else str(image_path))
 
     def _request_image_import(self) -> None:
         if self._on_image_import is not None:

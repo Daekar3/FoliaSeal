@@ -3004,11 +3004,11 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert len(widget.properties_panel._appearance_controls.container.layout.items) == 2
     assert len(widget.properties_panel._visible_text_controls.container.layout.items) == 4
     assert (
-        len(widget.properties_panel._visible_text_controls.field_checks_container.layout.items) == 8
+        len(widget.properties_panel._visible_text_controls.field_checks_container.layout.items) == 4
     )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
-        == 10
+        == 14
     )
     assert widget.properties_panel._placement_controls.container.parent is None
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"
@@ -3016,11 +3016,11 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     assert widget.properties_panel.validation_text() == "Place a signature on the page to continue."
     assert (
         widget.properties_panel._appearance_controls.summary_label.text()
-        == "Refine the preset's visible signature with the bounded choices used by the MVP."
+        == "Choose the content, image, and styling for the visible signature."
     )
     assert (
         widget.properties_panel._visible_text_controls.summary_label.text()
-        == "Use the preset's standard signing details, and hide fields only when needed."
+        == "Choose which signing details appear in the visible signature."
     )
     assert (
         widget.properties_panel._refinement_controls.helper_label.text()

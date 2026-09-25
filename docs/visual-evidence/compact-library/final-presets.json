@@ -55,8 +55,8 @@
     "catalog_selector": {
       "height": 23,
       "visible": true,
-      "width": 192,
-      "x": 206,
+      "width": 120,
+      "x": 57,
       "y": 8
     },
     "certificate_selector": {
@@ -70,14 +70,14 @@
       "height": 23,
       "visible": false,
       "width": 126,
-      "x": 573,
+      "x": 622,
       "y": 8
     },
     "delete": {
       "height": 23,
       "visible": false,
-      "width": 92,
-      "x": 1000,
+      "width": 80,
+      "x": 1012,
       "y": 8
     },
     "detail": {
@@ -97,8 +97,8 @@
     "duplicate": {
       "height": 23,
       "visible": false,
-      "width": 92,
-      "x": 803,
+      "width": 80,
+      "x": 840,
       "y": 8
     },
     "editor": {
@@ -132,15 +132,15 @@
     "object_selector": {
       "height": 23,
       "visible": true,
-      "width": 192,
-      "x": 602,
+      "width": 586,
+      "x": 262,
       "y": 8
     },
     "pin": {
       "height": 23,
       "visible": false,
-      "width": 93,
-      "x": 901,
+      "width": 80,
+      "x": 926,
       "y": 8
     },
     "placement_selector": {
@@ -153,8 +153,8 @@
     "rename": {
       "height": 23,
       "visible": false,
-      "width": 92,
-      "x": 705,
+      "width": 80,
+      "x": 754,
       "y": 8
     },
     "save": {
@@ -167,8 +167,8 @@
     "sort_selector": {
       "height": 23,
       "visible": true,
-      "width": 192,
-      "x": 800,
+      "width": 138,
+      "x": 854,
       "y": 8
     }
   }

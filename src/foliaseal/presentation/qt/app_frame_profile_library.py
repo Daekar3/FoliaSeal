@@ -53,6 +53,19 @@ def _compose_row(bindings: Any, *widgets: Any) -> Any:
     return container
 
 
+def _labeled_control(bindings: Any, label: str, control: Any) -> Any:
+    """Keep a field label visually attached to its control in the library header."""
+
+    container = bindings.q_widget()
+    layout = bindings.q_hbox_layout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(4)
+    label_widget = bindings.q_label(label)
+    layout.addWidget(label_widget)
+    layout.addWidget(control, 1)
+    return container
+
+
 def _set_enabled(widget: Any, enabled: bool) -> None:
     setter = getattr(widget, "setEnabled", None)
     if callable(setter):
@@ -554,10 +567,10 @@ class ReusableObjectLibraryDialog:
         header = self._bindings.q_widget()
         header_layout = self._bindings.q_hbox_layout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.addWidget(self._bindings.q_label("Catalog"))
-        header_layout.addWidget(navigation)
-        header_layout.addWidget(self._bindings.q_label("Saved object"))
-        header_layout.addWidget(selector)
+        catalog_field = _labeled_control(self._bindings, "Catalog", navigation)
+        saved_object_field = _labeled_control(self._bindings, "Saved object", selector)
+        header_layout.addWidget(catalog_field)
+        header_layout.addWidget(saved_object_field, 1)
         header_layout.addWidget(sort_selector)
         header_layout.addWidget(create)
         header_layout.addWidget(rename)

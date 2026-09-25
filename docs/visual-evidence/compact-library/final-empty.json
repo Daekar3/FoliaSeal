@@ -41,8 +41,8 @@
     "catalog_selector": {
       "height": 23,
       "visible": true,
-      "width": 192,
-      "x": 206,
+      "width": 120,
+      "x": 57,
       "y": 8
     },
     "create": {
@@ -97,8 +97,8 @@
     "object_selector": {
       "height": 23,
       "visible": true,
-      "width": 192,
-      "x": 602,
+      "width": 586,
+      "x": 262,
       "y": 8
     },
     "pin": {
@@ -125,8 +125,8 @@
     "sort_selector": {
       "height": 23,
       "visible": true,
-      "width": 192,
-      "x": 800,
+      "width": 138,
+      "x": 854,
       "y": 8
     }
   }
