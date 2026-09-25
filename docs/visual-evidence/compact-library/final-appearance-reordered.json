@@ -5,8 +5,8 @@
     650
   ],
   "appearance_field_order": [
-    "distinguished_name",
     "common_name",
+    "distinguished_name",
     "email",
     "title",
     "company",
@@ -44,7 +44,7 @@
     "maximum": 143,
     "value": 0
   },
-  "state": "appearance-default",
+  "state": "appearance-reordered",
   "style": "fusion",
   "widgets": {
     "breadcrumb": {

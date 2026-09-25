@@ -22,8 +22,10 @@ The final evidence is generated with
 `scripts/capture_compact_library_layout.py` on a real Qt `xcb` display at a
 1000 by 650 client size. It uses temporary settings, certificate, profile, and
 image roots. The deterministic states are final Presets, a true-empty
-Placements catalog, Certificates, and Appearance default, selected-image, and
-substantially scrolled states. Each generated PNG has a matching JSON report
+Placements catalog, Certificates, and Appearance default, reordered-field,
+selected-image, and substantially scrolled states. The default and reordered
+captures use identical conditions and demonstrate that moving the first field
+down changes the composed signature preview. Each generated PNG has a matching JSON report
 with actual geometry, style, font metrics, palette, screen, device-pixel
 ratio, active catalog, object selector state, scrollbar state, and relevant
 widget geometry.

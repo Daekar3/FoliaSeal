@@ -4,6 +4,16 @@
     1000,
     650
   ],
+  "appearance_field_order": [
+    "distinguished_name",
+    "common_name",
+    "email",
+    "title",
+    "company",
+    "signing_time",
+    "reason",
+    "location"
+  ],
   "catalog": "Appearances",
   "device_pixel_ratio": 1.0,
   "font": {
@@ -24,8 +34,8 @@
     650
   ],
   "sample_pixmap": [
-    240,
-    48
+    400,
+    66
   ],
   "saved_object_count": 0,
   "saved_object_text": "",
@@ -147,10 +157,10 @@
       "visible": true,
       "width": 418,
       "x": 574,
-      "y": 197
+      "y": 220
     },
     "sample_text": {
-      "height": 112,
+      "height": 135,
       "visible": true,
       "width": 418,
       "x": 574,

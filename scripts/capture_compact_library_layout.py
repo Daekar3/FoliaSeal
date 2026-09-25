@@ -25,6 +25,7 @@ CAPTURE_STATES = (
     "empty",
     "certificates",
     "appearance-default",
+    "appearance-reordered",
     "appearance-image",
     "appearance-scrolled",
 )
@@ -109,6 +110,11 @@ def _prepare_state(
 
     editor = _open_appearance(library, app)
     editor.controls.name_input.setText("Synthetic approval appearance")
+    if state == "appearance-reordered":
+        field_order = editor.controls.setup_form.appearance_controls.field_order
+        field_order.setCurrentIndex(0)
+        editor.controls.setup_form.appearance_controls.move_field_down.click()
+        app.processEvents()
     if state == "appearance-image":
         image_path = storage / "synthetic-signature.png"
         _write_synthetic_image(image_path)
@@ -272,6 +278,16 @@ def main() -> int:
                 "sample_pixmap": (
                     [image_pixmap.width(), image_pixmap.height()]
                     if image_pixmap is not None
+                    else None
+                ),
+                "appearance_field_order": (
+                    [
+                        field.value
+                        for field in (
+                            appearance.controls.setup_form.build_draft().appearance.field_order
+                        )
+                    ]
+                    if appearance is not None
                     else None
                 ),
                 "widgets": _state_widgets(library, active_editor),

@@ -61,12 +61,13 @@ class QtCanonicalPreviewLifecycle:
         inner_body_width: int,
         inner_body_height: int,
         fallback_card_style: str,
+        flatten_to_white: bool = False,
     ) -> CanonicalPreviewRenderState:
         try:
             render_kwargs = {
                 "zoom": max(1.0, preview_scale),
                 "include_border": True,
-                "flatten_to_white": False,
+                "flatten_to_white": flatten_to_white,
             }
             if self._render_snapshot is render_canonical_signature_preview:
                 render_kwargs["render_port"] = self._render_port

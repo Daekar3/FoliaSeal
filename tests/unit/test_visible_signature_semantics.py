@@ -175,8 +175,8 @@ def test_semantics_uses_fallback_preview_labels_when_certificate_is_unavailable(
     assert semantics.fields[2].text == "Email"
     assert semantics.fields[5].visible is False
     assert semantics.text.detail_text == (
-        "Distinguished name | Certificate common name | Email | Title | Company | "
-        "Reason | Location"
+        "Distinguished name • Certificate common name • Email • Title • Company • "
+        "Reason • Location"
     )
     assert semantics.text.stamp_text == semantics.text.detail_text
 

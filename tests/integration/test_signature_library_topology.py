@@ -646,7 +646,8 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         assert (dialog.width(), dialog.height()) == (1000, 650)
         assert editor.controls.cancel_button.text() == "Cancel"
         assert library.controls.library_footer_host.isVisible()
-        assert not editor.controls.sample_preview_image.isVisible()
+        assert editor.controls.sample_preview_image.isVisible()
+        assert editor.controls.sample_preview_image.pixmap() is not None
         assert editor.controls.save_button.isDefault()
         assert editor.controls.cancel_button.width() < 200
         assert editor.controls.save_button.width() < 200
@@ -694,10 +695,13 @@ def test_appearance_editor_minimum_layout_scroll_and_cancel(tmp_path: Path) -> N
         pixmap = editor.controls.sample_preview_image.pixmap()
         assert editor.controls.sample_preview_image.isVisible()
         assert pixmap is not None
-        assert (pixmap.width(), pixmap.height()) == (240, 48)
+        assert pixmap.width() > pixmap.height() > 0
+        assert pixmap.width() <= editor.controls.sample_preview_image.width()
+        assert pixmap.height() <= editor.controls.sample_preview_image.height()
         editor.controls.setup_form.set_image_stamp_path(None)
         app.processEvents()
-        assert not editor.controls.sample_preview_image.isVisible()
+        assert editor.controls.sample_preview_image.isVisible()
+        assert editor.controls.sample_preview_image.pixmap() is not None
 
         def top_left(widget):
             point = widget.mapTo(dialog, widget.rect().topLeft())

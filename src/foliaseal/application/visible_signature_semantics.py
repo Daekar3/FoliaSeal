@@ -384,7 +384,7 @@ def _compose_visible_signature_text(
 ) -> tuple[str, str, str]:
     title_text = signer_label_prefix.strip()
     if layout_template == SignatureLayoutTemplate.SINGLE_LINE:
-        detail_text = " | ".join(body_fragments)
+        detail_text = " • ".join(body_fragments)
     elif layout_template == SignatureLayoutTemplate.WRAPPED_BLOCK:
         if not body_fragments:
             detail_text = ""

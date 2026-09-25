@@ -3839,7 +3839,7 @@ def test_signing_shell_stamp_position_bottom_places_stamp_after_text(
     assert preview_controls.stamp_label.alignment == (_FakeQt.AlignLeft | _FakeQt.AlignTop)
     assert preview_controls.stamp_label.pixmap().height < preview_controls.stamp_label.fixed_size[1]
     assert preview_controls.detail_label.visible is True
-    assert " | " in widget.properties_panel.preview_text()
+    assert " • " in widget.properties_panel.preview_text()
 
 
 def test_signing_shell_stamp_position_left_centers_text_beside_stamp(
@@ -4132,10 +4132,10 @@ def test_signing_shell_fresh_workflow_uses_signer_first_default_preview_order(
     assert widget.properties_panel.preview_controls.title_label.visible is False
     detail_text = widget.properties_panel.preview_controls.detail_label.text()
     assert detail_text.startswith(
-        "Digitally signed by\nDistinguished name | Common name | Email | Title | Company | "
+        "Digitally signed by\nDistinguished name • Common name • Email • Title • Company • "
     )
-    assert detail_text.endswith(" UTC | Reason | Location")
-    assert expected_stamp_text.startswith("Digitally signed by\nDistinguished name | Common name")
+    assert detail_text.endswith(" UTC • Reason • Location")
+    assert expected_stamp_text.startswith("Digitally signed by\nDistinguished name • Common name")
 
 
 def test_signing_shell_wrapped_block_preview_groups_tail_fields(

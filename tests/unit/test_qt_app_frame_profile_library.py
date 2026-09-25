@@ -16,8 +16,10 @@ from foliaseal.application.reusable_signing_objects import (
     SavePreset,
 )
 from foliaseal.application.signature_library_session import CertificateLibraryRef
+from foliaseal.domain.models import SignatureFieldKey, SignatureFieldSource
 from foliaseal.presentation.qt.app_frame_profile_library import ReusableObjectLibraryDialog
 from foliaseal.presentation.qt.appearance_profile_editor_dialog import AppearanceProfileEditorDialog
+from foliaseal.presentation.qt.appearance_profile_editor_widget import AppearanceProfileEditorWidget
 from foliaseal.presentation.qt.signature_preset_editor_dialog import SignaturePresetEditorDialog
 from tests.support.signing_builders import (
     build_certificate_catalog,
@@ -25,6 +27,7 @@ from tests.support.signing_builders import (
     build_managed_certificate,
     build_placement_profile,
     build_signature_appearance,
+    build_signature_field_binding,
 )
 from tests.unit.test_qt_signing_shell import _fake_bindings
 
@@ -239,8 +242,65 @@ def test_appearance_editor_exposes_reachable_preview_and_minimum_geometry() -> N
     assert editor.controls.sample_preview_image.fixed_size is None
     assert editor.controls.form_scroll_area is not None
     assert editor.controls.cancel_button._text == "Cancel"
-    assert editor.controls.sample_preview_image.visible is False
-    assert "Image: none" in editor.controls.sample_preview_label.text()
+    assert editor.controls.sample_preview_image.visible is True
+    assert editor.controls.sample_preview_image.pixmap() is not None
+    assert "fields appear in this order" in editor.controls.sample_preview_label.text()
+
+
+def test_appearance_editor_preview_composes_fields_in_configured_order() -> None:
+    """The editor preview must make field-order controls observable to the user."""
+
+    service = ReusableSigningObjects(
+        InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
+    )
+    appearance = build_signature_appearance(
+        field_order=(
+            SignatureFieldKey.EMAIL,
+            SignatureFieldKey.REASON,
+            SignatureFieldKey.COMPANY,
+            SignatureFieldKey.TITLE,
+            SignatureFieldKey.SIGNING_TIME,
+            SignatureFieldKey.DISTINGUISHED_NAME,
+            SignatureFieldKey.COMMON_NAME,
+            SignatureFieldKey.LOCATION,
+        ),
+        email=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="first@example.com",
+        ),
+        reason=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="second reason",
+        ),
+        company=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="third company",
+        ),
+        title=build_signature_field_binding(
+            source=SignatureFieldSource.OVERRIDE,
+            override_text="fourth title",
+        ),
+    )
+    service.execute(SaveAppearance("Preview order", appearance))
+    ref = service.view().appearances[0].ref
+    editor = AppearanceProfileEditorWidget(
+        bindings=_fake_bindings(),
+        parent=None,
+        library=service,
+        initial_ref=ref,
+    )
+
+    text_before = editor.controls.sample_preview_label.text()
+    assert "1. Email: ada@example.test" in text_before
+    assert "2. Reason: Approval" in text_before
+    assert text_before.index("Email: ada@example.test") < text_before.index("Reason: Approval")
+
+    # The first field is selected after load; moving it down must refresh the composed preview.
+    editor.controls.setup_form.appearance_controls.move_field_down.click()
+    text_after = editor.controls.sample_preview_label.text()
+    assert "1. Reason: Approval" in text_after
+    assert "2. Email: ada@example.test" in text_after
+    assert text_after.index("Reason: Approval") < text_after.index("Email: ada@example.test")
 
 
 def test_first_use_focuses_presets_without_persisting_navigation_preference() -> None:
@@ -512,7 +572,9 @@ def test_library_owns_nested_appearance_editor_and_discards_dirty_child() -> Non
         "Signature Library / Appearances / New Appearance"
         in editor.controls.breadcrumb_label.text()
     )
-    assert "Sample preview using example signer data" in editor.controls.sample_preview_label.text()
+    assert "Example signature — fields appear in this order" in (
+        editor.controls.sample_preview_label.text()
+    )
 
     editor.controls.name_input.setText("Discarded appearance")
     assert editor.dirty is True
@@ -541,7 +603,7 @@ def test_nested_appearance_editor_save_preserves_identity_and_preview_is_not_per
     dialog.controls.edit_button.click()
     editor = dialog.controls.appearance_editor
     assert editor is not None
-    assert "Sample signer: Ada Example" in editor.controls.sample_preview_label.text()
+    assert "Distinguished name: CN=Ada" in editor.controls.sample_preview_label.text()
     editor.controls.name_input.setText("Approved")
     editor.controls.setup_form.appearance_controls.signer_label_prefix.setText("Signed by Board")
     editor.controls.save_button.click()

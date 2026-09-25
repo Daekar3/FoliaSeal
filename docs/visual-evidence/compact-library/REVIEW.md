@@ -1,6 +1,6 @@
 # Compact Signature Library visual review
 
-Status: PASS on the refreshed follow-up candidate 3, retained as the `final-*` evidence set. The installed-package gate is still pending because these captures were made from the corrected source tree before the replacement package was built and reinstalled.
+Status: PASS on the replacement composed-preview source candidate. Independent review opened the retained default, reordered, image, and scrolled PNGs after the first candidate was rejected for overlap and clipping. The installed-package gate remains pending.
 
 The reviewer opened and inspected every baseline and candidate PNG. The review
 used `docs/UI_SPEC.md` SUR03/SUR04, the two normative Library SVGs, and
@@ -56,10 +56,29 @@ remaining spacing and copy issues. Compliance review then found that the
 Saved object field could still expand internally, leaving the label effectively
 detached; the earlier test asserted only one side of the relationship. Candidate
 3 added stretch inside the grouped field and a strict 0–12 px label/control gap
-assertion. All six refreshed `final-*` PNG/JSON captures were opened and
-rechecked for hierarchy, density, grouping, wrapping, preview prominence, and
-native Qt coherence. They passed actual image inspection; the review did not
-pixel-match the normative SVGs.
+assertion.
+
+The next installed check found that the right-hand preview was only descriptive
+text plus a raw selected image; it did not render the configured signature, so
+Move field up/down had no visible result there. The first correction fed
+deterministic example signer data and the live Appearance draft into the
+canonical preview renderer. Its default and reordered reports record distinct
+field orders and pixels, the image state uses the composed renderer, and the
+scrolled state keeps preview/footer fixed. Actual PNG inspection nevertheless
+found overlapping two-line content, a large central blank block, and right-edge
+clipping, so that candidate failed the usability gate.
+
+The replacement routes deterministic example data through
+`VisibleSignatureSemanticsService`, renders the canonical sample on an opaque
+white page context, uses concise values and a wide single-line rectangle, and
+adds a numbered field-order guide. Direct inspection confirms that default and
+reordered states visibly exchange the first two fields with no overlap or
+clipping; the actual raster pixels also differ. The selected image is composed
+above the signature text without collision, and scrolling leaves the guide,
+raster, and footer stationary. The review did not pixel-match the normative
+SVGs. Raster text is necessarily small when the wide sample is scaled into the
+available preview column, so installed human review must still confirm practical
+readability and live response under the system theme.
 
 The source correction has not yet been accepted as an installed release. A
 new commit, fresh package checksum, offline/private/display-backed audits,

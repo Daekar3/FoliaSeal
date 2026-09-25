@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from foliaseal.application.reusable_signing_models import AppearanceProfile
@@ -23,8 +24,23 @@ from foliaseal.application.signature_properties_coordinator import (
     VisibleSignaturePlacementDraft,
     VisibleSignatureSetupDraft,
 )
-from foliaseal.domain.models import SignatureAppearance, SignatureFieldSource
+from foliaseal.application.signing_draft_contracts import (
+    SigningDraftPreview,
+    SigningDraftPreviewField,
+)
+from foliaseal.application.visible_signature_semantics import (
+    CertificateFieldValues,
+    VisibleSignatureSemanticsRequest,
+    VisibleSignatureSemanticsService,
+)
+from foliaseal.domain.models import (
+    SignatureAppearance,
+    SignatureFieldKey,
+    SignatureFieldSource,
+    SignatureRect,
+)
 from foliaseal.infra.config.schemas import ConfigValidationError
+from foliaseal.presentation.qt.signature_preview_lifecycle import QtCanonicalPreviewLifecycle
 from foliaseal.presentation.qt.visible_signature_setup_form import QtVisibleSignatureSetupForm
 
 
@@ -91,7 +107,9 @@ class AppearanceProfileEditorWidget:
         self._original_name = ""
         self._original_appearance = self._initial_appearance()
         self._staged_image_paths: set[str] = set()
+        self._last_preview_pixmap: Any | None = None
         self.controls = self._build_controls(parent)
+        self._preview_lifecycle = self._build_preview_lifecycle()
         self._suspend_updates = False
         self._refresh_preview()
 
@@ -320,6 +338,18 @@ class AppearanceProfileEditorWidget:
             action_row=action_row,
         )
 
+    def _build_preview_lifecycle(self) -> QtCanonicalPreviewLifecycle | None:
+        pixmap_factory = getattr(self._bindings, "q_pixmap", None)
+        qt = getattr(self._bindings, "qt", None)
+        if not callable(pixmap_factory) or qt is None:
+            return None
+        lifecycle = QtCanonicalPreviewLifecycle(q_pixmap=pixmap_factory, qt=qt)
+        destroyed = getattr(self.controls.container, "destroyed", None)
+        connect = getattr(destroyed, "connect", None)
+        if callable(connect):
+            connect(lambda *_args: lifecycle.dispose())
+        return lifecycle
+
     def _on_name_changed(self, *_args: object) -> None:
         self._mark_dirty()
 
@@ -412,61 +442,155 @@ class AppearanceProfileEditorWidget:
     def _refresh_preview(self) -> None:
         if not hasattr(self, "controls"):
             return
-        appearance = self.controls.setup_form.build_draft().appearance
-        signer_label = appearance.signer_label_prefix or "Digitally signed by"
-        layout = appearance.layout_template.value.replace("_", " ").title()
-        stamp = appearance.stamp_position.value.replace("_", " ").title()
-        has_image = appearance.image_stamp_path is not None
+        try:
+            appearance = self.controls.setup_form.build_draft().appearance
+        except (TypeError, ValueError):
+            # Compound controls can emit intermediate signals while their
+            # items are being replaced. Keep the last valid preview until the
+            # complete, valid control state emits its final change.
+            return
+        preview = _sample_preview_for_appearance(appearance)
+        visible_fields = tuple(
+            field for field in preview.fields if field.visible and field.text
+        )
+        visible_values = "\n".join(
+            f"{position}. {field.label}: {field.text}"
+            for position, field in enumerate(visible_fields, start=1)
+        )
         _set_text(
             self.controls.sample_preview_label,
-            "Sample preview using example signer data.\n"
-            "Sample signer: Ada Example\n"
-            f"{signer_label} Ada Example\n"
-            f"Layout: {layout} · Image position: {stamp}\n"
-            f"Image: {'selected' if has_image else 'none'}\n"
-            "Changes here are not saved to a document.",
+            "Example signature — fields appear in this order:\n"
+            f"{visible_values}",
         )
-        self._refresh_preview_image(appearance.image_stamp_path)
+        self._refresh_rendered_preview(appearance, preview)
 
     def refresh_preview_after_mount(self) -> None:
         """Apply preview visibility after the host becomes visible in the Library."""
 
         self._refresh_preview()
 
-    def _refresh_preview_image(self, image_path: str | None) -> None:
+    def _refresh_rendered_preview(
+        self,
+        appearance: SignatureAppearance,
+        preview: SigningDraftPreview,
+    ) -> None:
         preview_image = self.controls.sample_preview_image
-        if not image_path:
+        lifecycle = getattr(self, "_preview_lifecycle", None)
+        if lifecycle is None:
             set_visible = getattr(preview_image, "setVisible", None)
             if callable(set_visible):
                 set_visible(False)
             return
-        pixmap_factory = getattr(self._bindings, "q_pixmap", None)
-        if not callable(pixmap_factory):
-            return
-        pixmap = pixmap_factory(image_path)
-        is_null = getattr(pixmap, "isNull", None)
-        if image_path and callable(is_null) and not is_null():
-            scaled = getattr(pixmap, "scaled", None)
-            if callable(scaled):
-                qt = getattr(self._bindings, "qt", None)
-                aspect = getattr(qt, "KeepAspectRatio", None)
-                transform = getattr(qt, "SmoothTransformation", None)
-                args = [240, 96]
-                if aspect is not None:
-                    args.append(aspect)
-                if transform is not None:
-                    args.append(transform)
-                pixmap = scaled(*args)
-            set_pixmap = getattr(preview_image, "setPixmap", None)
-            if callable(set_pixmap):
-                set_pixmap(pixmap)
-            set_visible = getattr(preview_image, "setVisible", None)
-            if callable(set_visible):
-                set_visible(True)
-            return
+        try:
+            state = lifecycle.refresh(
+                preview=preview,
+                preview_scale=2.0,
+                inner_body_width=400,
+                inner_body_height=180,
+                fallback_card_style="",
+                flatten_to_white=True,
+            )
+        except Exception as exc:  # pragma: no cover - renderer failures are environment-specific
+            self._on_error(f"Unable to render the example signature preview: {exc}")
+            state = None
+        set_pixmap = getattr(preview_image, "setPixmap", None)
+        pixmap = self._last_preview_pixmap if state is None else state.pixmap
+        if pixmap is None:
+            pixmap = self._last_preview_pixmap
+        if pixmap is not None and callable(set_pixmap):
+            set_pixmap(pixmap)
+            self._last_preview_pixmap = pixmap
         set_visible = getattr(preview_image, "setVisible", None)
         if callable(set_visible):
-            set_visible(False)
+            set_visible(pixmap is not None)
+
+    def dispose(self) -> None:
+        """Release the temporary canonical preview raster, if one is active."""
+
+        lifecycle = getattr(self, "_preview_lifecycle", None)
+        if lifecycle is not None:
+            lifecycle.dispose()
+
+
+_SAMPLE_FIELD_TEXT = {
+    SignatureFieldKey.DISTINGUISHED_NAME: "CN=Ada",
+    SignatureFieldKey.COMMON_NAME: "Ada Example",
+    SignatureFieldKey.EMAIL: "ada@example.test",
+    SignatureFieldKey.SIGNING_TIME: "2026-01-15",
+    SignatureFieldKey.REASON: "Approval",
+    SignatureFieldKey.LOCATION: "Office",
+    SignatureFieldKey.TITLE: "Reviewer",
+    SignatureFieldKey.COMPANY: "Example",
+}
+
+
+class _ExampleCertificateFieldReader:
+    def read_fields(self, certificate_path: str, passphrase: str) -> CertificateFieldValues:
+        del certificate_path, passphrase
+        return CertificateFieldValues(available=True, values=dict(_SAMPLE_FIELD_TEXT))
+
+
+class _ExampleSigningClock:
+    def now(self, mode: Any) -> datetime:
+        del mode
+        return datetime(2026, 1, 15, 14, 30, tzinfo=UTC)
+
+
+def _sample_preview_for_appearance(
+    appearance: SignatureAppearance,
+) -> SigningDraftPreview:
+    """Build deterministic example data for the document-independent editor preview."""
+    signature_rect = SignatureRect(
+        page_index=0,
+        left_pt=0.0,
+        bottom_pt=0.0,
+        width_pt=720.0,
+        height_pt=120.0,
+    )
+    semantics = VisibleSignatureSemanticsService(
+        certificate_reader=_ExampleCertificateFieldReader(),
+        clock=_ExampleSigningClock(),
+    ).resolve(
+        VisibleSignatureSemanticsRequest(
+            certificate_path="example-certificate.p12",
+            passphrase="",
+            signature_rect=signature_rect,
+            appearance=appearance,
+        )
+    )
+    fields = tuple(
+        SigningDraftPreviewField(
+            field_key=field.field_key,
+            label=field.label,
+            text=field.text,
+            visible=field.visible,
+            source=field.source,
+            hint=field.hint,
+        )
+        for field in semantics.fields
+    )
+    prefix = semantics.text.title_text
+    return SigningDraftPreview(
+        title=prefix,
+        page_index=0,
+        signature_rect=signature_rect,
+        signer_label_prefix=prefix,
+        layout_template=appearance.layout_template,
+        stamp_position=appearance.stamp_position,
+        timezone_display_mode=appearance.timezone_display_mode,
+        show_field_names=appearance.show_field_names,
+        datetime_format=appearance.datetime_format,
+        text_style=appearance.text_style,
+        box_style=appearance.box_style,
+        image_stamp_path=appearance.image_stamp_path,
+        image_prominence=appearance.image_prominence,
+        preserve_image_alpha=appearance.preserve_image_alpha,
+        fields=fields,
+        detail_text=semantics.text.detail_text,
+        issues=semantics.issues,
+        can_submit=semantics.can_submit_visible_signature,
+        stamp_text=semantics.text.stamp_text,
+    )
 
 
 def _set_text(widget: Any, value: str) -> None:

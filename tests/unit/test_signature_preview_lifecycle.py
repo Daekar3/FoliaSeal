@@ -98,11 +98,12 @@ def test_preview_lifecycle_requests_bordered_canonical_render(tmp_path: Path) ->
         inner_body_width=100,
         inner_body_height=50,
         fallback_card_style="fallback-style",
+        flatten_to_white=True,
     )
 
     assert recorded_calls
     assert recorded_calls[-1]["include_border"] is True
-    assert recorded_calls[-1]["flatten_to_white"] is False
+    assert recorded_calls[-1]["flatten_to_white"] is True
     assert state.render_label_visible is True
     assert state.snapshot is not None
 

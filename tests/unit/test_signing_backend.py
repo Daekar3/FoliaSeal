@@ -2909,8 +2909,8 @@ def test_visible_signature_fit_issues_use_semantics_stamp_text(
     assert issues == ()
     assert captured["stamp_text"] == (
         "Digitally signed by\n"
-        "Test User | test@example.com | Board Secretary | FoliaSeal | "
-        "2026-05-01 14:30 | Wytheville, Virginia, US"
+        "Test User • test@example.com • Board Secretary • FoliaSeal • "
+        "2026-05-01 14:30 • Wytheville, Virginia, US"
     )
 
 
@@ -3725,7 +3725,7 @@ def test_build_stamp_text_accepts_compact_vertical_single_line_with_modest_width
 
     assert "Inkslapped by" in stamp_text
     assert (
-        "Adam Smith | Secretary.LHI@Outlook.com | Board Secretary | Lawson Heirs Inc." in stamp_text
+        "Adam Smith • Secretary.LHI@Outlook.com • Board Secretary • Lawson Heirs Inc." in stamp_text
     )
 
 

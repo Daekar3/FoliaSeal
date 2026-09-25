@@ -910,9 +910,15 @@ class QtVisibleSignatureSetupForm:
         clear = getattr(combo, "clear", None)
         add_items = getattr(combo, "addItems", None)
         if callable(clear) and callable(add_items):
-            clear()
-            add_items(tuple(labels))
-            setter(target)
+            block_signals = getattr(combo, "blockSignals", None)
+            previous_blocked = block_signals(True) if callable(block_signals) else None
+            try:
+                clear()
+                add_items(tuple(labels))
+                setter(target)
+            finally:
+                if callable(block_signals):
+                    block_signals(bool(previous_blocked))
             self._field_order = self._field_order_from_controls()
             self._on_any_control_changed()
 
