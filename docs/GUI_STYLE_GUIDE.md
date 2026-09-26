@@ -15,6 +15,10 @@ required labels and actions must remain visible and content must not require
 routine horizontal scrolling. Long forms may scroll vertically. A preview
 marked as sticky and the action footer must remain in place while form
 controls scroll.
+An Appearance sample can have its own horizontal detail viewport when a
+single-line signature is too wide to show legibly at the Library minimum. Keep
+the full field-order summary visible beside it and label the scrolling action.
+The Library form itself must still avoid horizontal scrolling.
 
 The Library keeps catalog navigation, saved-object selection, sorting, and
 object-management actions in a compact header. The fixed four-catalog choice

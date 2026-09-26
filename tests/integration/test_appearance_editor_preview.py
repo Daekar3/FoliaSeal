@@ -50,6 +50,8 @@ def _bindings() -> SimpleNamespace:
 def test_live_preview_is_composed_and_stays_visible_when_form_scrolls() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
 
     app = QApplication.instance() or QApplication(["foliaseal-appearance-preview-test"])
@@ -79,6 +81,14 @@ def test_live_preview_is_composed_and_stays_visible_when_form_scrolls() -> None:
 
     rendered_preview = editor.controls.sample_preview_image.pixmap()
     assert rendered_preview is not None
+    preview_scroll = editor.controls.sample_preview_scroll_area
+    assert preview_scroll is not None
+    assert rendered_preview.width() >= 900
+    assert preview_scroll.horizontalScrollBar().maximum() > 0
+    preview_scroll.setFocus()
+    QTest.keyClick(preview_scroll, Qt.Key.Key_Right)
+    app.processEvents()
+    assert preview_scroll.horizontalScrollBar().value() > 0
     rendered_image = rendered_preview.toImage()
     before_pixels = sha256(rendered_image.constBits().tobytes()).digest()
     for x, y in (
@@ -96,6 +106,11 @@ def test_live_preview_is_composed_and_stays_visible_when_form_scrolls() -> None:
     assert after_pixels != before_pixels
     assert "1. Common name" in preview.text()
     assert "2. Distinguished name" in preview.text()
+    preview_scroll.horizontalScrollBar().setValue(
+        preview_scroll.horizontalScrollBar().maximum()
+    )
+    app.processEvents()
+    assert preview_scroll.horizontalScrollBar().value() > 0
 
     footer_geometry = editor.controls.action_row.geometry()
     preview_geometry = preview.geometry()

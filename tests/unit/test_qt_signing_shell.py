@@ -164,6 +164,7 @@ class _FakeWidget:
         self.visible = True
         self.fixed_size = None
         self.fixed_width = None
+        self.fixed_height = None
         self.maximum_width = None
         self.minimum_size = None
         self.minimum_width = None
@@ -195,6 +196,9 @@ class _FakeWidget:
 
     def setFixedWidth(self, width):  # noqa: N802
         self.fixed_width = width
+
+    def setFixedHeight(self, height):  # noqa: N802
+        self.fixed_height = height
 
     def setMaximumWidth(self, width):  # noqa: N802
         self.maximum_width = width
@@ -243,7 +247,7 @@ class _FakeWidget:
         if width is None:
             width = self._width_value
 
-        height = self.fixed_size[1] if self.fixed_size is not None else 24
+        height = self.fixed_size[1] if self.fixed_size is not None else self.fixed_height or 24
 
         class _Hint:
             def __init__(self, width_value, height_value) -> None:

@@ -30,7 +30,12 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
 - [x] (2026-09-24) Run the bounded source visual loop for the installed-review findings. Candidate 1 corrected header label attachment, regrouped the Appearance controls, and replaced the most visible internal language; candidate 2 corrected the remaining spacing and copy issues; compliance review found the Saved object field still expanded internally, so candidate 3 added control stretch and enforced a strict 0–12 px label/control gap. All six refreshed retained PNG/JSON captures passed actual image inspection.
 - [x] (2026-09-24) Correct the installed-review regression in the Appearance preview. The first canonical-renderer candidate made field-order changes observable but overlapped and clipped; the replacement uses canonical semantics, an opaque page context, concise deterministic values, a wide sample rectangle, and a numbered order guide. Direct review of default, reordered, selected-image, and scrolled PNGs passed with no material finding; focused validation passed 60 tests.
 - [x] (2026-09-24) Complete replacement-candidate automated validation. Unit tests passed 1,614 with 19 skips and one existing Pillow deprecation warning; integration passed 71 with one skip plus the isolated real-offscreen polling test; Ruff, diff checking, and the ExecPlan checker passed.
-- [ ] Commit the source correction, build and audit a fresh package, install it, and complete human Library acceptance.
+- [x] (2026-09-26 01:40Z) Commit the source correction as `eb667de98`, build the fresh `0.1.0` Debian package, and pass the offline, private install-root, and real-X11 audits. The audited package SHA-256 is `77554fd1157873b870e53f0df44d9aa668eef09c91b16655389f3828772eca06`.
+- [x] (2026-09-26 01:40Z) Install that exact package through the previously authorized desktop authentication path. `dpkg --audit` and `dpkg --verify foliaseal` are clean, and the installed executable SHA-256 matches the package payload (`4660ece1e767181b4d1785309ae49a763238a85ae79f98aaa61cd0ef64a33cd1`). Launch the installed GUI with a disposable HOME/XDG profile for review.
+- [x] (2026-09-26 01:50Z) Record the second installed human review as failed: the configured 10 pt text was barely readable after the 720 pt sample was reduced to a 400 px image. Reopen source correction and reject the 320 pt sample candidate because its single-line content clips.
+- [x] (2026-09-26 01:50Z) Render the original canonical sample at a readable width inside a horizontally scrollable preview viewport. Directly inspect refreshed default, reordered, selected-image, and scrolled X11 captures. The visible 10 pt text is legible, and the guide, image composition, footer, and form scrolling remain coherent.
+- [x] (2026-09-26 01:54Z) Complete correction validation and independent compliance review. Unit tests passed 1,614 with 19 skips and one existing Pillow warning; integration passed 71 with one skip plus the isolated polling test; Ruff, diff checking, and the plan checker passed. The initial review flagged the guide's horizontal-scroll wording; a focused clarification and keyboard scroll test resolved it, and the follow-up review found no remaining material conflict.
+- [ ] Commit the correction, build and audit a new package, install it, and obtain human Library acceptance of preview readability, field-order controls, selected image, scrolling/footer, keyboard focus, and save/edit/rename workflows.
 - [ ] Reconcile this plan and the installed-package release matrix, commit final evidence/status, and resume the remaining release gates.
 
 ## Surprises & Discoveries
@@ -57,6 +62,10 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
   Evidence: `final-appearance-default.*`, `final-appearance-reordered.*`, and `final-appearance-image.*`; focused preview tests.
 - Observation: Rebuilding the field-order combo emitted transient incomplete orders while `clear()` and `addItems()` ran, which could reach preview construction and raise `ValueError`. Blocking compound-control signals and emitting one final change removes that invalid intermediate state; the preview also preserves its last valid raster if another compound control reports a transient invalid draft.
   Evidence: buffered installed-session traceback and the corrected `_move_field()` / `_refresh_preview()` paths.
+- Observation: The sandboxed display-backed package audit could not reach `DISPLAY=:0` and the packaged GUI exited before startup. The same artifact passed the real-X11 audit outside the sandbox with `qt_platform=xcb` and `gui_startup.status=started`.
+  Evidence: `xdpyinfo -display :0` succeeded outside the sandbox; `/tmp/foliaseal-compact-preview-HkDEkS/evidence/audit.json` records the passing audit.
+- Observation: The installed reviewer could barely read 10 pt text. The 720 pt sample was rendered at zoom 2 but then reduced to a 400 px image, leaving glyphs only a few pixels tall. Shrinking the sample rectangle to 320 pt preserved text size but clipped the single-line signature.
+  Evidence: installed human report on 2026-09-25; rejected `/tmp/foliaseal-compact-preview-HkDEkS/scale-candidate-1/` capture; accepted source captures under `docs/visual-evidence/compact-library/`.
 
 ## Decision Log
 
@@ -90,10 +99,13 @@ A user can open Manage Reusable Signing Objects, select a catalog and saved obje
 - Decision: Use at most three autonomous visual candidates, followed by one owner-authorized focused pass if needed.
   Rationale: The screenshot loop must correct material findings without turning release work into unlimited redesign. The earlier Appearance pilot used the same bounded pattern successfully.
   Date/Author: 2026-09-19 / Codex
+- Decision: Present the canonical 720 pt synthetic sample in a readable, horizontally scrollable viewport.
+  Rationale: Compressing the whole single-line sample into 400 px obscures the configured font size, while narrowing the sample clips the configured content. A viewport preserves the sample's content and proportions and lets users inspect it at legible size. The on-page preview remains authoritative for the final document.
+  Date/Author: 2026-09-26 / Codex
 
 ## Outcomes & Retrospective
 
-Implementation, independent code/compliance review, documentation reconciliation, automated validation, and the bounded visual loops are complete through the latest source candidate. The first loop corrected the compact topology; installed human review then reopened the slice for header-label attachment, Appearance grouping, user-facing copy, and finally the nonfunctional composed preview. The preview now uses canonical semantics and rendering; the replacement default/reordered/image/scrolled captures pass direct inspection after the first rendered candidate was rejected for overlap and clipping. A clean source commit, package build and audits, installation, and repeat human acceptance remain open; source geometry tests and screenshot review cannot substitute for the installed gate.
+Implementation, independent code/compliance review, documentation reconciliation, automated validation, and the bounded visual loops were complete through commit `eb667de98`. The first loop corrected the compact topology; installed human review then reopened the slice for header-label attachment, Appearance grouping, user-facing copy, and a nonfunctional composed preview. The fresh package from that commit passed all three audits and was installed, but the next human review found 10 pt text barely readable. The corrected source now keeps the canonical sample while presenting it in a readable, horizontally scrollable viewport; refreshed default/reordered/image/scrolled captures pass direct inspection. Full validation and follow-up compliance review pass. A new clean commit/package/audit/install cycle and installed human acceptance remain open. Source geometry tests and screenshot review cannot substitute for the installed gate.
 
 ## Context and Orientation
 
@@ -230,3 +242,9 @@ Revision note: Revised again after re-review to select a concrete completer-back
 Revision note: Activated on 2026-09-20 after red topology evidence. The initial compact implementation and automated green pass are recorded; independent review, retained visual evidence, package audits, installation, and human acceptance remain open.
 
 Revision note: Reopened on 2026-09-24 after installed human review accepted the compact topology but identified detached header labels, inefficient Appearance grouping, and prototype/MVP/preset-centric user-facing copy. Candidate 1 and candidate 2 corrected those findings; compliance review then found the Saved object field could still expand internally, and candidate 3 fixed the control stretch and added a strict 0–12 px gap assertion. All six final captures passed actual PNG inspection; a new source commit, package, audits, reinstall, and installed HITL remain pending.
+
+Revision note: Updated on 2026-09-26 after source commit `eb667de98`, the three passing audits of one exact package, and authenticated installation. The installed GUI is open under an isolated profile; owner acceptance and release-matrix reconciliation remain pending.
+
+Revision note: Reopened again on 2026-09-26 after the installed owner found the 10 pt preview text barely readable. Rejected a narrower sample that clipped content and retained a readable scrollable source candidate. A fresh package and installed review are required because the installed `eb667de98` artifact contains the failed preview.
+
+Revision note: Updated on 2026-09-26 after full source validation and follow-up compliance review. The style guide now distinguishes a scrollable signature-sample detail viewport from the Library form, and the real-Qt test verifies keyboard movement inside that viewport.

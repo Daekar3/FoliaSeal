@@ -249,6 +249,11 @@ def main() -> int:
                 if appearance is not None
                 else None
             )
+            sample_scroll = (
+                appearance.controls.sample_preview_scroll_area
+                if appearance is not None
+                else None
+            )
             report = {
                 "phase": args.phase,
                 "state": args.state,
@@ -278,6 +283,14 @@ def main() -> int:
                 "sample_pixmap": (
                     [image_pixmap.width(), image_pixmap.height()]
                     if image_pixmap is not None
+                    else None
+                ),
+                "sample_horizontal_scroll": (
+                    {
+                        "maximum": sample_scroll.horizontalScrollBar().maximum(),
+                        "viewport_width": sample_scroll.viewport().width(),
+                    }
+                    if sample_scroll is not None
                     else None
                 ),
                 "appearance_field_order": (

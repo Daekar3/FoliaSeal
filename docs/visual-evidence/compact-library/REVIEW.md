@@ -76,11 +76,24 @@ reordered states visibly exchange the first two fields with no overlap or
 clipping; the actual raster pixels also differ. The selected image is composed
 above the signature text without collision, and scrolling leaves the guide,
 raster, and footer stationary. The review did not pixel-match the normative
-SVGs. Raster text is necessarily small when the wide sample is scaled into the
-available preview column, so installed human review must still confirm practical
-readability and live response under the system theme.
+SVGs.
 
-The source correction has not yet been accepted as an installed release. A
-new commit, fresh package checksum, offline/private/display-backed audits,
+The installed human review then failed the readability gate: 10 pt text was
+barely legible because the 720 pt sample width was compressed to 400 screen
+pixels. A narrower 320 pt sample made the text larger but clipped the
+single-line content, so it was rejected. The accepted source candidate keeps
+the canonical 720 pt sample and presents a 960 px render in a 400 px horizontal
+viewport. The visible instruction explains how to inspect the rest. I opened
+the refreshed default, reordered, image, and scrolled PNGs. The text is now
+legible in the visible portion; moving the first field changes both the guide
+and the raster; the image remains composed above the text; and the preview and
+footer stay fixed when the form scrolls. The horizontal viewport is an
+intentional preview control, not a Library-wide horizontal scrollbar. The
+matching JSON records a 960 by 160 sample inside a 416 px viewport with a
+544 px horizontal scroll range. The real-Qt test confirms a focused viewport
+responds to the Right arrow while the form itself has no horizontal scrollbar.
+
+The readability correction has not yet been accepted as an installed release.
+A new commit, fresh package checksum, offline/private/display-backed audits,
 reinstall, and repeat installed human review remain required. Keyboard focus,
 high contrast, and accessibility technology checks remain separate gates.

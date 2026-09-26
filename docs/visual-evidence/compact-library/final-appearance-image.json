@@ -33,9 +33,13 @@
     1000,
     650
   ],
+  "sample_horizontal_scroll": {
+    "maximum": 544,
+    "viewport_width": 416
+  },
   "sample_pixmap": [
-    400,
-    66
+    960,
+    160
   ],
   "saved_object_count": 0,
   "saved_object_text": "",
@@ -153,11 +157,11 @@
       "y": 8
     },
     "sample_image": {
-      "height": 140,
+      "height": 160,
       "visible": true,
-      "width": 418,
-      "x": 574,
-      "y": 220
+      "width": 960,
+      "x": 575,
+      "y": 240
     },
     "sample_text": {
       "height": 135,

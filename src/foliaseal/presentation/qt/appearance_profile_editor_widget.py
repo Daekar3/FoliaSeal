@@ -52,6 +52,7 @@ class AppearanceProfileEditorWidgetControls:
     breadcrumb_label: Any
     sample_preview_label: Any
     sample_preview_image: Any
+    sample_preview_scroll_area: Any | None
     name_input: Any
     setup_form: QtVisibleSignatureSetupForm
     save_button: Any
@@ -263,14 +264,26 @@ class AppearanceProfileEditorWidget:
         if hasattr(sample_preview, "setMinimumHeight"):
             sample_preview.setMinimumHeight(112)
         preview_layout.addWidget(sample_preview)
+        preview_hint = bindings.q_label("Readable sample; scroll sideways to see the rest.")
+        if hasattr(preview_hint, "setWordWrap"):
+            preview_hint.setWordWrap(True)
+        preview_layout.addWidget(preview_hint)
         sample_preview_image = bindings.q_label("")
-        if hasattr(sample_preview_image, "setMinimumHeight"):
-            sample_preview_image.setMinimumHeight(140)
         if hasattr(sample_preview_image, "setAlignment"):
             alignment = getattr(getattr(bindings, "qt", None), "AlignCenter", None)
             if alignment is not None:
                 sample_preview_image.setAlignment(alignment)
-        preview_layout.addWidget(sample_preview_image)
+        sample_preview_scroll_area = None
+        scroll_factory = getattr(bindings, "q_scroll_area", None)
+        if callable(scroll_factory):
+            sample_preview_scroll_area = scroll_factory()
+            sample_preview_scroll_area.setWidgetResizable(False)
+            sample_preview_scroll_area.setFixedHeight(184)
+            sample_preview_scroll_area.setAccessibleName("Signature sample preview")
+            sample_preview_scroll_area.setWidget(sample_preview_image)
+            preview_layout.addWidget(sample_preview_scroll_area)
+        else:
+            preview_layout.addWidget(sample_preview_image)
         if hasattr(preview_layout, "addStretch"):
             preview_layout.addStretch()
 
@@ -304,7 +317,6 @@ class AppearanceProfileEditorWidget:
         form_layout.setContentsMargins(0, 0, 0, 0)
         form_layout.addWidget(setup_form.visible_text_controls.container)
         form_layout.addWidget(setup_form.appearance_controls.container)
-        scroll_factory = getattr(bindings, "q_scroll_area", None)
         scroll_area = None
         if callable(scroll_factory):
             scroll_area = scroll_factory()
@@ -330,6 +342,7 @@ class AppearanceProfileEditorWidget:
             breadcrumb_label=breadcrumb,
             sample_preview_label=sample_preview,
             sample_preview_image=sample_preview_image,
+            sample_preview_scroll_area=sample_preview_scroll_area,
             name_input=name_input,
             setup_form=setup_form,
             save_button=save_button,
@@ -485,7 +498,7 @@ class AppearanceProfileEditorWidget:
             state = lifecycle.refresh(
                 preview=preview,
                 preview_scale=2.0,
-                inner_body_width=400,
+                inner_body_width=960,
                 inner_body_height=180,
                 fallback_card_style="",
                 flatten_to_white=True,
@@ -500,6 +513,9 @@ class AppearanceProfileEditorWidget:
         if pixmap is not None and callable(set_pixmap):
             set_pixmap(pixmap)
             self._last_preview_pixmap = pixmap
+            adjust_size = getattr(preview_image, "adjustSize", None)
+            if callable(adjust_size):
+                adjust_size()
         set_visible = getattr(preview_image, "setVisible", None)
         if callable(set_visible):
             set_visible(pixmap is not None)

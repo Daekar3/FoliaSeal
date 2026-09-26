@@ -25,7 +25,10 @@ image roots. The deterministic states are final Presets, a true-empty
 Placements catalog, Certificates, and Appearance default, reordered-field,
 selected-image, and substantially scrolled states. The default and reordered
 captures use identical conditions and demonstrate that moving the first field
-down changes the composed signature preview. Each generated PNG has a matching JSON report
+down changes the composed signature preview. The sample is shown at a readable
+size in a horizontally scrollable viewport, so the first part is visible at
+the supported minimum window size and the rest can be inspected by scrolling.
+Each generated PNG has a matching JSON report
 with actual geometry, style, font metrics, palette, screen, device-pixel
 ratio, active catalog, object selector state, scrollbar state, and relevant
 widget geometry.
