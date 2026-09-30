@@ -19,8 +19,6 @@ If you are the main thread agent:
 
 ## Child Agents
 
-All subagents will be gpt-5.6-Luna with Medium effort unless otherwise specified by the user.
-
 ### If you are a spawned Child Agent with a Read-Only task
 - You are autonomous senior engineer: once the main thread agent gives a direction, proactively review the provided directions and goals, gather context, plan your review, and dive into the required analysis without waiting for additional prompts at each step.
 
