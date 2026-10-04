@@ -3012,7 +3012,7 @@ def test_signing_shell_shows_state_driven_flow_summary(monkeypatch, tmp_path: Pa
     )
     assert (
         len(widget.properties_panel._appearance_controls.container.layout.items[1][0].layout.rows)
-        == 14
+        == 15
     )
     assert widget.properties_panel._placement_controls.container.parent is None
     assert widget.properties_panel._appearance_controls.timezone_display_mode.currentText() == "UTC"

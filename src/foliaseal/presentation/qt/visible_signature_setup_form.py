@@ -551,10 +551,8 @@ class QtVisibleSignatureSetupForm:
         background_color.setPlaceholderText("#RRGGBB")
 
         image_rows = (
-            (
-                "Image",
-                _compose_row(bindings, image_path_label, browse_image_button, remove_image_button),
-            ),
+            ("Image", image_path_label),
+            ("", _compose_row(bindings, browse_image_button, remove_image_button)),
             ("Prominence", _compose_row(bindings, image_prominence, preserve_image_alpha)),
         )
         text_rows = (

@@ -11,7 +11,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from PySide6.QtGui import QColor, QFontMetrics, QImage, QPainter, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QCheckBox
 
 from foliaseal.application.signature_library_session import LibraryCatalog
 from foliaseal.infra.config.app_settings_storage import AppSettingsStore
@@ -116,9 +117,19 @@ def _prepare_state(
         editor.controls.setup_form.appearance_controls.move_field_down.click()
         app.processEvents()
     if state == "appearance-image":
-        image_path = storage / "synthetic-signature.png"
+        image_path = storage / "synthetic-source-signature.png"
         _write_synthetic_image(image_path)
-        editor.controls.setup_form.set_image_stamp_path(str(image_path))
+        image_store = getattr(editor, "_image_store", None)
+        if image_store is None:
+            raise RuntimeError("Appearance editor has no managed image store")
+        managed = image_store.import_asset(image_path)
+        editor.controls.setup_form.set_image_asset(str(managed.path), managed.asset)
+        appearance_controls = editor.controls.setup_form.appearance_controls
+        appearance_controls.stamp_position.setCurrentText("Left")
+        appearance_controls.image_prominence.setCurrentText("Primary")
+        field_checks = editor.controls.setup_form.visible_text_controls.field_checks_container
+        for check in field_checks.findChildren(QCheckBox):
+            check.setChecked(check.text() in {"Common name", "Signing time"})
         app.processEvents()
     if state == "appearance-scrolled":
         bar = editor.controls.form_scroll_area.verticalScrollBar()
@@ -222,6 +233,8 @@ def main() -> int:
             for _ in range(5):
                 dialog.resize(1000, 650)
                 app.processEvents()
+                QTest.qWait(200)
+                app.processEvents()
             if (dialog.width(), dialog.height()) != (1000, 650):
                 raise RuntimeError("window manager did not settle at 1000 by 650")
             if not dialog.isVisible():
@@ -241,6 +254,11 @@ def main() -> int:
             appearance = library.controls.appearance_editor
             appearance_bar = (
                 appearance.controls.form_scroll_area.verticalScrollBar()
+                if appearance is not None
+                else None
+            )
+            appearance_form_bar = (
+                appearance.controls.form_scroll_area.horizontalScrollBar()
                 if appearance is not None
                 else None
             )
@@ -283,6 +301,16 @@ def main() -> int:
                 "sample_pixmap": (
                     [image_pixmap.width(), image_pixmap.height()]
                     if image_pixmap is not None
+                    else None
+                ),
+                "image_basename": (
+                    appearance.controls.setup_form.appearance_controls.image_path_label.text()
+                    if appearance is not None
+                    else None
+                ),
+                "appearance_form_horizontal_scroll": (
+                    appearance_form_bar.maximum()
+                    if appearance_form_bar is not None
                     else None
                 ),
                 "sample_horizontal_scroll": (

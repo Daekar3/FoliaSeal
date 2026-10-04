@@ -14,6 +14,7 @@ from foliaseal.application.reusable_signing_objects import (
     ReusableSigningObjects,
     SaveAppearance,
 )
+from foliaseal.application.signature_image_import import ManagedSignatureImageStore
 from foliaseal.presentation.qt.appearance_profile_editor_widget import (
     AppearanceProfileEditorWidget,
 )
@@ -43,27 +44,32 @@ def _bindings() -> SimpleNamespace:
         q_double_spin_box=QtWidgets.QDoubleSpinBox,
         q_spin_box=QtWidgets.QSpinBox,
         q_push_button=QtWidgets.QPushButton,
+        q_object=QtCore.QObject,
+        q_event=QtCore.QEvent,
+        q_timer=QtCore.QTimer,
         qt=QtCore.Qt,
     )
 
 
-def test_live_preview_is_composed_and_stays_visible_when_form_scrolls() -> None:
+def test_live_preview_is_composed_and_stays_visible_when_form_scrolls(tmp_path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QCheckBox
 
     app = QApplication.instance() or QApplication(["foliaseal-appearance-preview-test"])
     service = ReusableSigningObjects(
         InMemoryCatalogRepository(SignaturePresetCatalog(schema_version=1))
     )
     service.execute(SaveAppearance("Preview", build_signature_appearance()))
+    image_store = ManagedSignatureImageStore(tmp_path / "managed-images")
     editor = AppearanceProfileEditorWidget(
         bindings=_bindings(),
         parent=None,
         library=service,
         initial_ref=service.view().appearances[0].ref,
+        image_store=image_store,
     )
     editor.controls.container.resize(1000, 650)
     editor.controls.container.show()
@@ -89,6 +95,7 @@ def test_live_preview_is_composed_and_stays_visible_when_form_scrolls() -> None:
     QTest.keyClick(preview_scroll, Qt.Key.Key_Right)
     app.processEvents()
     assert preview_scroll.horizontalScrollBar().value() > 0
+
     rendered_image = rendered_preview.toImage()
     before_pixels = sha256(rendered_image.constBits().tobytes()).digest()
     for x, y in (
@@ -111,6 +118,58 @@ def test_live_preview_is_composed_and_stays_visible_when_form_scrolls() -> None:
     )
     app.processEvents()
     assert preview_scroll.horizontalScrollBar().value() > 0
+
+    # The managed image path uses a long digest/UUID basename. It must wrap in
+    # the form without forcing a horizontal scrollbar or clipping image actions.
+    from PySide6.QtGui import QImage
+
+    source = tmp_path / "synthetic-source.png"
+    image = QImage(360, 72, QImage.Format.Format_ARGB32)
+    image.fill(0xFF202020)
+    assert image.save(str(source), "PNG")
+    managed = image_store.import_asset(source)
+    assert len(managed.path.name) >= 40
+    editor.controls.setup_form.set_image_asset(str(managed.path), managed.asset)
+    controls = editor.controls.setup_form.appearance_controls
+    controls.stamp_position.setCurrentText("Left")
+    checks = editor.controls.setup_form.visible_text_controls.field_checks_container.findChildren(
+        QCheckBox
+    )
+    for check in checks:
+        check.setChecked(check.text() in {"Common name", "Signing time"})
+    app.processEvents()
+    form_scroll = editor.controls.form_scroll_area
+    assert form_scroll.horizontalScrollBar().maximum() == 0
+    assert controls.browse_image_button.isVisible()
+    assert controls.remove_image_button.isVisible()
+    browse_right = controls.browse_image_button.mapTo(
+        form_scroll.viewport(), controls.browse_image_button.rect().bottomRight()
+    ).x()
+    remove_right = controls.remove_image_button.mapTo(
+        form_scroll.viewport(), controls.remove_image_button.rect().bottomRight()
+    ).x()
+    assert browse_right < form_scroll.viewport().width()
+    assert remove_right < form_scroll.viewport().width()
+    assert "Common name" in preview.text()
+    assert "Signing time" in preview.text()
+    assert "Email" not in preview.text()
+
+    app.processEvents()
+    image_pixmap = editor.controls.sample_preview_image.pixmap()
+    assert image_pixmap is not None
+    assert editor.controls.sample_preview_hint.text().startswith("Complete image preview")
+    assert image_pixmap.width() <= preview_scroll.viewport().width()
+    assert image_pixmap.height() <= 132
+    assert preview_scroll.horizontalScrollBar().maximum() == 0
+    previous_width = image_pixmap.width()
+    editor.controls.container.resize(760, 650)
+    QTest.qWait(120)
+    resized_pixmap = editor.controls.sample_preview_image.pixmap()
+    assert resized_pixmap is not None
+    assert resized_pixmap.width() <= preview_scroll.viewport().width()
+    assert resized_pixmap.width() < previous_width
+    editor.controls.container.resize(1000, 650)
+    QTest.qWait(120)
 
     footer_geometry = editor.controls.action_row.geometry()
     preview_geometry = preview.geometry()

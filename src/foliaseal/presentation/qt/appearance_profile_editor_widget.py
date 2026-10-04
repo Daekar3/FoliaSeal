@@ -52,6 +52,7 @@ class AppearanceProfileEditorWidgetControls:
     breadcrumb_label: Any
     sample_preview_label: Any
     sample_preview_image: Any
+    sample_preview_hint: Any
     sample_preview_scroll_area: Any | None
     name_input: Any
     setup_form: QtVisibleSignatureSetupForm
@@ -111,6 +112,9 @@ class AppearanceProfileEditorWidget:
         self._last_preview_pixmap: Any | None = None
         self.controls = self._build_controls(parent)
         self._preview_lifecycle = self._build_preview_lifecycle()
+        self._preview_resize_timer: Any | None = None
+        self._preview_resize_observer: Any | None = None
+        self._observe_preview_resizes()
         self._suspend_updates = False
         self._refresh_preview()
 
@@ -342,6 +346,7 @@ class AppearanceProfileEditorWidget:
             breadcrumb_label=breadcrumb,
             sample_preview_label=sample_preview,
             sample_preview_image=sample_preview_image,
+            sample_preview_hint=preview_hint,
             sample_preview_scroll_area=sample_preview_scroll_area,
             name_input=name_input,
             setup_form=setup_form,
@@ -362,6 +367,53 @@ class AppearanceProfileEditorWidget:
         if callable(connect):
             connect(lambda *_args: lifecycle.dispose())
         return lifecycle
+
+    def _observe_preview_resizes(self) -> None:
+        """Refresh image overview geometry after its preview viewport changes size."""
+
+        q_object = getattr(self._bindings, "q_object", None)
+        q_event = getattr(self._bindings, "q_event", None)
+        q_timer = getattr(self._bindings, "q_timer", None)
+        scroll_area = self.controls.sample_preview_scroll_area
+        if not all(callable(item) for item in (q_object, q_event, q_timer)) or scroll_area is None:
+            return
+        viewport_factory = getattr(scroll_area, "viewport", None)
+        viewport = viewport_factory() if callable(viewport_factory) else None
+        install_filter = getattr(viewport, "installEventFilter", None)
+        if not callable(install_filter):
+            return
+
+        timer = q_timer(self.controls.container)
+        timer.setSingleShot(True)
+        timer.setInterval(80)
+        timer.timeout.connect(self._refresh_image_overview_after_resize)  # type: ignore[attr-defined]
+        resize_type = getattr(getattr(q_event, "Type", q_event), "Resize", None)
+
+        class PreviewResizeObserver(q_object):
+            def __init__(self, parent: Any) -> None:
+                super().__init__(parent)
+
+            def eventFilter(self, watched: Any, event: Any) -> bool:  # noqa: N802
+                del watched
+                event_kind = event.type()
+                if resize_type is not None and event_kind == resize_type:
+                    timer.start()
+                return False
+
+        observer = PreviewResizeObserver(self.controls.container)
+        install_filter(observer)
+        self._preview_resize_timer = timer
+        self._preview_resize_observer = observer
+
+    def _refresh_image_overview_after_resize(self) -> None:
+        """Avoid rerendering the wider text-only sample for irrelevant resizes."""
+
+        try:
+            appearance = self.controls.setup_form.build_draft().appearance
+        except (TypeError, ValueError):
+            return
+        if appearance.image_stamp_path is not None:
+            self._refresh_preview()
 
     def _on_name_changed(self, *_args: object) -> None:
         self._mark_dirty()
@@ -495,11 +547,40 @@ class AppearanceProfileEditorWidget:
                 set_visible(False)
             return
         try:
+            image_selected = appearance.image_stamp_path is not None
+            scroll_area = self.controls.sample_preview_scroll_area
+            if scroll_area is not None:
+                qt = getattr(self._bindings, "qt", None)
+                policy = getattr(qt, "ScrollBarPolicy", qt)
+                policy_name = "ScrollBarAlwaysOff" if image_selected else "ScrollBarAsNeeded"
+                policy_value = getattr(policy, policy_name, None)
+                set_policy = getattr(scroll_area, "setHorizontalScrollBarPolicy", None)
+                if policy_value is not None and callable(set_policy):
+                    set_policy(policy_value)
+            if image_selected:
+                viewport = getattr(scroll_area, "viewport", None)
+                viewport = viewport() if callable(viewport) else scroll_area
+                width = getattr(viewport, "width", None)
+                height = getattr(viewport, "height", None)
+                width = width() if callable(width) else 440
+                height = height() if callable(height) else 132
+                # Re-render the image-bearing signature as an overview sized to the
+                # mounted preview pane. The textual field-order summary above remains
+                # the readable detail view for all visible values.
+                inner_body_width = max(1, min(int(width) - 2, 480))
+                inner_body_height = max(1, min(int(height) - 2, 132))
+                preview_scale = 2.0
+            else:
+                # Text-only signatures retain the larger horizontally scrollable
+                # sample so a single-line layout remains legible.
+                inner_body_width = 960
+                inner_body_height = 180
+                preview_scale = 2.0
             state = lifecycle.refresh(
                 preview=preview,
-                preview_scale=2.0,
-                inner_body_width=960,
-                inner_body_height=180,
+                preview_scale=preview_scale,
+                inner_body_width=inner_body_width,
+                inner_body_height=inner_body_height,
                 fallback_card_style="",
                 flatten_to_white=True,
             )
@@ -513,6 +594,12 @@ class AppearanceProfileEditorWidget:
         if pixmap is not None and callable(set_pixmap):
             set_pixmap(pixmap)
             self._last_preview_pixmap = pixmap
+            hint_text = (
+                "Complete image preview; visible field details are listed above."
+                if appearance.image_stamp_path is not None
+                else "Readable sample; scroll sideways to see the rest."
+            )
+            _set_text(self.controls.sample_preview_hint, hint_text)
             adjust_size = getattr(preview_image, "adjustSize", None)
             if callable(adjust_size):
                 adjust_size()

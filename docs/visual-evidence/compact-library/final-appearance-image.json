@@ -14,6 +14,7 @@
     "reason",
     "location"
   ],
+  "appearance_form_horizontal_scroll": 0,
   "catalog": "Appearances",
   "device_pixel_ratio": 1.0,
   "font": {
@@ -22,6 +23,7 @@
     "pixel_size": -1,
     "point_size": 10
   },
+  "image_basename": "c0c6c40e0da08fbe-292379c3d78646d08e82866592c8b3b5.png",
   "image_pixels": [
     1000,
     650
@@ -34,18 +36,18 @@
     650
   ],
   "sample_horizontal_scroll": {
-    "maximum": 544,
+    "maximum": 0,
     "viewport_width": 416
   },
   "sample_pixmap": [
-    960,
-    160
+    414,
+    69
   ],
   "saved_object_count": 0,
   "saved_object_text": "",
   "screen": "DP-4",
   "scrollbar": {
-    "maximum": 143,
+    "maximum": 162,
     "value": 0
   },
   "state": "appearance-image",
@@ -157,14 +159,14 @@
       "y": 8
     },
     "sample_image": {
-      "height": 160,
+      "height": 69,
       "visible": true,
-      "width": 960,
+      "width": 414,
       "x": 575,
-      "y": 240
+      "y": 217
     },
     "sample_text": {
-      "height": 135,
+      "height": 112,
       "visible": true,
       "width": 418,
       "x": 574,

@@ -14,6 +14,7 @@
     "reason",
     "location"
   ],
+  "appearance_form_horizontal_scroll": 0,
   "catalog": "Appearances",
   "device_pixel_ratio": 1.0,
   "font": {
@@ -22,6 +23,7 @@
     "pixel_size": -1,
     "point_size": 10
   },
+  "image_basename": "No image selected",
   "image_pixels": [
     1000,
     650
@@ -45,7 +47,7 @@
   "saved_object_text": "",
   "screen": "DP-4",
   "scrollbar": {
-    "maximum": 143,
+    "maximum": 162,
     "value": 0
   },
   "state": "appearance-reordered",

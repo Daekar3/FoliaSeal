@@ -1,5 +1,24 @@
 # Compact Signature Library visual review
 
+Installed review update (2026-10-04): REOPENED. The owner's saved Appearance
+uses a left-positioned primary image and a long managed-image basename. Its
+image dominates the cropped detail viewport, and the form has horizontal
+overflow that clips Browse/Remove. Earlier synthetic image evidence used a
+short basename and top positioning and did not exercise this state. A new
+synthetic capture and regression checks must cover both properties before
+repeat package acceptance.
+
+Source follow-up: PASS. The retained selected-image state now imports a long
+managed basename, chooses Left/Primary, and enables Common name and Signing
+time. Direct PNG inspection shows the full composition and both image actions.
+Its JSON records zero horizontal overflow in the form and image preview. A
+debounced viewport resize observer refits the image overview; real-Qt tests
+also shrink the viewport and check raster bounds. Default, reordered, and
+scrolled captures preserve readable text-only detail and stable footer/preview.
+Independent compliance review loaded the owner screenshot and candidate PNG
+and found no material discrepancy. Fresh package and owner acceptance remain
+pending.
+
 Status: PASS on the replacement composed-preview source candidate. Independent review opened the retained default, reordered, image, and scrolled PNGs after the first candidate was rejected for overlap and clipping. The installed-package gate remains pending.
 
 The reviewer opened and inspected every baseline and candidate PNG. The review

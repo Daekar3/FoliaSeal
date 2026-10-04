@@ -173,6 +173,7 @@ class QtAppFrameBindings:
     q_status_bar: type[Any] | None = None
     q_object: type[Any] | None = None
     q_event: type[Any] | None = None
+    q_timer: type[Any] | None = None
     q_completer: type[Any] | None = None
     q_standard_item_model: type[Any] | None = None
     q_standard_item: type[Any] | None = None
@@ -3258,6 +3259,7 @@ class QtAppFrameAdapter:
             q_status_bar=getattr(qt_widgets, "QStatusBar"),
             q_object=getattr(qt_core, "QObject"),
             q_event=getattr(qt_core, "QEvent"),
+            q_timer=getattr(qt_core, "QTimer"),
             q_completer=getattr(qt_widgets, "QCompleter"),
             q_standard_item_model=getattr(qt_gui, "QStandardItemModel"),
             q_standard_item=getattr(qt_gui, "QStandardItem"),
