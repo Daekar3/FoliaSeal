@@ -20,7 +20,7 @@ This first child makes the exact product, data, and interface changes reviewable
 ## Progress
 
 - [x] Complete metric-based disposable examples and settle the numeric proposal for approval (2026-10-05 02:39Z). Synthetic canonical-font PNG/PDF evidence supports 10/9.5/9 pt, 12 pt image floor and 216×72 pt sample. The disposable Monospace correction was checked in all four styles; actual production fixes remain 005b requirements.
-- [ ] Present the complete replacement text and normative SVG in an unfrozen approval artifact.
+- [x] Present the complete replacement text and proposed normative SVG in the unfrozen approval packet (2026-10-05 02:42Z). Commit fd0651aa8 identifies the exact reviewed packet; the owner approval request has been submitted and remains pending.
 - [ ] Record explicit owner approval for exact files and clauses; only then apply frozen amendments.
 - [ ] Reconcile old plan/release dependencies and validate governing documents.
 
