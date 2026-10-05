@@ -1,0 +1,15 @@
+{
+  "pdf_images": [
+    {
+      "name": "/Imgca41dab5-ac36-4026-b358-7f4b21134935",
+      "width": 800,
+      "height": 200,
+      "soft_mask": true
+    }
+  ],
+  "partial_alpha_extrema": [
+    0,
+    255
+  ],
+  "empty_alpha_bbox": null
+}

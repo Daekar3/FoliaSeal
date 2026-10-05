@@ -1,0 +1,386 @@
+[
+  {
+    "name": "Serif-left-10",
+    "text_pt": [
+      102,
+      22
+    ],
+    "image_pt": [
+      100,
+      25.0
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-left-9",
+    "text_pt": [
+      92,
+      20
+    ],
+    "image_pt": [
+      110,
+      27.5
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-right-10",
+    "text_pt": [
+      102,
+      22
+    ],
+    "image_pt": [
+      100,
+      25.0
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-right-9",
+    "text_pt": [
+      92,
+      20
+    ],
+    "image_pt": [
+      110,
+      27.5
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-above-10",
+    "text_pt": [
+      102,
+      22
+    ],
+    "image_pt": [
+      144,
+      36
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-above-9",
+    "text_pt": [
+      92,
+      20
+    ],
+    "image_pt": [
+      152,
+      38
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-below-10",
+    "text_pt": [
+      102,
+      22
+    ],
+    "image_pt": [
+      144,
+      36
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Serif-below-9",
+    "text_pt": [
+      92,
+      20
+    ],
+    "image_pt": [
+      152,
+      38
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-left-10",
+    "text_pt": [
+      103,
+      22
+    ],
+    "image_pt": [
+      99,
+      24.75
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-left-9",
+    "text_pt": [
+      93,
+      20
+    ],
+    "image_pt": [
+      109,
+      27.25
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-right-10",
+    "text_pt": [
+      103,
+      22
+    ],
+    "image_pt": [
+      99,
+      24.75
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-right-9",
+    "text_pt": [
+      93,
+      20
+    ],
+    "image_pt": [
+      109,
+      27.25
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-above-10",
+    "text_pt": [
+      103,
+      22
+    ],
+    "image_pt": [
+      144,
+      36
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-above-9",
+    "text_pt": [
+      93,
+      20
+    ],
+    "image_pt": [
+      152,
+      38
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-below-10",
+    "text_pt": [
+      103,
+      22
+    ],
+    "image_pt": [
+      144,
+      36
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Sans-Serif-below-9",
+    "text_pt": [
+      93,
+      20
+    ],
+    "image_pt": [
+      152,
+      38
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-left-10",
+    "text_pt": [
+      121,
+      22
+    ],
+    "image_pt": [
+      81,
+      20.25
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-left-9",
+    "text_pt": [
+      109,
+      20
+    ],
+    "image_pt": [
+      93,
+      23.25
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-right-10",
+    "text_pt": [
+      121,
+      22
+    ],
+    "image_pt": [
+      81,
+      20.25
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-right-9",
+    "text_pt": [
+      109,
+      20
+    ],
+    "image_pt": [
+      93,
+      23.25
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-above-10",
+    "text_pt": [
+      121,
+      22
+    ],
+    "image_pt": [
+      144,
+      36
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-above-9",
+    "text_pt": [
+      109,
+      20
+    ],
+    "image_pt": [
+      152,
+      38
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-below-10",
+    "text_pt": [
+      121,
+      22
+    ],
+    "image_pt": [
+      144,
+      36
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  },
+  {
+    "name": "Monospace-below-9",
+    "text_pt": [
+      109,
+      20
+    ],
+    "image_pt": [
+      152,
+      38
+    ],
+    "raster_px": [
+      288,
+      96
+    ],
+    "fits_floor": true
+  }
+]

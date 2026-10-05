@@ -1,0 +1,86 @@
+[
+  {
+    "width_pt": 154,
+    "selected": 9,
+    "candidates": [
+      {
+        "size": 10,
+        "text": [
+          102,
+          22
+        ],
+        "image": [
+          38,
+          9.5
+        ],
+        "fits": false
+      },
+      {
+        "size": 9.5,
+        "text": [
+          97,
+          21
+        ],
+        "image": [
+          43,
+          10.75
+        ],
+        "fits": false
+      },
+      {
+        "size": 9,
+        "text": [
+          92,
+          20
+        ],
+        "image": [
+          48,
+          12.0
+        ],
+        "fits": true
+      }
+    ]
+  },
+  {
+    "width_pt": 159,
+    "selected": 9.5,
+    "candidates": [
+      {
+        "size": 10,
+        "text": [
+          102,
+          22
+        ],
+        "image": [
+          43,
+          10.75
+        ],
+        "fits": false
+      },
+      {
+        "size": 9.5,
+        "text": [
+          97,
+          21
+        ],
+        "image": [
+          48,
+          12.0
+        ],
+        "fits": true
+      },
+      {
+        "size": 9,
+        "text": [
+          92,
+          20
+        ],
+        "image": [
+          53,
+          13.25
+        ],
+        "fits": true
+      }
+    ]
+  }
+]
